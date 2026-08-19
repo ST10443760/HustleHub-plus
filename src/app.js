@@ -25,6 +25,7 @@ app.use((req, res, next) => {
 // ---- Routes ----
 // Each teammate's routes get mounted here as they're built, e.g:
 // app.use('/api/auth', require('./routes/authRoutes'));
+const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'HustleHub+ API is running' });
