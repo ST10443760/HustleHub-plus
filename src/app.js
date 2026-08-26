@@ -4,6 +4,7 @@ const cors = require('cors');
 
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+const authenticateToken = require('./middleware/auth');
 
 const app = express();
 
@@ -27,6 +28,14 @@ app.use((req, res, next) => {
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'HustleHub+ API is running' });
+});
+
+app.get('/api/protected', authenticateToken, (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'You have accessed a protected route',
+    user: req.user
+  });
 });
 
 // ---- 404 + centralised error handling ----
