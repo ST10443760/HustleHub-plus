@@ -139,7 +139,13 @@ const login = async (req, res) => {
             return res.status(400).json({
                 success = false,
                 message = 'Ivalid Credentials'
-            })
+            });
         }
-
+        
+        //Check if password matches hashed password
+        const passwordMatches = await bcrypt.compare(
+            password,
+            user.password
+        );
+        
 
