@@ -1,22 +1,24 @@
-const fs = require_('fs');
+const fs = require('fs');
 const path = require('path');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 const userFile = path.join(__dirname, '../../data/users.json');
 
-function getUsers(){
+function getUsers() {
     const data = fs.readFileSync(userFile, 'utf-8');
 
-    if(!data.trim()){
+    if (!data.trim()) {
         return [];
     }
 
     return JSON.parse(data);
 }
 
-function saveUsers(users){
-fs.writeFileSync(userFile, JSON.stringify(users, null, 2)
-);
+function saveUsers(users) {
+    fs.writeFileSync(
+        userFile,
+        JSON.stringify(users, null, 2)
+    );
 }
 
 const register = async (req, res) => {
@@ -29,7 +31,7 @@ const register = async (req, res) => {
                 success: false,
                 message: 'Username, email and password are required.'
             });
-
+        }
 
         // Check password length
         if (password.length < 8) {
@@ -39,55 +41,75 @@ const register = async (req, res) => {
             });
         }
 
-        //Check email Validity
-        const emailRegex = /"^[^\s@]+@[^\s@]+\.[^\s@]+$"/;
+        // Check email validity
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-        if(!emailRegex.text(email)){
+        if (!emailRegex.test(email)) {
             return res.status(400).json({
                 success: false,
-                message: "Email Address Invalid, Please provide a valid Email Address"
-            })
-        }
-      
-        const users = getUsers();
-
-        //Check if username is taken
-        const existingUser = users.find(
-            user = user.username.toLowerCase() === username.trim.toLowerCase
-        );
-
-        if(existingUser){
-            return res.status(400).json({
-                success: false,
-                message: "Username is taken"
+                message: 'Email Address Invalid, Please provide a valid Email Address.'
             });
         }
 
-         //Check duplicate email
-         const existingEmail = users.find(
-            user >= user.email.toLowerCase() === email.trim.toLowerCase()
-         );
+        const users = getUsers();
 
-         if(existingEmail){
-            return res.status(400).json({
+        // Check if username is taken
+        const existingUser = users.find(
+            user => user.username.toLowerCase() === username.trim().toLowerCase()
+        );
+
+        if (existingUser) {
+            return res.status(409).json({
                 success: false,
-                message: "Email is already in use"
-            })
-         
-         // Hash password
-         const hashedPassword = await bcrypt.hash(password, 12);
+                message: 'Username is taken.'
+            });
         }
 
-        //Create User
-        const newUser ={
-            id = Date.now().toString(),
-            username= username.trim(),
-            email = email.trim().toLowerCase(),
-            password = hashedPassword,
-            createdAt = Date.now().toISOString()      
+        // Check duplicate email
+        const existingEmail = users.find(
+            user => user.email.toLowerCase() === email.trim().toLowerCase()
+        );
+
+        if (existingEmail) {
+            return res.status(409).json({
+                success: false,
+                message: 'Email is already in use.'
+            });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        // Create user
+        const newUser = {
+            id: Date.now().toString(),
+            username: username.trim(),
+            email: email.trim().toLowerCase(),
+            password: hashedPassword,
+            createdAt: new Date().toISOString()
         };
-        
-        }
-    }
-}
 
+        // Save user
+        users.push(newUser);
+        saveUsers(users);
+
+        // Response
+        return res.status(201).json({
+            success: true,
+            message: 'Registered successfully.',
+            user: {
+                id: newUser.id,
+                username: newUser.username,
+                email: newUser.email
+            }
+        });
+
+    } catch (error) {
+        console.error('Registration error:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: 'An error occurred during registration.'
+        });
+    }
+};
