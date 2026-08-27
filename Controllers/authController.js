@@ -134,4 +134,12 @@ const login = async (req, res) => {
             user => user.email.toLowerCase() === email.trim().toLowerCase()
         );
 
-        
+        //User doesn't exist
+        if(!user){
+            return res.status(400).json({
+                success = false,
+                message = 'Ivalid Credentials'
+            })
+        }
+
+
