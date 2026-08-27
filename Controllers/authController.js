@@ -30,7 +30,16 @@ const register = async (req, res) => {
                 message: 'Username, email and password are required.'
             });
 
-            
+
+        // Check password length
+        if (password.length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 8 characters long.'
+            });
+        }
+
         }
     }
 }
+
