@@ -21,6 +21,7 @@ function saveUsers(users) {
     );
 }
 
+//Register
 const register = async (req, res) => {
     try {
         const { username, email, password } = req.body;
@@ -113,3 +114,20 @@ const register = async (req, res) => {
         });
     }
 };
+
+//Login
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        //Check for missing fields
+        if(!email||!password){
+        return res.status(400).json({
+            success = false,
+            message = 'Email and Password are required'
+        });
+    }
+}
+}
+
+        
