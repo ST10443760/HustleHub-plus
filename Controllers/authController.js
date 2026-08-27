@@ -165,5 +165,13 @@ const login = async (req, res) => {
             email: user.email
         });
 
-        
+    }catch (error) {
+        console.error('Login error:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: 'An error occurred during login.'
+        });
+    }
+};
 
