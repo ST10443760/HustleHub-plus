@@ -77,6 +77,16 @@ const register = async (req, res) => {
          // Hash password
          const hashedPassword = await bcrypt.hash(password, 12);
         }
+
+        //Create User
+        const newUser ={
+            id = Date.now().toString(),
+            username= username.trim(),
+            email = email.trim().toLowerCase(),
+            password = hashedPassword,
+            createdAt = Date.now().toISOString()      
+        };
+        
         }
     }
 }
