@@ -127,7 +127,11 @@ const login = async (req, res) => {
             message = 'Email and Password are required'
         });
     }
-}
-}
+        const users = getUsers();
+        
+        //Find user
+        const user = users.find(
+            user => user.email.toLowerCase() === email.trim().toLowerCase()
+        );
 
         
