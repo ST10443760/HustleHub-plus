@@ -41,12 +41,28 @@ const register = async (req, res) => {
 
         //Check email Validity
         const emailRegex = /"^[^\s@]+@[^\s@]+\.[^\s@]+$"/;
+
         if(!emailRegex.text(email)){
             return res.status(400).json({
                 success: false,
                 message: "Email Address Invalid, Please provide a valid Email Address"
             })
         }
+      
+        const users = getUsers();
+
+        //Check if username is taken
+        const existingUser = userFile.find(
+            user = user.username.toLowerCase() === username.trim.toLowerCase
+        );
+
+        if(existingUser){
+            return res.status(400).json({
+                success: false,
+                message: "Username is taken"
+            });
+        }
+
 
         }
     }
