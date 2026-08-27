@@ -123,8 +123,8 @@ const login = async (req, res) => {
         //Check for missing fields
         if(!email||!password){
         return res.status(400).json({
-            success = false,
-            message = 'Email and Password are required'
+            success: false,
+            message: 'Email and Password are required'
         });
     }
         const users = getUsers();
@@ -137,8 +137,8 @@ const login = async (req, res) => {
         //User doesn't exist
         if(!user){
             return res.status(400).json({
-                success = false,
-                message = 'Ivalid Credentials'
+                success: false,
+                message: 'Ivalid Credentials'
             });
         }
         
@@ -151,9 +151,19 @@ const login = async (req, res) => {
         //Incorrect Password
         if (!passwordMatches){
             return res.status(400).json({
-                success = false,
-                message = "Incorrect Email or Password"
+                success: false,
+                message: "Incorrect Email or Password"
             });
         }
 
+        //Succesful Login
+        return res.status(200).json({
+            success: true,
+            message: 'Login Successful',
+            id: user.id,
+            username: user.username,
+            email: user.email
+        });
+
+        
 
