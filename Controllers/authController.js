@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-const userFile = path.join(__dirname, '../../data/users.json');
+const userFile = path.join(__dirname, '../users.json');
 
 function getUsers() {
     const data = fs.readFileSync(userFile, 'utf-8');
@@ -121,12 +121,13 @@ const login = async (req, res) => {
         const { email, password } = req.body;
 
         //Check for missing fields
-        if(!email||!password){
-        return res.status(400).json({
-            success: false,
-            message: 'Email and Password are required'
-        });
-    }
+        if(!email || !password){
+            return res.status(400).json({
+                success: false,
+                message: 'Email and Password are required'
+            });
+        }
+
         const users = getUsers();
         
         //Find user
@@ -136,9 +137,9 @@ const login = async (req, res) => {
 
         //User doesn't exist
         if(!user){
-            return res.status(400).json({
+            return res.status(401).json({
                 success: false,
-                message: 'Ivalid Credentials'
+                message: 'Invalid Credentials'
             });
         }
         
@@ -150,7 +151,7 @@ const login = async (req, res) => {
 
         //Incorrect Password
         if (!passwordMatches){
-            return res.status(400).json({
+            return res.status(401).json({
                 success: false,
                 message: "Incorrect Email or Password"
             });
