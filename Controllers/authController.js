@@ -52,7 +52,7 @@ const register = async (req, res) => {
         const users = getUsers();
 
         //Check if username is taken
-        const existingUser = userFile.find(
+        const existingUser = users.find(
             user = user.username.toLowerCase() === username.trim.toLowerCase
         );
 
@@ -63,7 +63,17 @@ const register = async (req, res) => {
             });
         }
 
+         //Check duplicate email
+         const existingEmail = users.find(
+            user >= user.email.toLowerCase() === email.trim.toLowerCase()
+         );
 
+         if(existingEmail){
+            return res.status(400).json({
+                success: false,
+                message: "Email is already in use"
+            })
+         }
         }
     }
 }
