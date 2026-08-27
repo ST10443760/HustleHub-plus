@@ -147,5 +147,13 @@ const login = async (req, res) => {
             password,
             user.password
         );
-        
+
+        //Incorrect Password
+        if (!passwordMatches){
+            return res.status(400).json({
+                success = false,
+                message = "Incorrect Email or Password"
+            });
+        }
+
 
