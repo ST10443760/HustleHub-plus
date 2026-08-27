@@ -73,7 +73,10 @@ const register = async (req, res) => {
                 success: false,
                 message: "Email is already in use"
             })
-         }
+         
+         // Hash password
+         const hashedPassword = await bcrypt.hash(password, 12);
+        }
         }
     }
 }
