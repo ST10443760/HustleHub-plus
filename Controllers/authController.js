@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { generateToken } = require('../src/utils/jwt');
 
 const userFile = path.join(__dirname, '../users.json');
 
@@ -83,12 +84,13 @@ const register = async (req, res) => {
 
         // Create user
         const newUser = {
-            id: Date.now().toString(),
-            username: username.trim(),
-            email: email.trim().toLowerCase(),
-            password: hashedPassword,
-            createdAt: new Date().toISOString()
-        };
+    id: Date.now().toString(),
+    username: username.trim(),
+    email: email.trim().toLowerCase(),
+    password: hashedPassword,
+    role: 'user',
+    createdAt: new Date().toISOString()
+};
 
         // Save user
         users.push(newUser);
@@ -157,14 +159,23 @@ const login = async (req, res) => {
             });
         }
 
-        //Succesful Login
-        return res.status(200).json({
-            success: true,
-            message: 'Login Successful',
-            id: user.id,
-            username: user.username,
-            email: user.email
-        });
+        // Successful Login
+const token = generateToken({
+    id: user.id,
+    role: user.role || 'user'
+});
+
+return res.status(200).json({
+    success: true,
+    message: 'Login Successful',
+    token,
+    user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role || 'user'
+    }
+});
 
     }catch (error) {
         console.error('Login error:', error);
