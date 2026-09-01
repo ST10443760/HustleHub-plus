@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "id": "1788252987065",
+    "username": "lihle123",
+    "email": "lihle@example.com",
+    "password": "$2a$12$rb36MQz9kM1QJeNEe9f2UOmsRd.N59mptZd2DHKX29xnfwqXiLScK",
+    "createdAt": "2026-09-01T08:56:27.065Z"
+  }
+]
