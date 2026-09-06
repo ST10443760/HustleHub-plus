@@ -233,3 +233,29 @@ newman run postman/HustleHub_Part1_Auth.postman_collection.json --insecure
 | Injection / malformed input | express-validator rejects invalid input before it reaches controllers |
 | Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
 | Data interception in transit | API served over HTTPS, even in local development |
+
+## 13. API Testing Screenshots
+
+Screenshots below show the Postman collection run confirming both successful
+and invalid/error scenarios, matching the automated tests in
+`postman/HustleHub_Part1_Auth.postman_collection.json`.
+
+| Scenario | Screenshot |
+|---|---|
+| Health check | `docs/screenshots/01-health-check.png` |
+| Successful registration (token issued, no password hash leaked) | `docs/screenshots/02-register-success.png` |
+| Duplicate email registration rejected | `docs/screenshots/03-register-duplicate.png` |
+| Invalid registration input rejected | `docs/screenshots/04-register-invalid.png` |
+| Successful login (token issued) | `docs/screenshots/05-login-success.png` |
+| Login with wrong password rejected | `docs/screenshots/06-login-wrong-password.png` |
+| Protected route rejected with no token | `docs/screenshots/07-protected-no-token.png` |
+| Protected route succeeds with valid token | `docs/screenshots/08-protected-valid-token.png` |
+
+![Health Check](./docs/screenshots/01-health-check.png)
+![Register Success](./docs/screenshots/02-register-success.png)
+![Register Duplicate](./docs/screenshots/03-register-duplicate.png)
+![Register Invalid](./docs/screenshots/04-register-invalid.png)
+![Login Success](./docs/screenshots/05-login-success.png)
+![Login Wrong Password](./docs/screenshots/06-login-wrong-password.png)
+![Protected No Token](./docs/screenshots/07-protected-no-token.png)
+![Protected Valid Token](./docs/screenshots/08-protected-valid-token.png)
