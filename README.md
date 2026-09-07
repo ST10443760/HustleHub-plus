@@ -220,7 +220,7 @@ newman run postman/HustleHub_Part1_Auth.postman_collection.json --insecure
 
 ## 11. Demonstration Video
 
-`<link to be added>`
+https://youtu.be/qTK6iV_0lmI
 
 ## 12. Security Review Summary
 
