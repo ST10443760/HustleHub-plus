@@ -1,0 +1,47 @@
+{
+  "info": {
+    "name": "HustleHub+ Part 2 API Tests",
+    "_postman_id": "hustlehub-part2-income-tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "freelancerToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Income Tracking",
+      "item": [
+        {
+          "name": "Get Freelancer Income",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{freelancerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/income",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "income"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
