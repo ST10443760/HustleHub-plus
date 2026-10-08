@@ -1,7 +1,21 @@
+# dependencies (root, api/ and client/)
 node_modules/
+
+# secrets
 .env
+.env.*
+!.env.example
+
+# local TLS certs and keys
 *.pem
 *.key
 *.crt
-.DS_Store
+
+# build output
+dist/
+coverage/
+
+# logs and OS junk
 npm-debug.log*
+*.log
+.DS_Store
