@@ -12,5 +12,12 @@ function parseGigInput(body,partial=false) {
         else
             out.title = clean(body.title);
     }
+    
+    if(!partial || body.description !== undefined) {
+        if(typeof body.description !== 'string' || body.description.length>1000)
+            errors.push('Description must be a string with at most 1000 characters');
+        else
+            out.description = clean(body.description);
+    }
 
 }
