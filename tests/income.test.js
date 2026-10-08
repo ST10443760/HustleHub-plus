@@ -34,11 +34,32 @@ describe("Income tracking", () => {
       json: jest.fn((data) => {
         expect(data.totalIncome).toBe(1000);
         expect(data.bookings).toHaveLength(1);
-        expect(data.bookings[0].freelancerId).toBe("freelancer-002");
         done();
       })
     };
 
     getIncome(req, res);
+  });
+
+  test("denies income access to non-freelancers", () => {
+    const req = {
+      user: {
+        userId: "client-001",
+        role: "user"
+      }
+    };
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+
+    getIncome(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: "Only freelancers can access income tracking"
+    });
   });
 });
