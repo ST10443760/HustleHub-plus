@@ -1,0 +1,73 @@
+
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f3f5fa;
+}
+
+.form-card {
+  background: white;
+  padding: 35px;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+.form-card h1 {
+  color: #253a70;
+  text-align: center;
+}
+
+.form-card h2 {
+  margin-top: 25px;
+}
+
+.form-card p {
+  color: #666;
+  text-align: center;
+}
+
+.form-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-card label {
+  font-weight: 600;
+}
+
+.form-card input {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.form-card button {
+  margin-top: 15px;
+  padding: 13px;
+  background: #253a70;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.form-card button:hover {
+  background: #17264b;
+}
+
+.form-card .message {
+  margin-top: 15px;
+  color: #253a70;
+}
+
+.login-text {
+  margin-top: 20px;
+}
