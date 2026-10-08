@@ -14,3 +14,11 @@ exports.bookGig = (req, res) => {
         return res.status(403).json({ error: "Cannot book your own gig" });
     }
 
+    // Ensure no duplicate bookings
+    const bookings = load("bookings");
+    const duplicate = bookings.find(
+        (b) => b.gigId === gigId && b.clientId === req.user.id && b.status !== "cancelled"
+    );
+    if (duplicate) {
+        return res.status(409).json({ error: "You already booked this gig" });
+    }
