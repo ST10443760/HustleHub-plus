@@ -1,75 +1,112 @@
 {
-  "info": {
-    "name": "HustleHub+ Part 2 API Tests",
-    "_postman_id": "hustlehub-part2-income-tests",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:5000"
-    },
-    {
-      "key": "freelancerToken",
-      "value": ""
-    }
-  ],
-  "item": [
-    {
-      "name": "Income Tracking",
-      "item": [
-        {
-          "name": "Get Freelancer Income",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{freelancerToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/income",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "income"
-              ]
-            }
-          },
-          "response": [],
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Response indicates success', function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json.success).to.eql(true);",
-                  "});",
-                  "",
-                  "pm.test('Response contains total income', function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('totalIncome');",
-                  "});",
-                  "",
-                  "pm.test('Response contains bookings', function () {",
-                  "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('bookings');",
-                  "});"
-                ]
-              }
-            }
-          ]
-        }
-      ]
-    }
-  ]
+    "info":  {
+                 "name":  "HustleHub+ Part 2 API Tests",
+                 "_postman_id":  "hustlehub-part2-income-tests",
+                 "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+             },
+    "variable":  [
+                     {
+                         "key":  "baseUrl",
+                         "value":  "http://localhost:5000"
+                     },
+                     {
+                         "key":  "freelancerToken",
+                         "value":  ""
+                     }
+                 ],
+    "item":  [
+                 {
+                     "name":  "Income Tracking",
+                     "item":  [
+                                  {
+                                      "name":  "Get Freelancer Income",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "Authorization",
+                                                                         "value":  "Bearer {{freelancerToken}}"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/income",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "income"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "response":  [
+
+                                                   ],
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "type":  "text/javascript",
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status code is 200\u0027, function () {",
+                                                                                    "    pm.response.to.have.status(200);",
+                                                                                    "});",
+                                                                                    "",
+                                                                                    "pm.test(\u0027Response indicates success\u0027, function () {",
+                                                                                    "    const json = pm.response.json();",
+                                                                                    "    pm.expect(json.success).to.eql(true);",
+                                                                                    "});",
+                                                                                    "",
+                                                                                    "pm.test(\u0027Response contains total income\u0027, function () {",
+                                                                                    "    const json = pm.response.json();",
+                                                                                    "    pm.expect(json).to.have.property(\u0027totalIncome\u0027);",
+                                                                                    "});",
+                                                                                    "",
+                                                                                    "pm.test(\u0027Response contains bookings\u0027, function () {",
+                                                                                    "    const json = pm.response.json();",
+                                                                                    "    pm.expect(json).to.have.property(\u0027bookings\u0027);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  },
+                                  {
+                                      "name":  "Get Income Without Token",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{baseUrl}}/api/income",
+                                                                  "host":  [
+                                                                               "{{baseUrl}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "income"
+                                                                           ]
+                                                              }
+                                                  },
+                                      "event":  [
+                                                    {
+                                                        "listen":  "test",
+                                                        "script":  {
+                                                                       "exec":  [
+                                                                                    "pm.test(\u0027Status code is 401\u0027, function () {",
+                                                                                    "    pm.expect(pm.response.json().success).to.equal(false);",
+                                                                                    "});",
+                                                                                    "pm.test(\u0027Response indicates failure\u0027, function () {",
+                                                                                    "    pm.expect(pm.response.json().success).to.equal(false);",
+                                                                                    "});"
+                                                                                ]
+                                                                   }
+                                                    }
+                                                ]
+                                  }
+                              ]
+                 }
+             ]
 }
+
