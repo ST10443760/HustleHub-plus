@@ -177,9 +177,9 @@ to the repository.
 ## 7. HTTPS
 
 The API is served over HTTPS using a locally generated, self-signed SSL
-certificate (`certs/cert.pem`, `certs/key.pem`). `server.js` reads these
+certificate (`api/certs/cert.pem`, `api/certs/key.pem`). `server.js` reads these
 files and starts an `https` server rather than plain `http`. See
-`certs/README.md` for exact instructions to regenerate the certificate,
+`api/certs/README.md` for exact instructions to regenerate the certificate,
 since certificate/key files are excluded from git via `.gitignore` and must
 be generated locally by anyone cloning the repository. HTTPS matters even
 in local development because it's the same code path that will run in
@@ -216,7 +216,7 @@ Part 3.
 
 ## 10. Testing
 
-A Postman collection (`postman/HustleHub_Part1_Auth.postman_collection.json`)
+A Postman collection (`api/postman/HustleHub_Part1_Auth.postman_collection.json`)
 covers both valid and invalid scenarios:
 
 - Health check
@@ -232,12 +232,12 @@ covers both valid and invalid scenarios:
 - Protected route with a valid token (expects `200` and the authenticated user)
 
 To run it: import the collection into Postman, disable SSL verification,
-start the server (`npm run dev`), and run the collection — or run it
+start the server (`npm run dev` inside `api/`), and run the collection — or run it
 headlessly via Newman:
 
 ```bash
 npm install -g newman
-newman run postman/HustleHub_Part1_Auth.postman_collection.json --insecure
+newman run api/postman/HustleHub_Part1_Auth.postman_collection.json --insecure
 ```
 
 ## 11. Demonstration Video
@@ -260,7 +260,7 @@ https://youtu.be/qTK6iV_0lmI
 
 Screenshots below show the Postman collection run confirming both successful
 and invalid/error scenarios, matching the automated tests in
-`postman/HustleHub_Part1_Auth.postman_collection.json`.
+`api/postman/HustleHub_Part1_Auth.postman_collection.json`.
 
 | Scenario | Screenshot |
 |---|---|
