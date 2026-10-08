@@ -26,4 +26,19 @@ exports.getGig = (req, res) => {
     res.json(gig);
 };
 
+exports.updateGig = (req, res) => {
+    const gigs = load("gigs");
+    const gig = gigs.find((g) => g.id === req.params.id);
+    if (!gig) return res.status(404).json({ error: "Gig not found" });
+    if (gig.freelancerId !== req.user.id) 
+        return res.status(403).json({ error: "You can only edit your own gigs"});
+
+    const { out, errors } = parseGigInput(req.body, true);
+    if (errors.length) return res.status(400).json({ errors });
+
+    object.assign(gig, out, { updatedAt: new Date().toISOString() });
+    save("gigs", gigs);
+    res.json(gig);
+};
+
 }
