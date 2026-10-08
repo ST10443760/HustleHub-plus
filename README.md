@@ -73,36 +73,58 @@ formatted consistently and never leaks internal details.
 ## 3. Project Structure
 
 ```
-src/
-  app.js                     # Express app, middleware pipeline, route mounting
-  server.js                  # entry point - starts the HTTPS server
-  routes/
-    authRoutes.js            # /api/auth/register, /login, /me
-  controllers/
-    authController.js        # register/login business logic
-  models/
-    userModel.js             # in-memory user storage (Part 1 only)
-  middleware/
-    authMiddleware.js        # JWT verification ("protect") + role check
-    errorHandler.js          # centralised error handling
-    validators.js            # input validation rules (express-validator)
-  utils/
-    logger.js                 # shared logging utility
-    generateToken.js         # JWT signing helper
-certs/                        # local self-signed SSL certificate (see certs/README.md)
-postman/                      # Postman collection for API testing
+api/                           # Express backend
+  src/
+    app.js                     # Express app, middleware pipeline, route mounting
+    server.js                  # entry point - starts the HTTPS server
+    routes/
+      authRoutes.js            # /api/auth/register, /login, /me
+    controllers/
+      authController.js        # register/login business logic
+    models/
+      userModel.js             # in-memory user storage (Part 1 only)
+    middleware/
+      authMiddleware.js        # JWT verification ("protect") + role check
+      errorHandler.js          # centralised error handling
+      validators.js            # input validation rules (express-validator)
+    utils/
+      logger.js                # shared logging utility
+      generateToken.js         # JWT signing helper
+  certs/                       # local self-signed SSL certificate (see api/certs/README.md)
+  postman/                     # Postman collection for API testing
+client/                        # React frontend (Vite)
+docs/                          # architecture diagram and screenshots
 ```
 
 ## 4. Getting Started
 
+The backend and frontend are separate projects, so run each one in its own
+terminal.
+
+**Backend (`api/`)**
+
 ```bash
+cd api
 npm install
 cp .env.example .env      # then set your own JWT_SECRET inside .env
 npm run dev
 ```
 
+**Frontend (`client/`)**
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+The frontend runs at `http://localhost:5173`. In development, Vite proxies
+every `/api` request to the backend at `https://localhost:5000`, so start the
+backend first. The proxy skips certificate checks (`secure: false`) only
+because the local cert is self-signed; this setting is dev-only.
+
 The API runs at `https://localhost:5000`. Because the SSL certificate is
-self-signed (see `certs/README.md` for why and how to regenerate it), your
+self-signed (see `api/certs/README.md` for why and how to regenerate it), your
 browser and Postman will warn that the connection isn't trusted — that
 warning is expected for local development. In Postman, disable "SSL
 certificate verification" under Settings → General.
