@@ -39,7 +39,35 @@
               ]
             }
           },
-          "response": []
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response indicates success', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.test('Response contains total income', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('totalIncome');",
+                  "});",
+                  "",
+                  "pm.test('Response contains bookings', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('bookings');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     }
