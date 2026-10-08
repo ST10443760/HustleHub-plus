@@ -105,3 +105,14 @@ Postman collection: `<add link/path once exported>`
 
 ## 9. Demonstration Video
 `<add link here>`
+
+
+## 10. Virona — Income Tracking & Backend Testing
+
+Income tracking allows authenticated freelancers to view their own bookings and
+the total income generated from those bookings.
+
+### Income Tracking Endpoint
+
+text
+GET /api/income
