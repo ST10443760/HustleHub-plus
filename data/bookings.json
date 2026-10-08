@@ -1,0 +1,26 @@
+[
+  {
+    "id": "booking-001",
+    "gigId": "gig-001",
+    "clientId": "client-001",
+    "freelancerId": "freelancer-001",
+    "status": "confirmed",
+    "createdAt": "2026-10-08T10:00:00.000Z"
+  },
+  {
+    "id": "booking-002",
+    "gigId": "gig-002",
+    "clientId": "client-002",
+    "freelancerId": "freelancer-001",
+    "status": "confirmed",
+    "createdAt": "2026-10-08T11:00:00.000Z"
+  },
+  {
+    "id": "booking-003",
+    "gigId": "gig-003",
+    "clientId": "client-003",
+    "freelancerId": "freelancer-002",
+    "status": "confirmed",
+    "createdAt": "2026-10-08T12:00:00.000Z"
+  }
+]
