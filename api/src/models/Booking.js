@@ -9,6 +9,14 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Gig',
       required: true,
+      index: true, // "does this gig have bookings?" check before deleting a gig
+    },
+    // Snapshot of the gig title at booking time, so renaming the gig later
+    // doesn't change what was booked.
+    gigTitle: {
+      type: String,
+      required: true,
+      maxlength: 600, // same cap as the (HTML-escaped) gig title
     },
     client: {
       type: mongoose.Schema.Types.ObjectId,
