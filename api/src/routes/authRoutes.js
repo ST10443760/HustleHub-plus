@@ -3,6 +3,7 @@ const router = express.Router();
 
 const { register, login } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+const { loginLimiter, registerLimiter } = require('../middleware/rateLimiters');
 const User = require('../models/User');
 const { AppError } = require('../middleware/errorHandler');
 const {
@@ -11,8 +12,9 @@ const {
   handleValidationErrors,
 } = require('../middleware/validators');
 
-router.post('/register', registerValidationRules, handleValidationErrors, register);
-router.post('/login', loginValidationRules, handleValidationErrors, login);
+// Limiters run first, so even requests that fail validation are counted.
+router.post('/register', registerLimiter, registerValidationRules, handleValidationErrors, register);
+router.post('/login', loginLimiter, loginValidationRules, handleValidationErrors, login);
 
 /**
  * Protected test route - proves the JWT middleware actually works.
