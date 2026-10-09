@@ -5,6 +5,7 @@ const cors = require('cors');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const sanitize = require('./middleware/sanitize');
 const { helmetOptions, corsOptions } = require('./config/security');
+const { generalLimiter } = require('./middleware/rateLimiters');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -16,6 +17,7 @@ app.disable('x-powered-by');
 // Order matters here - keep helmet/cors first, body parsing next, then routes.
 app.use(helmet(helmetOptions)); // strict CSP, HSTS, nosniff, no-referrer, cross-origin policies
 app.use(cors(corsOptions)); // only CLIENT_ORIGIN, never a wildcard
+app.use('/api', generalLimiter); // safety net, before any body is parsed
 app.use(express.json({ limit: '10kb' })); // body parser, with a sane size limit
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(sanitize); // strips $ / . keys from body, query and params - must come after parsing
