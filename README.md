@@ -363,10 +363,10 @@ TLS connection.
 
 ## 8. Input Validation & Error Handling
 
-Every field accepted by `/register` and `/login` is validated using
-`express-validator` before it reaches the controller: names and emails are
-trimmed and format-checked, emails are normalised, and passwords must meet
-a minimum length and complexity rule. Invalid input is rejected with a
+Every field the API accepts is validated using `express-validator` before
+it reaches a controller: names and emails are trimmed and format-checked,
+emails are normalised, passwords must meet a minimum length and
+complexity rule, and free text is HTML-escaped (see **Security** below). Invalid input is rejected with a
 `400` response listing the specific validation failures, without ever
 executing any business logic against unvalidated data.
 
@@ -374,7 +374,8 @@ All errors — validation failures, authentication failures, or unexpected
 exceptions — pass through a single centralised error handler
 (`middleware/errorHandler.js`). This handler:
 
-- Logs the full error detail (including stack trace) to the server console only
+- Logs the error to the server console only (stack traces only for
+  unexpected errors, and never in production)
 - Returns a generic, safe message to the client for any non-operational
   (unexpected) error
 - Never includes a stack trace, file path, or configuration value in any
@@ -384,10 +385,9 @@ exceptions — pass through a single centralised error handler
 
 A shared logging utility (`utils/logger.js`) is used throughout the
 codebase instead of raw `console.log`, so log output stays consistent and
-timestamped. Key events are logged with an `event()` helper, currently
-covering registration, successful login, and failed login attempts —
-laying the groundwork for the more comprehensive logging required in
-Part 3.
+timestamped. Security-relevant events are logged with an `event()` helper:
+see **Security → Logging** below for the full list and what is never
+logged. This lays the groundwork for the cloud logging required in Part 3.
 
 ## 10. Testing
 
