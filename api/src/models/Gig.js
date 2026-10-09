@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+// Shared with the validators so the allowed list lives in one place.
+const GIG_CATEGORIES = ['design', 'writing', 'development', 'marketing', 'video', 'other'];
+
 const gigSchema = new mongoose.Schema(
   {
     title: {
@@ -37,8 +40,7 @@ const gigSchema = new mongoose.Schema(
     category: {
       type: String,
       required: [true, 'Category is required'],
-      trim: true,
-      maxlength: 50,
+      enum: GIG_CATEGORIES,
     },
     // Always set from the authenticated user, never from the request body.
     freelancer: {
@@ -68,3 +70,4 @@ gigSchema.set('toJSON', {
 });
 
 module.exports = mongoose.model('Gig', gigSchema);
+module.exports.GIG_CATEGORIES = GIG_CATEGORIES;
