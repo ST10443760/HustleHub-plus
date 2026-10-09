@@ -1,10 +1,9 @@
-const bcryptjs = require('bcryptjs');
 const User = require('../models/User');
+const { hashPassword, comparePassword } = require('../utils/password');
 const generateToken = require('../utils/generateToken');
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
 
-const SALT_ROUNDS = 10;
 const DUPLICATE_EMAIL_MESSAGE = 'An account with this email already exists';
 
 async function register(req, res, next) {
@@ -22,7 +21,7 @@ async function register(req, res, next) {
       throw new AppError(DUPLICATE_EMAIL_MESSAGE, 409);
     }
 
-    const passwordHash = await bcryptjs.hash(password, SALT_ROUNDS);
+    const passwordHash = await hashPassword(password);
     const user = await User.create({ name, email, passwordHash, role });
 
     logger.event('AUTH', 'User registered', { userId: user.id, role: user.role });
@@ -59,7 +58,7 @@ async function login(req, res, next) {
       throw new AppError('Invalid email or password', 401);
     }
 
-    const passwordMatches = await bcryptjs.compare(password, user.passwordHash);
+    const passwordMatches = await comparePassword(password, user.passwordHash);
     if (!passwordMatches) {
       logger.event('AUTH', 'Failed login - wrong password', { userId: user.id });
       throw new AppError('Invalid email or password', 401);
