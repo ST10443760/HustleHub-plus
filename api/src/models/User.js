@@ -4,12 +4,16 @@ const ROLES = ['client', 'freelancer', 'admin'];
 
 const userSchema = new mongoose.Schema(
   {
+    // The name is HTML-escaped before it's saved (& becomes &amp; and so on),
+    // which can make it longer. The 60-character limit applies to what the
+    // user types and is enforced in the validators; this cap leaves room
+    // for the escaped form.
     name: {
       type: String,
       required: [true, 'Name is required'],
       trim: true,
       minlength: 2,
-      maxlength: 60,
+      maxlength: 360,
     },
     email: {
       type: String,
