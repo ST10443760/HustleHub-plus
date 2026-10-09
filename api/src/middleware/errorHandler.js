@@ -34,6 +34,13 @@ function notFoundHandler(req, res, next) {
  * that logic rather than creating a second error handler.
  */
 function errorHandler(err, req, res, next) {
+  // Mongoose rejected the data (schema validation, bad cast, unknown field
+  // under strict: 'throw'). That's bad input, not a server fault, but the
+  // raw message names schema paths, so it's replaced with a generic one.
+  if (['ValidationError', 'CastError', 'StrictModeError'].includes(err.name)) {
+    err = Object.assign(new AppError('Invalid input', 400), { stack: err.stack, cause: err.message });
+  }
+
   const statusCode = err.statusCode || 500;
 
   // Full details go to the server log only - never to the client.
@@ -41,6 +48,7 @@ function errorHandler(err, req, res, next) {
     statusCode,
     path: req.originalUrl,
     method: req.method,
+    cause: err.cause,
     stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
   });
 
