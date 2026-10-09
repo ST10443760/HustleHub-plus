@@ -226,6 +226,36 @@ response. The JWT secret is read from an environment variable
 (`process.env.JWT_SECRET`) and is never hard-coded in source or committed
 to the repository.
 
+### Roles and access control
+
+Every user has exactly one role. It's stored on the user record in MongoDB,
+and `protect` reads it from the database on each request rather than
+trusting the token, so a role change takes effect immediately.
+
+| Role | How you get it | What it can do |
+|---|---|---|
+| `client` | Default at registration | Browse gigs, book gigs, view their own bookings and transactions |
+| `freelancer` | Choose it at registration | Create, edit and delete their **own** gigs, view bookings on their gigs, view their income |
+| `admin` | Only via `npm run seed:admin` | List all users, view all transactions, remove any gig |
+
+Registration only accepts `client` or `freelancer`. Sending
+`"role": "admin"` is rejected with a `400`, so nobody can make themselves an
+admin through the API.
+
+Routes are restricted with `requireRole(...)`. A user with the wrong role
+gets a generic `403` that doesn't say which role would have been allowed, and
+the attempt is logged (user id, role, method and path). All `/api/admin`
+routes require both a valid token and the admin role.
+
+**Ownership rule.** Being the right role isn't enough to change a record: you
+also have to own it. `requireOwnership` loads the record by its id, returns
+`404` if it doesn't exist and `403` if its owner isn't the logged-in user.
+The owner is always compared against the user from the verified token and
+database lookup, never against an id sent in the request body or query
+string. Admins only bypass this on routes that explicitly allow it. Malformed
+ids are rejected with a `400` by `validateObjectId` before they reach the
+database.
+
 ## 7. HTTPS
 
 The API is served over HTTPS using a locally generated, self-signed SSL
