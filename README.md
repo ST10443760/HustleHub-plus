@@ -156,15 +156,16 @@ database URI.
 **Clearing test data**
 
 Newman runs and manual testing create throwaway users
-(`test-...@example.com`, `role-...@example.com`). To remove only those:
+(`test-...@example.com`, `role-...@example.com`). To remove only those users
+and the gigs, bookings and transactions that belong to them:
 
 ```bash
 cd api
 npm run clean:test
 ```
 
-It prints how many users it removed, never deletes an admin, and refuses to
-run when `NODE_ENV` is `production`.
+It prints how much it removed, never deletes an admin, and refuses to run
+when `NODE_ENV` is `production`.
 
 **Frontend (`client/`)**
 
