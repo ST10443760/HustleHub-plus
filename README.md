@@ -134,6 +134,34 @@ Node can't resolve the SRV record on your network. Use the standard
 `mongodb://host1,host2,host3/...` string from Atlas (Connect → Drivers)
 instead.
 
+**Creating the admin account**
+
+Admins can't sign up through `/api/auth/register`, so the admin account is
+created by a seed script. Set `ADMIN_EMAIL`, `ADMIN_NAME` and
+`ADMIN_PASSWORD` (at least 12 characters) in `api/.env`, then:
+
+```bash
+cd api
+npm run seed:admin
+```
+
+The script is safe to run again: if an account with that email already
+exists it says so and changes nothing. It never logs the password or the
+database URI.
+
+**Clearing test data**
+
+Newman runs and manual testing create throwaway users
+(`test-...@example.com`, `role-...@example.com`). To remove only those:
+
+```bash
+cd api
+npm run clean:test
+```
+
+It prints how many users it removed, never deletes an admin, and refuses to
+run when `NODE_ENV` is `production`.
+
 **Frontend (`client/`)**
 
 ```bash
