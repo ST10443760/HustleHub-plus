@@ -7,9 +7,13 @@ const { AppError } = require('./errorHandler');
  */
 const registerValidationRules = [
   body('name')
+    .exists().withMessage('Name is required').bail()
+    // typeof, not isString(): isString() would pass an array of strings.
+    .custom((value) => typeof value === 'string').withMessage('Name must be text').bail()
     .trim()
     .notEmpty().withMessage('Name is required')
-    .isLength({ min: 2, max: 60 }).withMessage('Name must be 2-60 characters'),
+    .isLength({ min: 2, max: 60 }).withMessage('Name must be 2-60 characters')
+    .escape(), // names are shown to other users, so store them HTML-escaped
   body('email')
     .trim()
     .notEmpty().withMessage('Email is required')
