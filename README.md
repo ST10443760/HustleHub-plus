@@ -93,6 +93,8 @@ api/                           # Express backend
       incomeController.js      # income aggregation over completed transactions
     config/
       db.js                    # MongoDB connection (Mongoose)
+      security.js              # Helmet/CSP options, CORS locked to CLIENT_ORIGIN
+      rateLimits.js            # rate limit numbers (strict defaults, no overrides in production)
     models/
       User.js                  # users (password hash never selected by default)
       Gig.js                   # gig listings owned by a freelancer
@@ -106,15 +108,19 @@ api/                           # Express backend
       validators.js            # input validation rules (express-validator)
       gigValidators.js         # gig body + list query rules, HTML escaping
       bookingValidators.js     # booking body: gigId only
+      sanitize.js              # strips $ and . keys from body, query and params
+      rateLimiters.js          # login, register, booking and general limiters
     utils/
       logger.js                # shared logging utility
       generateToken.js         # JWT signing helper
       password.js              # bcryptjs hashing (shared salt rounds)
       escapeRegex.js           # makes search text safe to use in a regex
       money.js                 # rounds money to 2 decimals
+      gigRemoval.js            # shared delete-or-deactivate rule for gigs
   scripts/
     seedAdmin.js               # creates the admin account (npm run seed:admin)
-    cleanTestData.js           # removes test users (npm run clean:test)
+    cleanTestData.js           # removes test users and their data (npm run clean:test)
+    startTest.js               # starts the API with relaxed rate limits (npm run start:test)
   certs/                       # local self-signed SSL certificate (see api/certs/README.md)
   postman/                     # Postman collection for API testing
 client/                        # React frontend (Vite)
