@@ -1,17 +1,22 @@
 
-//import { describe, it, expect } from 'vitest';
-import { describe, it, expect, afterEach } from 'vitest';
-//import { render, screen } from '@testing-library/react';
-import { render, screen, cleanup } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import GigList from './GigList.jsx';
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
+
 describe('HustleHub+ Gig Browsing', () => {
-  it('displays the available gigs', () => {
+  it('displays sample gigs when the API is unavailable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 404
+    });
+
     render(<GigList />);
 
     expect(
@@ -33,18 +38,27 @@ describe('HustleHub+ Gig Browsing', () => {
     expect(
       screen.getByText('Garden Maintenance')
     ).toBeInTheDocument();
+
+    expect(
+      await screen.findByText(/Demo mode: Showing sample gigs/i)
+    ).toBeInTheDocument();
   });
 
-  it('filters gigs when the user searches', async () => {
-    const user = userEvent.setup();
+  it('filters gigs when the user searches', () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 404
+    });
 
     render(<GigList />);
 
     const searchInput = screen.getByRole('searchbox', {
-      name: 'Search gigs',
+      name: 'Search gigs'
     });
 
-    await user.type(searchInput, 'Math');
+    fireEvent.change(searchInput, {
+      target: { value: 'Math' }
+    });
 
     expect(
       screen.getByText('Math Tutor Needed')
@@ -56,6 +70,36 @@ describe('HustleHub+ Gig Browsing', () => {
 
     expect(
       screen.queryByText('Event Photographer')
+    ).not.toBeInTheDocument();
+  });
+
+  it('displays real gigs when the API responds successfully', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 'gig-123',
+          title: 'React Developer Needed',
+          category: 'Technology',
+          location: 'Remote',
+          price: 1500,
+          description: 'Build a React website.'
+        }
+      ]
+    });
+
+    render(<GigList />);
+
+    expect(
+      await screen.findByText('React Developer Needed')
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByText('Math Tutor Needed')
+    ).not.toBeInTheDocument();
+
+    expect(
+      screen.queryByText(/Demo mode: Showing sample gigs/i)
     ).not.toBeInTheDocument();
   });
 });

@@ -1,10 +1,9 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './GigList.css';
 import GigDetails from './GigDetails.jsx';
 
-// Temporary sample gigs for frontend development.
-// Replace these with API data when the gig backend is ready.
+// Demonstration data used until the gig API is available.
 const sampleGigs = [
   {
     id: 1,
@@ -41,20 +40,75 @@ const sampleGigs = [
 ];
 
 function GigList() {
+  const [gigs, setGigs] = useState(sampleGigs);
+  const [loading, setLoading] = useState(true);
+  const [usingSampleData, setUsingSampleData] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedGig, setSelectedGig] = useState(null);
 
-  const filteredGigs = sampleGigs.filter((gig) => {
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadGigs = async () => {
+      try {
+        const token = sessionStorage.getItem('hustlehub_token');
+
+        const response = await fetch(
+          'https://localhost:5000/api/gigs',
+          {
+            headers: token
+              ? { Authorization: `Bearer ${token}` }
+              : {},
+            signal: controller.signal
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data)) {
+          throw new Error('Unexpected gig data.');
+        }
+
+        if (!controller.signal.aborted) {
+          setGigs(data);
+          setUsingSampleData(false);
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.warn('Using sample gigs:', error.message);
+
+          if (!controller.signal.aborted) {
+            setGigs(sampleGigs);
+            setUsingSampleData(true);
+          }
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadGigs();
+
+    return () => controller.abort();
+  }, []);
+
+  const filteredGigs = gigs.filter((gig) => {
     const searchTerm = search.toLowerCase();
 
     return (
-      gig.title.toLowerCase().includes(searchTerm) ||
-      gig.category.toLowerCase().includes(searchTerm) ||
-      gig.location.toLowerCase().includes(searchTerm)
+      (gig.title || '').toLowerCase().includes(searchTerm) ||
+      (gig.category || '').toLowerCase().includes(searchTerm) ||
+      (gig.location || '').toLowerCase().includes(searchTerm)
     );
   });
 
-    if (selectedGig) {
+  if (selectedGig) {
     return (
       <GigDetails
         gig={selectedGig}
@@ -73,6 +127,17 @@ function GigList() {
       <main className="gig-content">
         <h2>Available Gigs</h2>
 
+        {loading && (
+          <p role="status">Loading gigs...</p>
+        )}
+
+        {!loading && usingSampleData && (
+          <p role="status">
+            Demo mode: Showing sample gigs while the backend
+            gig API is unavailable. These are not real bookings.
+          </p>
+        )}
+
         <input
           className="gig-search"
           type="search"
@@ -85,7 +150,9 @@ function GigList() {
         <div className="gig-grid">
           {filteredGigs.map((gig) => (
             <article className="gig-card" key={gig.id}>
-              <span className="gig-category">{gig.category}</span>
+              <span className="gig-category">
+                {gig.category}
+              </span>
 
               <h3>{gig.title}</h3>
 
@@ -103,16 +170,18 @@ function GigList() {
                 type="button"
                 className="gig-button"
                 onClick={() => setSelectedGig(gig)}
-                >
+              >
                 View Details
-              </button>   
+              </button>
             </article>
           ))}
         </div>
 
-        {filteredGigs.length === 0 && (
+        {!loading && filteredGigs.length === 0 && (
           <p role="status" className="gig-empty">
-            No gigs found. Try a different search.
+            {search
+              ? 'No gigs found. Try a different search.'
+              : 'No gigs are available yet.'}
           </p>
         )}
       </main>

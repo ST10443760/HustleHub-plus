@@ -83,7 +83,17 @@ function App() {
       }
 
       if (isLogin) {
-        setMessage(`Welcome back, ${data.username}!`);
+        const token = data.token ?? data.data?.token;
+        const loggedInUser =
+          data.user ?? data.data?.user ?? data;
+
+        if (token) {
+          sessionStorage.setItem('hustlehub_token', token);
+        }
+
+        setMessage(
+          `Welcome back, ${loggedInUser.username || 'user'}!`
+        );
       } else {
         setMessage('Registration successful! You can now log in.');
       }
