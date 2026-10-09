@@ -474,11 +474,169 @@ variables (they're never stored in the collection):
 newman run api/postman/HustleHub_Part1_Auth.postman_collection.json --insecure   --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
 ```
 
-## 11. Demonstration Video
+## 11. Security
+
+Security is layered: every request passes through several independent
+checks, so a gap in one is caught by another.
+
+### Validation and sanitising
+
+- **Validation (express-validator).** Every route that accepts input has a
+  rule set. Types are checked with `typeof` (so an array or object can't
+  slip through as a string), lengths and ranges are enforced, categories and
+  roles come from fixed lists, and ids must be exactly 24 hex characters.
+  Unknown fields are rejected with a `400` rather than ignored, so a
+  request can't set `freelancer`, `price`, `role` or `isActive` by adding
+  them to the body.
+- **HTML escaping.** Every free-text field that other users see (gig title,
+  description and category, and the user's name) is trimmed and
+  HTML-escaped before it's saved, so `<script>` is stored as
+  `&lt;script&gt;` and can't run in a browser.
+- **NoSQL operator stripping.** A global middleware (express-mongo-sanitize)
+  removes any key starting with `$` or containing `.` from the body, query
+  string and route params before any route runs, so `{ "$gt": "" }` can
+  never reach a Mongoose query. This is defence in depth on top of the
+  validators, which already reject such input.
+- **Search** text is escaped before it's used in a regex, so `.*` matches
+  only the literal text `.*`.
+- **Body limits.** Request bodies are capped at 10kb (`413`), and malformed
+  JSON gets a clear `400`.
+
+### Passwords
+
+Passwords are hashed with **bcryptjs** (10 salt rounds) and never stored,
+logged or returned. The hash field is excluded from every query by default.
+Login always runs a bcrypt comparison, against a dummy hash when the email
+doesn't exist, so an unknown email takes as long as a wrong password and
+response times can't be used to find valid accounts. Both cases return the
+same `401 Invalid email or password`.
+
+### JWT and roles
+
+Tokens are signed with `JWT_SECRET` and carry only the user id and role.
+On every protected request, `protect` verifies the signature and then
+**loads the user from the database** and uses the role stored there, not the
+one in the token, so a role change takes effect immediately and a deleted
+user's token stops working.
+
+### RBAC and ownership
+
+- `requireRole(...)` restricts each route to the roles in the API table.
+  A wrong role gets a generic `403` that doesn't say which role was needed.
+- `requireOwnership(...)` loads the record and checks the logged-in user
+  owns it (a gig's freelancer; a booking's client or freelancer), comparing
+  against the user from the token and database, never an id from the request.
+  Missing records are `404`, someone else's are `403`.
+- Price, freelancer, client and status on a booking always come from the
+  database and the token, never the request.
+- Admins can't self-register; the one admin account is created by
+  `npm run seed:admin`.
+
+### Rate limiting
+
+| Limiter | Applies to | Limit | Counted per |
+|---|---|---|---|
+| Login | `POST /api/auth/login` | 5 **failed** attempts per 15 minutes (successful logins don't count) | IP |
+| Register | `POST /api/auth/register` | 10 per hour | IP |
+| Booking | `POST /api/bookings` | 10 per 10 minutes | Logged-in user (IP if none) |
+| General | Everything under `/api` | 100 per 15 minutes | IP |
+
+Going over a limit returns `429` with a `Retry-After` header and
+`{ "success": false, "error": "Too many requests, please try again in N seconds." }`.
+The standard `RateLimit` and `RateLimit-Policy` headers are sent; the legacy
+`X-RateLimit-*` headers are off. Every hit is logged with the limiter name
+and IP.
+
+For local testing, each limit's max can be raised with `RATE_LIMIT_LOGIN_MAX`,
+`RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_BOOKING_MAX` and
+`RATE_LIMIT_GENERAL_MAX` (`npm run start:test` does this). These overrides are
+**ignored when `NODE_ENV` is `production`**, so the strict values above
+always apply in a deployed API.
+
+### Security headers (Helmet)
+
+Helmet is configured explicitly. The API's Content-Security-Policy is built
+from scratch, with no `unsafe-inline` or `unsafe-eval` anywhere:
+
+| Directive | Value |
+|---|---|
+| `default-src` | `'self'` |
+| `script-src` | `'self'` |
+| `style-src` | `'self'` |
+| `img-src` | `'self' data:` |
+| `connect-src` | `'self'` and `CLIENT_ORIGIN` |
+| `object-src` | `'none'` |
+| `frame-ancestors` | `'none'` |
+| `base-uri` | `'self'` |
+| `form-action` | `'self'` |
+
+Also set: `Strict-Transport-Security` (1 year, including subdomains),
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
+`X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`,
+`Cross-Origin-Resource-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`. `X-Powered-By` is removed.
+
+The React client gets its own CSP, which comes with the frontend.
+
+### CORS
+
+CORS is locked to the single origin in `CLIENT_ORIGIN`, never a wildcard.
+Only `GET`, `POST`, `PUT` and `DELETE` and only the `Authorization` and
+`Content-Type` headers are allowed. A request or preflight from any other
+origin gets a generic `403 Origin not allowed` with no
+`Access-Control-Allow-Origin` header, and is logged. Requests with no
+`Origin` header (Postman, curl, server-to-server) aren't cross-origin
+browser requests, so CORS doesn't apply to them.
+
+### Logging
+
+All logging goes through `utils/logger.js`. Security events are logged with
+`logger.event`: registrations, successful and failed logins, bookings,
+transactions and failed bookings, gig changes, admin actions, denied role
+and ownership checks, rate limit hits, blocked CORS origins and stripped
+NoSQL operators. Failed logins are logged identically whether or not the
+email exists, with a masked email (`j***@example.com`) and the IP. Logs
+never contain passwords, tokens, the database connection string or the JWT
+secret. Stack traces are logged only for unexpected errors and never in
+production, and they never appear in an API response.
+
+### Known and accepted: dev-only audit findings
+
+`npm audit --omit=dev` reports **0 vulnerabilities** for the API's
+production dependencies. The full `npm audit` reports high-severity
+findings in `braces`, which is only reached through `nodemon` → `chokidar`.
+nodemon is a development tool that watches files and restarts the server;
+it never runs in a deployed API and never handles requests. The only
+available fix (`npm audit fix --force`) downgrades nodemon to 1.x, which is
+a breaking change, so this is accepted for now.
+
+### JWT in localStorage: the trade-off
+
+The React client will keep the JWT in `localStorage`, which is acceptable
+for this POE but has a known risk: **any script running on the page can read
+`localStorage`**, so a single XSS bug would let an attacker steal the token
+and act as the user until it expires. An `httpOnly` cookie would hide the
+token from scripts, but brings CSRF protection and cookie configuration
+with it.
+
+The risk is reduced by:
+
+- **Escaping on the way in:** all user-supplied text is HTML-escaped
+  before it's stored.
+- **React's default escaping on the way out:** JSX escapes values when it
+  renders them, and the client won't use `dangerouslySetInnerHTML`.
+- **A strict CSP:** `script-src 'self'` with no `unsafe-inline` or
+  `unsafe-eval` blocks injected inline scripts and scripts from other
+  origins, even if markup did get in.
+- **Short-lived tokens:** tokens expire after 1 hour (`JWT_EXPIRES_IN`).
+- **The role isn't trusted from the token:** a stolen token can't be used to
+  gain more rights than the user already has.
+
+## 12. Demonstration Video
 
 https://youtu.be/qTK6iV_0lmI
 
-## 12. Security Review Summary
+## 13. Security Review Summary
 
 | Concern | How it's addressed |
 |---|---|
@@ -490,7 +648,7 @@ https://youtu.be/qTK6iV_0lmI
 | Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
 | Data interception in transit | API served over HTTPS, even in local development |
 
-## 13. API Testing Screenshots
+## 14. API Testing Screenshots
 
 Screenshots below show the Postman collection run confirming both successful
 and invalid/error scenarios, matching the automated tests in
