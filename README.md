@@ -641,10 +641,15 @@ https://youtu.be/qTK6iV_0lmI
 | Concern | How it's addressed |
 |---|---|
 | Plain-text password storage | Never stored — hashed with bcryptjs before persisting |
-| Credential stuffing / enumeration | Identical generic error for wrong password vs unknown email |
+| Credential stuffing / enumeration | Identical generic error and timing for wrong password vs unknown email; failed logins rate limited (5 per 15 min per IP) |
 | Unauthorised access to protected routes | JWT required and verified on every protected request |
 | Token tampering | Signature verification via `JWT_SECRET`; invalid signatures rejected |
-| Injection / malformed input | express-validator rejects invalid input before it reaches controllers |
+| Injection / malformed input | express-validator rejects invalid input and unknown fields; global middleware strips `$` and `.` keys |
+| Cross-site scripting | Text fields HTML-escaped before saving; strict CSP with no `unsafe-inline` |
+| Privilege escalation / IDOR | Role read from the database on every request; RBAC on every route; ownership checks on gigs and bookings |
+| Brute force and abuse | Rate limits on login, register and booking, plus a general limit across the API |
+| Cross-origin abuse | CORS locked to `CLIENT_ORIGIN`; other origins get a `403` and no CORS headers |
+| Clickjacking and MIME sniffing | `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` |
 | Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
 | Data interception in transit | API served over HTTPS, even in local development |
 
