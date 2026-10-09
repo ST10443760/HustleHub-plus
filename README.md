@@ -79,8 +79,10 @@ api/                           # Express backend
     server.js                  # entry point - starts the HTTPS server
     routes/
       authRoutes.js            # /api/auth/register, /login, /me
+      adminRoutes.js           # /api/admin/* (admin role only)
     controllers/
       authController.js        # register/login business logic
+      adminController.js       # admin-only actions (list users)
     config/
       db.js                    # MongoDB connection (Mongoose)
     models/
@@ -89,12 +91,18 @@ api/                           # Express backend
       Booking.js               # a client's booking of a gig
       Transaction.js           # payment record created for every booking
     middleware/
-      authMiddleware.js        # JWT verification ("protect") + role check
+      authMiddleware.js        # JWT verification ("protect") + role check ("requireRole")
+      ownership.js             # "requireOwnership" - users can only touch their own records
+      validateObjectId.js      # rejects malformed :id params with a 400
       errorHandler.js          # centralised error handling
       validators.js            # input validation rules (express-validator)
     utils/
       logger.js                # shared logging utility
       generateToken.js         # JWT signing helper
+      password.js              # bcryptjs hashing (shared salt rounds)
+  scripts/
+    seedAdmin.js               # creates the admin account (npm run seed:admin)
+    cleanTestData.js           # removes test users (npm run clean:test)
   certs/                       # local self-signed SSL certificate (see api/certs/README.md)
   postman/                     # Postman collection for API testing
 client/                        # React frontend (Vite)
