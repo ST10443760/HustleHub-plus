@@ -137,7 +137,7 @@ terminal.
 ```bash
 cd api
 npm install
-cp .env.example .env      # then set MONGO_URI and JWT_SECRET inside .env
+cp .env.example .env      # then set MONGO_URI, JWT_SECRET and CLIENT_ORIGIN inside .env
 npm run dev
 ```
 
@@ -151,6 +151,11 @@ If an Atlas `mongodb+srv://` string fails with `querySrv ECONNREFUSED`,
 Node can't resolve the SRV record on your network. Use the standard
 `mongodb://host1,host2,host3/...` string from Atlas (Connect → Drivers)
 instead.
+
+`CLIENT_ORIGIN` is the only browser origin allowed to call the API
+(`http://localhost:5173` for the Vite dev server). It must be an exact
+origin with no trailing slash, and it is required when `NODE_ENV` is
+`production`.
 
 **Creating the admin account**
 
