@@ -19,6 +19,11 @@ const registerValidationRules = [
     .notEmpty().withMessage('Password is required')
     .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
     .matches(/\d/).withMessage('Password must contain at least one number'),
+  // Optional - defaults to client. Admin is never allowed through public
+  // registration; admin accounts are seeded separately.
+  body('role')
+    .optional()
+    .isIn(['client', 'freelancer']).withMessage('Role must be either client or freelancer'),
 ];
 
 const loginValidationRules = [
