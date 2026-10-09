@@ -27,7 +27,22 @@
     { "key": "gigs_client_id", "value": "" },
     { "key": "gig_id", "value": "" },
     { "key": "fb_gig_id", "value": "" },
-    { "key": "unknown_gig_id", "value": "" }
+    { "key": "unknown_gig_id", "value": "" },
+    { "key": "bk_client_email", "value": "" },
+    { "key": "bk_fa_email", "value": "" },
+    { "key": "bk_fb_email", "value": "" },
+    { "key": "bk_client_token", "value": "" },
+    { "key": "bk_fa_token", "value": "" },
+    { "key": "bk_fb_token", "value": "" },
+    { "key": "bk_client_id", "value": "" },
+    { "key": "bk_fa_id", "value": "" },
+    { "key": "bk_fb_id", "value": "" },
+    { "key": "bk_gig_id", "value": "" },
+    { "key": "bk_gig_price", "value": "" },
+    { "key": "bk_inactive_gig_id", "value": "" },
+    { "key": "bk_unknown_gig_id", "value": "" },
+    { "key": "bk_booking_id", "value": "" },
+    { "key": "bk_txn_ref", "value": "" }
   ],
   "item": [
     {
@@ -1255,6 +1270,1024 @@
               }
             ],
             "url": "{{base_url}}/api/gigs/{{gig_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "description": "Clients book active gigs. Price and freelancer come from the gig; every booking creates a transaction in the same database transaction.",
+      "item": [
+        {
+          "name": "Register Client (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const unique = Date.now() + '-' + Math.floor(Math.random() * 10000);",
+                  "pm.collectionVariables.set('bk_client_email', 'test-' + unique + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('bk_client_token', json.data.token);",
+                  "pm.collectionVariables.set('bk_client_id', json.data.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bookings client\",\n  \"email\": \"{{bk_client_email}}\",\n  \"password\": \"password123\",\n  \"role\": \"client\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Register Freelancer A (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const unique = Date.now() + '-' + Math.floor(Math.random() * 10000);",
+                  "pm.collectionVariables.set('bk_fa_email', 'test-' + unique + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('bk_fa_token', json.data.token);",
+                  "pm.collectionVariables.set('bk_fa_id', json.data.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bookings freelancer\",\n  \"email\": \"{{bk_fa_email}}\",\n  \"password\": \"password123\",\n  \"role\": \"freelancer\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Register Freelancer B (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const unique = Date.now() + '-' + Math.floor(Math.random() * 10000);",
+                  "pm.collectionVariables.set('bk_fb_email', 'test-' + unique + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('bk_fb_token', json.data.token);",
+                  "pm.collectionVariables.set('bk_fb_id', json.data.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bookings freelancer\",\n  \"email\": \"{{bk_fb_email}}\",\n  \"password\": \"password123\",\n  \"role\": \"freelancer\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Freelancer A Creates Gig (setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const gig = pm.response.json().data.gig;",
+                  "pm.collectionVariables.set('bk_gig_id', gig.id);",
+                  "pm.collectionVariables.set('bk_gig_price', String(gig.price));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Website landing page\",\n  \"description\": \"A responsive landing page built to your design.\",\n  \"price\": 250,\n  \"category\": \"development\",\n  \"deliveryDays\": 7\n}"
+            },
+            "url": "{{base_url}}/api/gigs"
+          }
+        },
+        {
+          "name": "Freelancer A Creates Second Gig (setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('bk_inactive_gig_id', pm.response.json().data.gig.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Paused gig\",\n  \"description\": \"A responsive landing page built to your design.\",\n  \"price\": 90,\n  \"category\": \"development\",\n  \"deliveryDays\": 7\n}"
+            },
+            "url": "{{base_url}}/api/gigs"
+          }
+        },
+        {
+          "name": "Freelancer A Deactivates Second Gig (setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}"
+            },
+            "url": "{{base_url}}/api/gigs/{{bk_inactive_gig_id}}"
+          }
+        },
+        {
+          "name": "Book Gig - Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json().data;",
+                  "pm.test('Price comes from the gig', () => {",
+                  "  pm.expect(body.booking.price).to.eql(Number(pm.collectionVariables.get('bk_gig_price')));",
+                  "});",
+                  "pm.test('Client and freelancer come from the token and the gig', () => {",
+                  "  pm.expect(body.booking.client).to.eql(pm.collectionVariables.get('bk_client_id'));",
+                  "  pm.expect(body.booking.freelancer).to.eql(pm.collectionVariables.get('bk_fa_id'));",
+                  "  pm.expect(body.booking.status).to.eql('confirmed');",
+                  "});",
+                  "pm.test('Transaction created with the booking', () => {",
+                  "  pm.expect(body.transaction.booking).to.eql(body.booking.id);",
+                  "  pm.expect(body.transaction.amount).to.eql(body.booking.price);",
+                  "  pm.expect(body.transaction.status).to.eql('completed');",
+                  "  pm.expect(body.payment.reference).to.eql(body.transaction.reference);",
+                  "  pm.expect(body.payment.simulated).to.eql(true);",
+                  "});",
+                  "pm.collectionVariables.set('bk_booking_id', body.booking.id);",
+                  "pm.collectionVariables.set('bk_txn_ref', body.transaction.reference);",
+                  "pm.test('No password hashes, emails or stack traces', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('.js:');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{bk_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Book Gig - Price in Body (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{bk_gig_id}}\",\n  \"price\": 1\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Book Gig - Freelancer in Body (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{bk_gig_id}}\",\n  \"freelancer\": \"{{bk_fb_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Book Gig - Status in Body (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{bk_gig_id}}\",\n  \"status\": \"cancelled\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Book Gig - Freelancer Token (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fb_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{bk_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Book Gig - No Token (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{bk_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Book Gig - Malformed gigId (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"not-a-real-id\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Book Gig - Unknown gigId (should fail)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "let id = '';",
+                  "for (let i = 0; i < 24; i++) id += '0123456789abcdef'[Math.floor(Math.random() * 16)];",
+                  "pm.collectionVariables.set('bk_unknown_gig_id', id);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{bk_unknown_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Book Gig - Inactive Gig (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{bk_inactive_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "My Bookings - Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Includes the booking', () => {",
+                  "  const list = pm.response.json().data.bookings;",
+                  "  const found = list.some((x) => (x.id === pm.collectionVariables.get('bk_booking_id')) || (x.booking === pm.collectionVariables.get('bk_booking_id')));",
+                  "  pm.expect(found).to.eql(true);",
+                  "});",
+                  "pm.test('Other party shown by name only', () => {",
+                  "  const b = pm.response.json().data.bookings.find((x) => x.id === pm.collectionVariables.get('bk_booking_id'));",
+                  "  pm.expect(Object.keys(b.freelancer).sort()).to.eql(['id', 'name']);",
+                  "});",
+                  "pm.test('No password hashes, emails or stack traces', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('.js:');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings/mine"
+          }
+        },
+        {
+          "name": "My Bookings - Gig Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Includes the booking', () => {",
+                  "  const list = pm.response.json().data.bookings;",
+                  "  const found = list.some((x) => (x.id === pm.collectionVariables.get('bk_booking_id')) || (x.booking === pm.collectionVariables.get('bk_booking_id')));",
+                  "  pm.expect(found).to.eql(true);",
+                  "});",
+                  "pm.test('No password hashes, emails or stack traces', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('.js:');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings/mine"
+          }
+        },
+        {
+          "name": "My Bookings - Other Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Does not include the booking', () => {",
+                  "  const list = pm.response.json().data.bookings;",
+                  "  const found = list.some((x) => (x.id === pm.collectionVariables.get('bk_booking_id')) || (x.booking === pm.collectionVariables.get('bk_booking_id')));",
+                  "  pm.expect(found).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fb_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings/mine"
+          }
+        },
+        {
+          "name": "Get Booking - Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No password hashes, emails or stack traces', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('.js:');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings/{{bk_booking_id}}"
+          }
+        },
+        {
+          "name": "Get Booking - Gig Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings/{{bk_booking_id}}"
+          }
+        },
+        {
+          "name": "Get Booking - Other Freelancer (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fb_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings/{{bk_booking_id}}"
+          }
+        },
+        {
+          "name": "My Transactions - Client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Includes the booking', () => {",
+                  "  const list = pm.response.json().data.transactions;",
+                  "  const found = list.some((x) => (x.id === pm.collectionVariables.get('bk_booking_id')) || (x.booking === pm.collectionVariables.get('bk_booking_id')));",
+                  "  pm.expect(found).to.eql(true);",
+                  "});",
+                  "pm.test('Has the reference from the booking', () => {",
+                  "  pm.expect(pm.response.json().data.transactions.map((t) => t.reference)).to.include(pm.collectionVariables.get('bk_txn_ref'));",
+                  "});",
+                  "pm.test('No password hashes, emails or stack traces', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('.js:');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/transactions/mine"
+          }
+        },
+        {
+          "name": "My Transactions - Gig Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Includes the booking', () => {",
+                  "  const list = pm.response.json().data.transactions;",
+                  "  const found = list.some((x) => (x.id === pm.collectionVariables.get('bk_booking_id')) || (x.booking === pm.collectionVariables.get('bk_booking_id')));",
+                  "  pm.expect(found).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/transactions/mine"
+          }
+        },
+        {
+          "name": "My Transactions - Other Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Does not include the booking', () => {",
+                  "  const list = pm.response.json().data.transactions;",
+                  "  const found = list.some((x) => (x.id === pm.collectionVariables.get('bk_booking_id')) || (x.booking === pm.collectionVariables.get('bk_booking_id')));",
+                  "  pm.expect(found).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fb_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/transactions/mine"
+          }
+        },
+        {
+          "name": "Freelancer A Raises Gig Price",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 400\n}"
+            },
+            "url": "{{base_url}}/api/gigs/{{bk_gig_id}}"
+          }
+        },
+        {
+          "name": "Get Booking - Price Unchanged After Gig Edit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Booking keeps the price it was booked at', () => {",
+                  "  pm.expect(pm.response.json().data.booking.price).to.eql(Number(pm.collectionVariables.get('bk_gig_price')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/bookings/{{bk_booking_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Income",
+      "description": "Freelancer income from completed transactions, attributed to the right freelancer. Uses the users and booking from the Bookings folder.",
+      "item": [
+        {
+          "name": "Income - Gig Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json().data;",
+                  "pm.test('Total equals the price the gig was booked at', () => {",
+                  "  pm.expect(body.totalEarned).to.eql(Number(pm.collectionVariables.get('bk_gig_price')));",
+                  "  pm.expect(body.bookingCount).to.eql(1);",
+                  "});",
+                  "pm.test('One item for the booking', () => {",
+                  "  pm.expect(body.items).to.have.lengthOf(1);",
+                  "  pm.expect(body.items[0].bookingId).to.eql(pm.collectionVariables.get('bk_booking_id'));",
+                  "  pm.expect(body.items[0].reference).to.eql(pm.collectionVariables.get('bk_txn_ref'));",
+                  "  pm.expect(body.items[0].amount).to.eql(Number(pm.collectionVariables.get('bk_gig_price')));",
+                  "  pm.expect(body.items[0]).to.include.keys('gigTitle', 'date');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income"
+          }
+        },
+        {
+          "name": "Income - Other Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Nothing earned', () => {",
+                  "  const body = pm.response.json().data;",
+                  "  pm.expect(body.totalEarned).to.eql(0);",
+                  "  pm.expect(body.items).to.eql([]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fb_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income"
+          }
+        },
+        {
+          "name": "Income - Client (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income"
+          }
+        },
+        {
+          "name": "Admin Transactions - Client (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/transactions"
+          }
+        },
+        {
+          "name": "Admin Transactions - Admin (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Paginated, newest first, names only', () => {",
+                  "  const body = pm.response.json().data;",
+                  "  pm.expect(body).to.include.keys('transactions', 'page', 'limit', 'total');",
+                  "  pm.expect(body.transactions.length).to.be.at.most(5);",
+                  "  for (let i = 1; i < body.transactions.length; i++) {",
+                  "    pm.expect(new Date(body.transactions[i - 1].createdAt) >= new Date(body.transactions[i].createdAt)).to.be.true;",
+                  "  }",
+                  "});",
+                  "pm.test('No password hashes, emails or stack traces', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('.js:');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/transactions?limit=5"
           }
         }
       ]
