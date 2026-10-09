@@ -11,7 +11,9 @@ const logger = require('../utils/logger');
  *     updateGig);
  *
  * Options:
- *   ownerField   - field on the document holding the owner's user id
+ *   ownerField   - field on the document holding the owner's user id, or an
+ *                  array of fields when a record has more than one owner
+ *                  (a booking belongs to both its client and its freelancer)
  *   resourceName - used in the 404 message ("Gig not found")
  *   allowAdmin   - when true, admins skip the owner check
  *
@@ -21,7 +23,8 @@ const logger = require('../utils/logger');
  * the controller doesn't have to query it again.
  */
 function requireOwnership(Model, { ownerField, resourceName = 'Resource', allowAdmin = false }) {
-  if (!ownerField) {
+  const ownerFields = [].concat(ownerField || []);
+  if (ownerFields.length === 0) {
     throw new Error('requireOwnership needs an ownerField');
   }
 
@@ -34,9 +37,11 @@ function requireOwnership(Model, { ownerField, resourceName = 'Resource', allowA
       }
 
       const isAdminBypass = allowAdmin && req.user.role === 'admin';
-      const ownerId = doc[ownerField] ? doc[ownerField].toString() : null;
+      const isOwner = ownerFields.some(
+        (field) => doc[field] && doc[field].toString() === String(req.user.id)
+      );
 
-      if (!isAdminBypass && ownerId !== String(req.user.id)) {
+      if (!isAdminBypass && !isOwner) {
         logger.event('RBAC', 'Access denied - not the owner', {
           userId: req.user.id,
           role: req.user.role,
