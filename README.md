@@ -111,9 +111,20 @@ terminal.
 ```bash
 cd api
 npm install
-cp .env.example .env      # then set your own JWT_SECRET inside .env
+cp .env.example .env      # then set MONGO_URI and JWT_SECRET inside .env
 npm run dev
 ```
+
+The API needs a MongoDB database. Set `MONGO_URI` in `api/.env` to either a
+local instance (`mongodb://localhost:27017/hustlehub`) or a MongoDB Atlas
+connection string. The real value lives only in `.env`, which is never
+committed. The server connects to the database before it starts listening,
+and exits with a safe error message (never the URI) if it can't connect.
+
+If an Atlas `mongodb+srv://` string fails with `querySrv ECONNREFUSED`,
+Node can't resolve the SRV record on your network. Use the standard
+`mongodb://host1,host2,host3/...` string from Atlas (Connect → Drivers)
+instead.
 
 **Frontend (`client/`)**
 
