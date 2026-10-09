@@ -42,7 +42,13 @@
     { "key": "bk_inactive_gig_id", "value": "" },
     { "key": "bk_unknown_gig_id", "value": "" },
     { "key": "bk_booking_id", "value": "" },
-    { "key": "bk_txn_ref", "value": "" }
+    { "key": "bk_txn_ref", "value": "" },
+    { "key": "sec_client_email", "value": "" },
+    { "key": "sec_fl_email", "value": "" },
+    { "key": "sec_client_token", "value": "" },
+    { "key": "sec_fl_token", "value": "" },
+    { "key": "sec_gig_id", "value": "" },
+    { "key": "big_text", "value": "" }
   ],
   "item": [
     {
@@ -2288,6 +2294,475 @@
               }
             ],
             "url": "{{base_url}}/api/admin/transactions?limit=5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Security",
+      "description": "Security headers, injection attempts, locked CORS, body errors and admin-only gig removal.",
+      "item": [
+        {
+          "name": "Register Client (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const unique = Date.now() + '-' + Math.floor(Math.random() * 10000);",
+                  "pm.collectionVariables.set('sec_client_email', 'test-' + unique + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('sec_client_token', pm.response.json().data.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Security client\",\n  \"email\": \"{{sec_client_email}}\",\n  \"password\": \"password123\",\n  \"role\": \"client\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Register Freelancer (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const unique = Date.now() + '-' + Math.floor(Math.random() * 10000);",
+                  "pm.collectionVariables.set('sec_fl_email', 'test-' + unique + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('sec_fl_token', pm.response.json().data.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Security freelancer\",\n  \"email\": \"{{sec_fl_email}}\",\n  \"password\": \"password123\",\n  \"role\": \"freelancer\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Freelancer Creates Gig (setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('sec_gig_id', pm.response.json().data.gig.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sec_fl_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Security test gig\",\n  \"description\": \"A gig used by the security and rate limit tests.\",\n  \"price\": 120,\n  \"category\": \"design\",\n  \"deliveryDays\": 4\n}"
+            },
+            "url": "{{base_url}}/api/gigs"
+          }
+        },
+        {
+          "name": "Security Headers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Strict Content-Security-Policy', () => {",
+                  "  const csp = pm.response.headers.get('Content-Security-Policy');",
+                  "  pm.expect(csp).to.include(\"default-src 'self'\");",
+                  "  pm.expect(csp).to.include(\"script-src 'self'\");",
+                  "  pm.expect(csp).to.include(\"frame-ancestors 'none'\");",
+                  "  pm.expect(csp).to.include(\"object-src 'none'\");",
+                  "  pm.expect(csp).to.not.include('unsafe-inline');",
+                  "  pm.expect(csp).to.not.include('unsafe-eval');",
+                  "});",
+                  "pm.test('nosniff, no-referrer and HSTS', () => {",
+                  "  pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.eql('nosniff');",
+                  "  pm.expect(pm.response.headers.get('Referrer-Policy')).to.eql('no-referrer');",
+                  "  pm.expect(pm.response.headers.get('Strict-Transport-Security')).to.include('max-age=');",
+                  "});",
+                  "pm.test('No X-Powered-By header', () => {",
+                  "  pm.expect(pm.response.headers.has('X-Powered-By')).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/health"
+          }
+        },
+        {
+          "name": "Login - Operator in Email (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Generic error shape, no stack trace', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.be.a('string');",
+                  "  pm.expect(pm.response.text()).to.not.include('.js:');",
+                  "  pm.expect(pm.response.text()).to.not.include('    at ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": { \"$gt\": \"\" },\n  \"password\": \"password123\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Browse Gigs - Operator in Query (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Generic error shape, no stack trace', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.be.a('string');",
+                  "  pm.expect(pm.response.text()).to.not.include('.js:');",
+                  "  pm.expect(pm.response.text()).to.not.include('    at ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sec_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/gigs?category[$ne]=design"
+          }
+        },
+        {
+          "name": "CORS - Disallowed Origin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('No Access-Control-Allow-Origin header', () => {",
+                  "  pm.expect(pm.response.headers.has('Access-Control-Allow-Origin')).to.eql(false);",
+                  "});",
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Generic error shape, no stack trace', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.be.a('string');",
+                  "  pm.expect(pm.response.text()).to.not.include('.js:');",
+                  "  pm.expect(pm.response.text()).to.not.include('    at ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://evil.example"
+              }
+            ],
+            "url": "{{base_url}}/api/health"
+          }
+        },
+        {
+          "name": "CORS - Allowed Origin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Echoes only the client origin', () => {",
+                  "  pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.eql('http://localhost:5173');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Origin",
+                "value": "http://localhost:5173"
+              }
+            ],
+            "url": "{{base_url}}/api/health"
+          }
+        },
+        {
+          "name": "Malformed JSON (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Clear message', () => pm.expect(pm.response.json().error).to.eql('Request body is not valid JSON'));",
+                  "pm.test('Generic error shape, no stack trace', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.be.a('string');",
+                  "  pm.expect(pm.response.text()).to.not.include('.js:');",
+                  "  pm.expect(pm.response.text()).to.not.include('    at ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"email\": \"broken@example.com\", "
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Oversized Body (should fail)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Just over the 10kb body limit.",
+                  "pm.collectionVariables.set('big_text', 'x'.repeat(12000));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 413', () => pm.response.to.have.status(413));",
+                  "pm.test('Clear message', () => pm.expect(pm.response.json().error).to.eql('Request body is too large'));",
+                  "pm.test('Generic error shape, no stack trace', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.be.a('string');",
+                  "  pm.expect(pm.response.text()).to.not.include('.js:');",
+                  "  pm.expect(pm.response.text()).to.not.include('    at ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"big@example.com\",\n  \"password\": \"{{big_text}}\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Admin Delete Gig - Client (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sec_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/gigs/{{sec_gig_id}}"
+          }
+        },
+        {
+          "name": "Admin Delete Gig - Freelancer (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sec_fl_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/gigs/{{sec_gig_id}}"
+          }
+        },
+        {
+          "name": "Admin Delete Gig - Admin (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Gig deleted (no bookings)', () => {",
+                  "  const body = pm.response.json().data;",
+                  "  pm.expect(body.deleted).to.eql(true);",
+                  "  pm.expect(body.id).to.eql(pm.collectionVariables.get('sec_gig_id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/gigs/{{sec_gig_id}}"
+          }
+        },
+        {
+          "name": "Get Gig After Admin Delete (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{sec_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/gigs/{{sec_gig_id}}"
           }
         }
       ]
