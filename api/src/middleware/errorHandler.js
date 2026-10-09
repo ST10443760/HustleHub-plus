@@ -13,6 +13,19 @@ class AppError extends Error {
   }
 }
 
+// body-parser error types -> [safe message, status].
+const BODY_PARSER_MESSAGES = {
+  'entity.parse.failed': ['Request body is not valid JSON', 400],
+  'entity.too.large': ['Request body is too large', 413],
+  'entity.verify.failed': ['Request body could not be read', 400],
+  'request.aborted': ['Request was aborted', 400],
+  'request.size.invalid': ['Request body could not be read', 400],
+  'stream.encoding.set': ['Request body could not be read', 400],
+  'charset.unsupported': ['Unsupported character set', 415],
+  'encoding.unsupported': ['Unsupported content encoding', 415],
+  'parameters.too.many': ['Too many parameters in request body', 413],
+};
+
 /**
  * 404 handler - for any route that doesn't match.
  * Must be registered AFTER all real routes, BEFORE the error handler.
@@ -39,6 +52,14 @@ function errorHandler(err, req, res, next) {
   // raw message names schema paths, so it's replaced with a generic one.
   if (['ValidationError', 'CastError', 'StrictModeError'].includes(err.name)) {
     err = Object.assign(new AppError('Invalid input', 400), { stack: err.stack, cause: err.message });
+  }
+
+  // The body parser rejected the request before any route ran (bad JSON,
+  // too large, unsupported encoding). Its own messages can quote the raw
+  // body, so they're swapped for fixed ones.
+  if (err.type && BODY_PARSER_MESSAGES[err.type]) {
+    const [message, status] = BODY_PARSER_MESSAGES[err.type];
+    err = Object.assign(new AppError(message, status), { stack: err.stack, cause: err.type });
   }
 
   const statusCode = err.statusCode || 500;
