@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { AppError } = require('./errorHandler');
 const User = require('../models/User');
+const logger = require('../utils/logger');
 
 /**
  * Protects a route - requires a valid JWT in the Authorization header
@@ -52,10 +53,19 @@ async function protect(req, res, next) {
 /**
  * Role-based access control - use after `protect`.
  * Usage: router.delete('/gigs/:id', protect, requireRole('freelancer'), ...)
+ *
+ * The response stays generic - it never says which roles would have been
+ * allowed, so it can't be used to map out the permission model.
  */
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
+      logger.event('RBAC', 'Access denied - wrong role', {
+        userId: req.user ? req.user.id : null,
+        role: req.user ? req.user.role : null,
+        method: req.method,
+        path: req.originalUrl,
+      });
       return next(new AppError('You do not have permission to perform this action', 403));
     }
     next();
