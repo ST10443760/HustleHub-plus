@@ -260,6 +260,41 @@ string. Admins only bypass this on routes that explicitly allow it. Malformed
 ids are rejected with a `400` by `validateObjectId` before they reach the
 database.
 
+### API endpoints
+
+All routes are under `https://localhost:5000`. "Logged in" means a valid
+`Authorization: Bearer <token>` header.
+
+| Method | Path | Who can call it | Notes |
+|---|---|---|---|
+| GET | `/api/health` | Anyone | Health check |
+| POST | `/api/auth/register` | Anyone | `role` may be `client` (default) or `freelancer`, never `admin` |
+| POST | `/api/auth/login` | Anyone | Same generic error for wrong password and unknown email |
+| GET | `/api/auth/me` | Logged in | The current user |
+| GET | `/api/admin/users` | Admin | All users, newest first, no password hashes |
+| GET | `/api/gigs` | Logged in | Active gigs, newest first. Query: `page`, `limit` (max 50), `category`, `q`, `minPrice`, `maxPrice` |
+| GET | `/api/gigs/mine` | Freelancer | Your own gigs, including inactive ones |
+| GET | `/api/gigs/:id` | Logged in | One gig. Inactive gigs are only visible to their owner (404 for everyone else) |
+| POST | `/api/gigs` | Freelancer | Creates a gig owned by you |
+| PUT | `/api/gigs/:id` | Freelancer, **owner only** | Update `title`, `description`, `price`, `category`, `deliveryDays`, `isActive` |
+| DELETE | `/api/gigs/:id` | Freelancer, **owner only** | Deletes the gig, or deactivates it if it already has bookings |
+
+**Gig rules**
+
+- The owner of a gig is always the logged-in freelancer (`req.user.id`).
+  Sending `freelancer`, `isActive` or any other field that isn't allowed
+  is rejected with a `400`, not silently ignored.
+- Text fields (title, description, category) are trimmed, length-checked
+  and HTML-escaped before they're saved, so markup can't run in a browser
+  later. Price must be a number from 1 to 100000 (at most 2 decimals),
+  delivery days a whole number from 1 to 90, and category one of
+  `design`, `writing`, `development`, `marketing`, `video`, `other`.
+- Search (`q`) is plain text: regex characters are escaped, so `.*` only
+  matches the literal text `.*`.
+- Updating or deleting someone else's gig returns `403` and is logged.
+  A gig with bookings is deactivated instead of deleted so booking and
+  transaction history keeps a valid reference.
+
 ## 7. HTTPS
 
 The API is served over HTTPS using a locally generated, self-signed SSL
