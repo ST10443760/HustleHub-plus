@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
+const sanitize = require('./middleware/sanitize');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -13,6 +14,7 @@ app.use(helmet()); // sets secure HTTP headers
 app.use(cors()); // tighten this to a specific origin once the frontend exists (Part 2)
 app.use(express.json({ limit: '10kb' })); // body parser, with a sane size limit
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(sanitize); // strips $ / . keys from body, query and params - must come after parsing
 
 // Lightweight request logger - not a replacement for the event-specific
 // logging in each controller, just a trace of what hit the API.
