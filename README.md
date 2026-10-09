@@ -33,10 +33,10 @@ top of it.
 
 ## 2. Architecture
 
-The system follows a MERN-oriented architecture. Part 1 implements the
-**Express/Node** backend only; **React** (frontend) and **MongoDB**
-(database) are introduced in Part 2, replacing the in-memory storage used
-here.
+The system follows a MERN architecture: a **React** frontend, an
+**Express/Node** backend and a **MongoDB** database (via Mongoose). Part 1
+kept users in memory; Part 2 replaces that with MongoDB, so accounts and all
+marketplace data now persist across server restarts.
 
 ![Architecture Diagram](./docs/architecture-diagram.png)
 
@@ -63,7 +63,7 @@ Auth controller (register / login logic)
 bcryptjs (password hashing)  +  input validation
       │
       ▼
-In-memory user store
+MongoDB (Mongoose models)
 ```
 
 Errors raised at any stage are caught by a single centralised error handler
@@ -81,8 +81,13 @@ api/                           # Express backend
       authRoutes.js            # /api/auth/register, /login, /me
     controllers/
       authController.js        # register/login business logic
+    config/
+      db.js                    # MongoDB connection (Mongoose)
     models/
-      userModel.js             # in-memory user storage (Part 1 only)
+      User.js                  # users (password hash never selected by default)
+      Gig.js                   # gig listings owned by a freelancer
+      Booking.js               # a client's booking of a gig
+      Transaction.js           # payment record created for every booking
     middleware/
       authMiddleware.js        # JWT verification ("protect") + role check
       errorHandler.js          # centralised error handling
