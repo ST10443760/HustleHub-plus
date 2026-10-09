@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const { hashPassword, comparePassword } = require('../utils/password');
+const { hashPassword, comparePassword, DUMMY_HASH } = require('../utils/password');
 const generateToken = require('../utils/generateToken');
 const { AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
@@ -51,16 +51,17 @@ async function login(req, res, next) {
 
     // passwordHash is select: false on the model, so ask for it explicitly.
     const user = await User.findOne({ email }).select('+passwordHash');
-    if (!user) {
-      logger.event('AUTH', 'Failed login - unknown email', { email });
-      // Same generic message as "wrong password" below - never confirm
-      // whether the email exists, that's a user-enumeration leak.
-      throw new AppError('Invalid email or password', 401);
-    }
 
-    const passwordMatches = await comparePassword(password, user.passwordHash);
-    if (!passwordMatches) {
-      logger.event('AUTH', 'Failed login - wrong password', { userId: user.id });
+    // bcrypt always runs - against a dummy hash when the email is unknown -
+    // so both failure cases take the same time.
+    const passwordMatches = await comparePassword(password, user ? user.passwordHash : DUMMY_HASH);
+
+    if (!user || !passwordMatches) {
+      logger.event('AUTH', user ? 'Failed login - wrong password' : 'Failed login - unknown email', {
+        email,
+      });
+      // Same generic message for both cases - never confirm whether the
+      // email exists, that's a user-enumeration leak.
       throw new AppError('Invalid email or password', 401);
     }
 
