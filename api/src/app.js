@@ -13,6 +13,14 @@ const app = express();
 // Don't advertise the framework (Helmet removes the header too).
 app.disable('x-powered-by');
 
+// Lightweight request logger - not a replacement for the event-specific
+// logging in each controller, just a trace of what hit the API. First, so
+// requests blocked by CORS or a rate limiter still show up.
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // ---- Security & parsing middleware pipeline ----
 // Order matters here - keep helmet/cors first, body parsing next, then routes.
 app.use(helmet(helmetOptions)); // strict CSP, HSTS, nosniff, no-referrer, cross-origin policies
@@ -21,13 +29,6 @@ app.use('/api', generalLimiter); // safety net, before any body is parsed
 app.use(express.json({ limit: '10kb' })); // body parser, with a sane size limit
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(sanitize); // strips $ / . keys from body, query and params - must come after parsing
-
-// Lightweight request logger - not a replacement for the event-specific
-// logging in each controller, just a trace of what hit the API.
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.originalUrl}`);
-  next();
-});
 
 // ---- Routes ----
 app.use('/api/auth', require('./routes/authRoutes'));
