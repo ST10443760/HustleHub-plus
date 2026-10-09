@@ -281,12 +281,18 @@ All routes are under `https://localhost:5000`. "Logged in" means a valid
 | POST | `/api/auth/login` | Anyone | Same generic error for wrong password and unknown email |
 | GET | `/api/auth/me` | Logged in | The current user |
 | GET | `/api/admin/users` | Admin | All users, newest first, no password hashes |
+| GET | `/api/admin/transactions` | Admin | All transactions, newest first. Query: `page`, `limit` (max 50) |
 | GET | `/api/gigs` | Logged in | Active gigs, newest first. Query: `page`, `limit` (max 50), `category`, `q`, `minPrice`, `maxPrice` |
 | GET | `/api/gigs/mine` | Freelancer | Your own gigs, including inactive ones |
 | GET | `/api/gigs/:id` | Logged in | One gig. Inactive gigs are only visible to their owner (404 for everyone else) |
 | POST | `/api/gigs` | Freelancer | Creates a gig owned by you |
 | PUT | `/api/gigs/:id` | Freelancer, **owner only** | Update `title`, `description`, `price`, `category`, `deliveryDays`, `isActive` |
 | DELETE | `/api/gigs/:id` | Freelancer, **owner only** | Deletes the gig, or deactivates it if it already has bookings |
+| POST | `/api/bookings` | Client | Body is `{ "gigId": "..." }` only. Creates the booking and its transaction, returns a simulated payment confirmation |
+| GET | `/api/bookings/mine` | Client, Freelancer | Clients: their bookings. Freelancers: bookings on their gigs. Newest first |
+| GET | `/api/bookings/:id` | The booking's client or freelancer | Anyone else gets `403` |
+| GET | `/api/transactions/mine` | Client, Freelancer | Clients: what they paid. Freelancers: what they were paid |
+| GET | `/api/income` | Freelancer | `{ totalEarned, bookingCount, items }` from completed transactions |
 
 **Gig rules**
 
