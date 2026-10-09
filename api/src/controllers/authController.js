@@ -17,14 +17,17 @@ async function register(req, res, next) {
     if (existing) {
       // 409 Conflict - don't reveal *why* beyond "already registered",
       // and definitely don't confirm/deny in a way that helps enumerate users.
-      logger.event('AUTH', 'Registration attempt with existing email', { email });
+      logger.event('AUTH', 'Registration attempt with existing email', {
+        email: logger.maskEmail(email),
+        ip: req.ip,
+      });
       throw new AppError(DUPLICATE_EMAIL_MESSAGE, 409);
     }
 
     const passwordHash = await hashPassword(password);
     const user = await User.create({ name, email, passwordHash, role });
 
-    logger.event('AUTH', 'User registered', { userId: user.id, role: user.role });
+    logger.event('AUTH', 'User registered', { userId: user.id, role: user.role, ip: req.ip });
 
     const token = generateToken(user);
 
@@ -57,15 +60,15 @@ async function login(req, res, next) {
     const passwordMatches = await comparePassword(password, user ? user.passwordHash : DUMMY_HASH);
 
     if (!user || !passwordMatches) {
-      logger.event('AUTH', user ? 'Failed login - wrong password' : 'Failed login - unknown email', {
-        email,
-      });
+      // One message for both cases, so the log doesn't reveal whether the
+      // account exists either. Never the password.
+      logger.event('AUTH', 'Failed login', { email: logger.maskEmail(email), ip: req.ip });
       // Same generic message for both cases - never confirm whether the
       // email exists, that's a user-enumeration leak.
       throw new AppError('Invalid email or password', 401);
     }
 
-    logger.event('AUTH', 'User logged in', { userId: user.id });
+    logger.event('AUTH', 'User logged in', { userId: user.id, ip: req.ip });
 
     const token = generateToken(user);
 
