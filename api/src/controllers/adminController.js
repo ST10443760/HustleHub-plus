@@ -1,5 +1,8 @@
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
+const Gig = require('../models/Gig');
+const { AppError } = require('../middleware/errorHandler');
+const { removeOrDeactivateGig } = require('../utils/gigRemoval');
 const logger = require('../utils/logger');
 
 // GET /api/admin/users - every user, newest first. passwordHash is
@@ -48,4 +51,27 @@ async function listTransactions(req, res, next) {
   }
 }
 
-module.exports = { listUsers, listTransactions };
+// DELETE /api/admin/gigs/:id - remove any gig (e.g. one breaking the rules).
+// Same rule as the owner's delete: deactivated instead if it has bookings.
+async function deleteAnyGig(req, res, next) {
+  try {
+    const gig = await Gig.findById(req.params.id);
+    if (!gig) {
+      throw new AppError('Gig not found', 404);
+    }
+
+    const result = await removeOrDeactivateGig(gig);
+
+    logger.event('ADMIN', result.deleted ? 'Admin deleted a gig' : 'Admin deactivated a gig - it has bookings', {
+      adminId: req.user.id,
+      gigId: result.id,
+      freelancerId: gig.freelancer.toString(),
+    });
+
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listUsers, listTransactions, deleteAnyGig };
