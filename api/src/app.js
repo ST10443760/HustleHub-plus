@@ -25,6 +25,9 @@ app.use((req, res, next) => {
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/gigs', require('./routes/gigRoutes'));
+app.use('/api/bookings', require('./routes/bookingRoutes'));
+app.use('/api/transactions', require('./routes/transactionRoutes'));
+app.use('/api/income', require('./routes/incomeRoutes'));
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ success: true, message: 'HustleHub+ API is running' });
