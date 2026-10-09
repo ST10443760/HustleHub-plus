@@ -313,6 +313,20 @@ covers both valid and invalid scenarios:
 - Protected route with an invalid/tampered token (expects `401`)
 - Protected route with a valid token (expects `200` and the authenticated user)
 
+An **RBAC** folder checks access control on `/api/admin/users`:
+
+- No token (expects `401`)
+- Client token (expects `403`, generic message)
+- Freelancer token (expects `403`, generic message)
+- Registering with `"role": "admin"` (expects `400`, no token issued)
+- Admin login and admin token (expects `200`, no password hashes, newest
+  first). These two only run when admin credentials are supplied and are
+  skipped cleanly otherwise.
+
+Every run registers users with a fresh `test-...@example.com` email, so the
+collection can be run repeatedly against the same database. Use
+`npm run clean:test` to clear them out afterwards.
+
 To run it: import the collection into Postman, disable SSL verification,
 start the server (`npm run dev` inside `api/`), and run the collection — or run it
 headlessly via Newman:
@@ -320,6 +334,13 @@ headlessly via Newman:
 ```bash
 npm install -g newman
 newman run api/postman/HustleHub_Part1_Auth.postman_collection.json --insecure
+```
+
+To include the admin tests, pass the seeded admin's credentials as
+variables (they're never stored in the collection):
+
+```bash
+newman run api/postman/HustleHub_Part1_Auth.postman_collection.json --insecure   --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
 ```
 
 ## 11. Demonstration Video
