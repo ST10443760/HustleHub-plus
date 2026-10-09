@@ -237,12 +237,13 @@ containing only the user's `id` and `role` in its payload — never the
 password hash or other sensitive fields, since a JWT payload is signed but
 not encrypted and can be decoded by anyone holding the token.
 
-Protected routes (currently `GET /api/auth/me`) are wrapped in a `protect`
-middleware that:
+Every route except the health check, register and login is wrapped in a
+`protect` middleware that:
 
 1. Reads the token from the `Authorization: Bearer <token>` header
 2. Verifies its signature against `JWT_SECRET`
-3. Confirms the user it refers to still exists
+3. Loads the user from the database, confirming they still exist and
+   taking their role from the database rather than the token
 4. Attaches the authenticated user to `req.user` for the controller to use
 
 Missing, expired, or tampered tokens all return the same generic `401`
