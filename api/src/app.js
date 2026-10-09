@@ -8,6 +8,9 @@ const logger = require('./utils/logger');
 
 const app = express();
 
+// Don't advertise the framework (Helmet removes the header too).
+app.disable('x-powered-by');
+
 // ---- Security & parsing middleware pipeline ----
 // Order matters here - keep helmet/cors first, body parsing next, then routes.
 app.use(helmet()); // sets secure HTTP headers
