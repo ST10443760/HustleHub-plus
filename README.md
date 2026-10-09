@@ -80,9 +80,11 @@ api/                           # Express backend
     routes/
       authRoutes.js            # /api/auth/register, /login, /me
       adminRoutes.js           # /api/admin/* (admin role only)
+      gigRoutes.js             # /api/gigs (browse, create, update, delete)
     controllers/
       authController.js        # register/login business logic
       adminController.js       # admin-only actions (list users)
+      gigController.js         # gig listing, search and owner-only changes
     config/
       db.js                    # MongoDB connection (Mongoose)
     models/
@@ -96,10 +98,12 @@ api/                           # Express backend
       validateObjectId.js      # rejects malformed :id params with a 400
       errorHandler.js          # centralised error handling
       validators.js            # input validation rules (express-validator)
+      gigValidators.js         # gig body + list query rules, HTML escaping
     utils/
       logger.js                # shared logging utility
       generateToken.js         # JWT signing helper
       password.js              # bcryptjs hashing (shared salt rounds)
+      escapeRegex.js           # makes search text safe to use in a regex
   scripts/
     seedAdmin.js               # creates the admin account (npm run seed:admin)
     cleanTestData.js           # removes test users (npm run clean:test)
