@@ -22,14 +22,12 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true, // clients listing their own bookings
     },
     // Copied from the gig at booking time, not taken from the request.
     freelancer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true, // freelancers listing bookings on their gigs
     },
     status: {
       type: String,
@@ -49,6 +47,10 @@ const bookingSchema = new mongoose.Schema(
     strict: 'throw',
   }
 );
+
+// "My bookings", newest first - for both sides of a booking.
+bookingSchema.index({ client: 1, createdAt: -1 });
+bookingSchema.index({ freelancer: 1, createdAt: -1 });
 
 bookingSchema.set('toJSON', {
   transform(doc, ret) {
