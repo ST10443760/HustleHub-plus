@@ -1,0 +1,701 @@
+{
+  "info": {
+    "name": "HustleHub+ - Rate Limits",
+    "description": "Run against the API with its STRICT default limits (npm run dev / npm start, not start:test). Restart the API between runs so every window starts clean.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://localhost:5000"
+    },
+    {
+      "key": "rl_unknown_email",
+      "value": ""
+    },
+    {
+      "key": "rl_client_email",
+      "value": ""
+    },
+    {
+      "key": "rl_fl_email",
+      "value": ""
+    },
+    {
+      "key": "rl_client_token",
+      "value": ""
+    },
+    {
+      "key": "rl_fl_token",
+      "value": ""
+    },
+    {
+      "key": "rl_gig_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Login Limiter",
+      "description": "5 failed logins per 15 minutes per IP.",
+      "item": [
+        {
+          "name": "Failed Login 1 of 5",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const unique = Date.now() + '-' + Math.floor(Math.random() * 10000);",
+                  "pm.collectionVariables.set('rl_unknown_email', 'test-' + unique + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rl_unknown_email}}\",\n  \"password\": \"wrongpassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Failed Login 2 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rl_unknown_email}}\",\n  \"password\": \"wrongpassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Failed Login 3 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rl_unknown_email}}\",\n  \"password\": \"wrongpassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Failed Login 4 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rl_unknown_email}}\",\n  \"password\": \"wrongpassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Failed Login 5 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rl_unknown_email}}\",\n  \"password\": \"wrongpassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Failed Login 6 (rate limited)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 429', () => pm.response.to.have.status(429));",
+                  "pm.test('Retry-After header with a sensible number of seconds', () => {",
+                  "  const retryAfter = Number(pm.response.headers.get('Retry-After'));",
+                  "  pm.expect(Number.isInteger(retryAfter)).to.eql(true);",
+                  "  pm.expect(retryAfter).to.be.within(1, 900);",
+                  "});",
+                  "pm.test('Meaningful message that matches Retry-After', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  const match = /^Too many requests, please try again in (\\d+) seconds\\.$/.exec(body.error);",
+                  "  pm.expect(match, body.error).to.not.eql(null);",
+                  "  pm.expect(Number(match[1])).to.eql(Number(pm.response.headers.get('Retry-After')));",
+                  "});",
+                  "pm.test('Standard RateLimit headers, no legacy X-RateLimit headers', () => {",
+                  "  pm.expect(pm.response.headers.has('RateLimit')).to.eql(true);",
+                  "  pm.expect(pm.response.headers.has('X-RateLimit-Limit')).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{rl_unknown_email}}\",\n  \"password\": \"wrongpassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Booking Limiter",
+      "description": "10 bookings per 10 minutes per user.",
+      "item": [
+        {
+          "name": "Register Client (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const unique = Date.now() + '-' + Math.floor(Math.random() * 10000);",
+                  "pm.collectionVariables.set('rl_client_email', 'test-' + unique + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('rl_client_token', pm.response.json().data.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"RateLimit client\",\n  \"email\": \"{{rl_client_email}}\",\n  \"password\": \"password123\",\n  \"role\": \"client\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Register Freelancer (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const unique = Date.now() + '-' + Math.floor(Math.random() * 10000);",
+                  "pm.collectionVariables.set('rl_fl_email', 'test-' + unique + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('rl_fl_token', pm.response.json().data.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"RateLimit freelancer\",\n  \"email\": \"{{rl_fl_email}}\",\n  \"password\": \"password123\",\n  \"role\": \"freelancer\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Freelancer Creates Gig (setup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('rl_gig_id', pm.response.json().data.gig.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_fl_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Security test gig\",\n  \"description\": \"A gig used by the security and rate limit tests.\",\n  \"price\": 120,\n  \"category\": \"design\",\n  \"deliveryDays\": 4\n}"
+            },
+            "url": "{{base_url}}/api/gigs"
+          }
+        },
+        {
+          "name": "Booking 1 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 2 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 3 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 4 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 5 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 6 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 7 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 8 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 9 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 10 of 10",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        },
+        {
+          "name": "Booking 11 (rate limited)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 429', () => pm.response.to.have.status(429));",
+                  "pm.test('Retry-After header with a sensible number of seconds', () => {",
+                  "  const retryAfter = Number(pm.response.headers.get('Retry-After'));",
+                  "  pm.expect(Number.isInteger(retryAfter)).to.eql(true);",
+                  "  pm.expect(retryAfter).to.be.within(1, 600);",
+                  "});",
+                  "pm.test('Meaningful message that matches Retry-After', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  const match = /^Too many requests, please try again in (\\d+) seconds\\.$/.exec(body.error);",
+                  "  pm.expect(match, body.error).to.not.eql(null);",
+                  "  pm.expect(Number(match[1])).to.eql(Number(pm.response.headers.get('Retry-After')));",
+                  "});",
+                  "pm.test('Standard RateLimit headers, no legacy X-RateLimit headers', () => {",
+                  "  pm.expect(pm.response.headers.has('RateLimit')).to.eql(true);",
+                  "  pm.expect(pm.response.headers.has('X-RateLimit-Limit')).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{rl_client_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gigId\": \"{{rl_gig_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/bookings"
+          }
+        }
+      ]
+    }
+  ]
+}
