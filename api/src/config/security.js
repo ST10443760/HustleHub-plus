@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { AppError } = require('../middleware/errorHandler');
 
 const DEV_CLIENT_ORIGIN = 'http://localhost:5173';
 
@@ -60,4 +61,27 @@ const helmetOptions = {
   xPoweredBy: false, // removes X-Powered-By
 };
 
-module.exports = { CLIENT_ORIGIN, helmetOptions, resolveClientOrigin };
+/**
+ * CORS locked to the client origin. Requests with no Origin header (curl,
+ * Postman, server-to-server) aren't browser cross-origin requests, so CORS
+ * doesn't apply and they're let through. Any other origin is refused with
+ * a generic 403 - no Access-Control-Allow-Origin header is ever sent for
+ * it, and preflights from it fail the same way.
+ */
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || origin === CLIENT_ORIGIN) {
+      return callback(null, true);
+    }
+    const err = new AppError('Origin not allowed', 403);
+    err.blockedOrigin = origin;
+    return callback(err);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+  credentials: false, // the JWT travels in the Authorization header, not a cookie
+  maxAge: 600, // browsers may cache a successful preflight for 10 minutes
+  optionsSuccessStatus: 204,
+};
+
+module.exports = { CLIENT_ORIGIN, helmetOptions, corsOptions, resolveClientOrigin };
