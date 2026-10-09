@@ -24,6 +24,16 @@ const gigSchema = new mongoose.Schema(
       min: [0, 'Price cannot be negative'],
       max: 1000000,
     },
+    deliveryDays: {
+      type: Number,
+      required: [true, 'Delivery time is required'],
+      min: 1,
+      max: 90,
+      validate: {
+        validator: Number.isInteger,
+        message: 'Delivery days must be a whole number',
+      },
+    },
     category: {
       type: String,
       required: [true, 'Category is required'],
