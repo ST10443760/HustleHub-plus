@@ -419,6 +419,28 @@ checks:
   client updating, are all `403`
 - Owner deletes (`200`), after which the gig returns `404`
 
+A **Bookings** folder registers a fresh client and two fresh freelancers,
+then checks:
+
+- The client books a gig (`201`): the price matches the gig, the freelancer
+  and client come from the gig and the token, and the response includes the
+  transaction and a payment confirmation with the same reference
+- Sending `price`, `freelancer` or `status` in the body (`400`), a
+  freelancer trying to book (`403`), no token (`401`)
+- Malformed `gigId` (`400`), unknown `gigId` (`404`), inactive gig (`404`)
+- `/api/bookings/mine` and `/api/transactions/mine` show the booking to
+  the client and the gig's freelancer, but not to the other freelancer
+- `GET /api/bookings/:id` works for both parties and is `403` for the
+  other freelancer
+- After the freelancer raises the gig price, the booking still shows the
+  price it was booked at
+
+An **Income** folder then checks that the gig's freelancer has
+`totalEarned` equal to the booked price with one item, the other freelancer
+has `0` and an empty list, a client gets `403` on `/api/income` and on
+`/api/admin/transactions`, and (only when admin credentials are supplied)
+the admin can list all transactions.
+
 Every run registers users with a fresh `test-...@example.com` email, so the
 collection can be run repeatedly against the same database. Use
 `npm run clean:test` to clear them out afterwards (it also removes
