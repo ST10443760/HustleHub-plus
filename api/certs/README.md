@@ -12,7 +12,7 @@ need to generate your own.
 
 ## Regenerating the certificate
 
-Run this from the project root (requires OpenSSL - already installed on
+Run this from the `api/` folder (requires OpenSSL - already installed on
 Mac/Linux; on Windows, Git Bash includes it):
 
 ```bash
