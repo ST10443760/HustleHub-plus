@@ -31,7 +31,8 @@ const BODY_PARSER_MESSAGES = {
  * Must be registered AFTER all real routes, BEFORE the error handler.
  */
 function notFoundHandler(req, res, next) {
-  next(new AppError(`Route not found: ${req.method} ${req.originalUrl}`, 404));
+  // req.path, not originalUrl: the query string is never echoed back.
+  next(new AppError(`Route not found: ${req.method} ${req.path}`, 404));
 }
 
 /**
