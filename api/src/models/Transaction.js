@@ -27,13 +27,11 @@ const transactionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     freelancer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true, // income lookups per freelancer
     },
     // Number, not a string, so income totals can be summed directly.
     amount: {
@@ -60,6 +58,13 @@ const transactionSchema = new mongoose.Schema(
     strict: 'throw',
   }
 );
+
+// "My transactions", newest first, for each side.
+transactionSchema.index({ client: 1, createdAt: -1 });
+// Income: one freelancer's completed transactions, newest first.
+transactionSchema.index({ freelancer: 1, status: 1, createdAt: -1 });
+// Admin list of all transactions, newest first.
+transactionSchema.index({ createdAt: -1 });
 
 transactionSchema.set('toJSON', {
   transform(doc, ret) {
