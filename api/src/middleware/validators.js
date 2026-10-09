@@ -1,4 +1,4 @@
-const { body, validationResult } = require('express-validator');
+const { body, query, checkExact, validationResult } = require('express-validator');
 const { AppError } = require('./errorHandler');
 
 /**
@@ -37,6 +37,24 @@ const loginValidationRules = [
 ];
 
 /**
+ * ?page and ?limit for paginated lists. Anything else in the query string is
+ * rejected. typeof checks catch ?page=1&page=2, which arrives as an array.
+ */
+const paginationQueryRules = [
+  checkExact(
+    ['page', 'limit'].map((name) =>
+      query(name)
+        .optional()
+        .custom((value) => typeof value === 'string').withMessage(`${name} must be a single value`).bail()
+        .isInt({ min: 1, max: name === 'limit' ? 50 : 1000 })
+        .withMessage(name === 'limit' ? 'limit must be a whole number from 1 to 50' : 'page must be a whole number from 1 to 1000')
+        .toInt()
+    ),
+    { locations: ['query'], message: 'Request contains query parameters that are not allowed' }
+  ),
+];
+
+/**
  * Runs after the rule set above. Collects any validation errors and turns
  * them into a single clean 400 response via the centralised error handler -
  * never lets a raw validation error object reach the client.
@@ -53,5 +71,6 @@ function handleValidationErrors(req, res, next) {
 module.exports = {
   registerValidationRules,
   loginValidationRules,
+  paginationQueryRules,
   handleValidationErrors,
 };
