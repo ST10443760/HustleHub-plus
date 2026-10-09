@@ -24,8 +24,8 @@ const gigSchema = new mongoose.Schema(
     price: {
       type: Number,
       required: [true, 'Price is required'],
-      min: [0, 'Price cannot be negative'],
-      max: 1000000,
+      min: [1, 'Price must be at least 1'],
+      max: 100000,
     },
     deliveryDays: {
       type: Number,
