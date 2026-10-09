@@ -4,6 +4,7 @@ const cors = require('cors');
 
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const sanitize = require('./middleware/sanitize');
+const { helmetOptions, corsOptions } = require('./config/security');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -13,7 +14,7 @@ app.disable('x-powered-by');
 
 // ---- Security & parsing middleware pipeline ----
 // Order matters here - keep helmet/cors first, body parsing next, then routes.
-app.use(helmet()); // sets secure HTTP headers
+app.use(helmet(helmetOptions)); // strict CSP, HSTS, nosniff, no-referrer, cross-origin policies
 app.use(cors()); // tighten this to a specific origin once the frontend exists (Part 2)
 app.use(express.json({ limit: '10kb' })); // body parser, with a sane size limit
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
