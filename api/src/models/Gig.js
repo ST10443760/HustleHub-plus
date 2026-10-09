@@ -64,6 +64,10 @@ const gigSchema = new mongoose.Schema(
   }
 );
 
+// Browse page: active gigs, newest first (optionally by category).
+gigSchema.index({ isActive: 1, createdAt: -1 });
+gigSchema.index({ isActive: 1, category: 1, createdAt: -1 });
+
 gigSchema.set('toJSON', {
   transform(doc, ret) {
     ret.id = ret._id.toString();
