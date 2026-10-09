@@ -81,10 +81,16 @@ api/                           # Express backend
       authRoutes.js            # /api/auth/register, /login, /me
       adminRoutes.js           # /api/admin/* (admin role only)
       gigRoutes.js             # /api/gigs (browse, create, update, delete)
+      bookingRoutes.js         # /api/bookings (book a gig, my bookings, one booking)
+      transactionRoutes.js     # /api/transactions/mine
+      incomeRoutes.js          # /api/income (freelancer earnings)
     controllers/
       authController.js        # register/login business logic
-      adminController.js       # admin-only actions (list users)
+      adminController.js       # admin-only actions (users, all transactions)
       gigController.js         # gig listing, search and owner-only changes
+      bookingController.js     # booking + transaction in one database transaction
+      transactionController.js # each user's own transactions
+      incomeController.js      # income aggregation over completed transactions
     config/
       db.js                    # MongoDB connection (Mongoose)
     models/
@@ -99,11 +105,13 @@ api/                           # Express backend
       errorHandler.js          # centralised error handling
       validators.js            # input validation rules (express-validator)
       gigValidators.js         # gig body + list query rules, HTML escaping
+      bookingValidators.js     # booking body: gigId only
     utils/
       logger.js                # shared logging utility
       generateToken.js         # JWT signing helper
       password.js              # bcryptjs hashing (shared salt rounds)
       escapeRegex.js           # makes search text safe to use in a regex
+      money.js                 # rounds money to 2 decimals
   scripts/
     seedAdmin.js               # creates the admin account (npm run seed:admin)
     cleanTestData.js           # removes test users (npm run clean:test)
