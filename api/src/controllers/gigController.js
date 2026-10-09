@@ -1,7 +1,7 @@
 const Gig = require('../models/Gig');
-const Booking = require('../models/Booking');
 const { AppError } = require('../middleware/errorHandler');
 const escapeRegex = require('../utils/escapeRegex');
+const { removeOrDeactivateGig } = require('../utils/gigRemoval');
 const logger = require('../utils/logger');
 
 // Fields a freelancer may set. The owner (freelancer) is never in these
@@ -133,37 +133,14 @@ async function updateGig(req, res, next) {
 // instead of deleted, so bookings and transactions keep a valid reference.
 async function deleteGig(req, res, next) {
   try {
-    const gig = req.resource;
-    const hasBookings = await Booking.exists({ gig: gig._id });
+    const result = await removeOrDeactivateGig(req.resource);
 
-    if (hasBookings) {
-      gig.isActive = false;
-      await gig.save();
-
-      logger.event('GIG', 'Gig deactivated instead of deleted - it has bookings', {
-        gigId: gig.id,
-        freelancerId: req.user.id,
-      });
-
-      return res.status(200).json({
-        success: true,
-        data: {
-          id: gig.id,
-          deleted: false,
-          deactivated: true,
-          message: 'This gig has bookings, so it was deactivated instead of deleted to keep the booking history.',
-        },
-      });
-    }
-
-    await gig.deleteOne();
-
-    logger.event('GIG', 'Gig deleted', { gigId: gig.id, freelancerId: req.user.id });
-
-    res.status(200).json({
-      success: true,
-      data: { id: gig.id, deleted: true, deactivated: false },
+    logger.event('GIG', result.deleted ? 'Gig deleted' : 'Gig deactivated instead of deleted - it has bookings', {
+      gigId: result.id,
+      freelancerId: req.user.id,
     });
+
+    res.status(200).json({ success: true, data: result });
   } catch (err) {
     next(err);
   }
