@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const { roundMoney } = require('../utils/money');
 
 const TRANSACTION_STATUSES = ['completed', 'refunded'];
 
@@ -39,6 +40,7 @@ const transactionSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+      set: roundMoney,
     },
     // Payment is simulated for Part 2, so a transaction is completed on creation.
     status: {
