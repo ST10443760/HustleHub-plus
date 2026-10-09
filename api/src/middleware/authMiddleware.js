@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { AppError } = require('./errorHandler');
-const { findById } = require('../models/userModel');
+const User = require('../models/User');
 
 /**
  * Protects a route - requires a valid JWT in the Authorization header
@@ -9,7 +10,7 @@ const { findById } = require('../models/userModel');
  * On success, attaches the authenticated user to req.user so downstream
  * controllers can use it (e.g. req.user.id, req.user.role).
  */
-function protect(req, res, next) {
+async function protect(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -18,9 +19,23 @@ function protect(req, res, next) {
 
   const token = authHeader.split(' ')[1];
 
+  let decoded;
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = findById(decoded.id);
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    // Covers both expired and tampered/invalid tokens - same generic
+    // message either way, no need to tell an attacker which case it was.
+    return next(new AppError('Not authenticated - invalid or expired token', 401));
+  }
+
+  if (!mongoose.isValidObjectId(decoded.id)) {
+    return next(new AppError('Not authenticated - invalid or expired token', 401));
+  }
+
+  try {
+    // Role comes from the database, not the token, so a role change takes
+    // effect straight away.
+    const user = await User.findById(decoded.id).select('role');
 
     if (!user) {
       return next(new AppError('Not authenticated - user no longer exists', 401));
@@ -29,17 +44,14 @@ function protect(req, res, next) {
     req.user = { id: user.id, role: user.role };
     next();
   } catch (err) {
-    // Covers both expired and tampered/invalid tokens - same generic
-    // message either way, no need to tell an attacker which case it was.
-    return next(new AppError('Not authenticated - invalid or expired token', 401));
+    // A database failure is a server error, not an auth failure.
+    next(err);
   }
 }
 
 /**
  * Role-based access control - use after `protect`.
  * Usage: router.delete('/gigs/:id', protect, requireRole('freelancer'), ...)
- * (Full RBAC across gig/booking routes lands in Part 2 - this is the
- * building block it'll be built on.)
  */
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
