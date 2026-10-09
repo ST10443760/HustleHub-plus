@@ -98,4 +98,42 @@ async function createBooking(req, res, next) {
   });
 }
 
-module.exports = { createBooking };
+// GET /api/bookings/mine - clients see their bookings, freelancers see
+// bookings on their gigs. Only the OTHER party is populated, by name only.
+async function listMyBookings(req, res, next) {
+  try {
+    const isClient = req.user.role === 'client';
+    const filter = isClient ? { client: req.user.id } : { freelancer: req.user.id };
+    const otherParty = isClient ? 'freelancer' : 'client';
+
+    const bookings = await Booking.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('gig', 'title')
+      .populate(otherParty, 'name');
+
+    res.status(200).json({
+      success: true,
+      data: { bookings: bookings.map((b) => b.toJSON()) },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// GET /api/bookings/:id - only the booking's client or freelancer.
+// requireOwnership has already loaded it into req.resource and checked that.
+async function getBooking(req, res, next) {
+  try {
+    const booking = await req.resource.populate([
+      { path: 'gig', select: 'title' },
+      { path: 'client', select: 'name' },
+      { path: 'freelancer', select: 'name' },
+    ]);
+
+    res.status(200).json({ success: true, data: { booking: booking.toJSON() } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { createBooking, listMyBookings, getBooking };
