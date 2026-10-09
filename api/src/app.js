@@ -15,7 +15,7 @@ app.disable('x-powered-by');
 // ---- Security & parsing middleware pipeline ----
 // Order matters here - keep helmet/cors first, body parsing next, then routes.
 app.use(helmet(helmetOptions)); // strict CSP, HSTS, nosniff, no-referrer, cross-origin policies
-app.use(cors()); // tighten this to a specific origin once the frontend exists (Part 2)
+app.use(cors(corsOptions)); // only CLIENT_ORIGIN, never a wildcard
 app.use(express.json({ limit: '10kb' })); // body parser, with a sane size limit
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(sanitize); // strips $ / . keys from body, query and params - must come after parsing
