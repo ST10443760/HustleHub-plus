@@ -453,26 +453,61 @@ has `0` and an empty list, a client gets `403` on `/api/income` and on
 `/api/admin/transactions`, and (only when admin credentials are supplied)
 the admin can list all transactions.
 
+A **Security** folder checks:
+
+- The CSP (`default-src 'self'`, `frame-ancestors 'none'`, no
+  `unsafe-inline`), `nosniff`, `no-referrer` and HSTS headers are present,
+  and `X-Powered-By` is absent
+- An operator object in the login email and an operator in a query string
+  are both rejected with `400`
+- A request with `Origin: http://evil.example` gets `403` and no
+  `Access-Control-Allow-Origin`; the client origin is allowed
+- Malformed JSON gives `400` and an oversized body `413`, with no stack trace
+- A client and a freelancer both get `403` on `DELETE /api/admin/gigs/:id`,
+  and (only when admin credentials are supplied) the admin can delete the gig
+
 Every run registers users with a fresh `test-...@example.com` email, so the
 collection can be run repeatedly against the same database. Use
 `npm run clean:test` to clear them out afterwards (it also removes
 their gigs, bookings and transactions).
 
-To run it: import the collection into Postman, disable SSL verification,
-start the server (`npm run dev` inside `api/`), and run the collection — or run it
-headlessly via Newman:
+**Running the tests**
+
+The main collection registers and logs in far more often than the strict
+rate limits allow, so it runs against the API started with relaxed limits.
+The rate limits themselves are proven by a separate collection that runs
+against the strict defaults.
 
 ```bash
 npm install -g newman
-newman run api/postman/HustleHub_Part1_Auth.postman_collection.json --insecure
+
+# 1. Main collection, against relaxed limits
+cd api
+npm run start:test          # in one terminal (refuses to run in production)
+newman run postman/HustleHub_Part1_Auth.postman_collection.json --insecure
+
+# 2. Rate limit collection, against the strict defaults
+npm run dev                 # restart without start:test, so the strict limits apply
+newman run postman/HustleHub_RateLimits.postman_collection.json --insecure
 ```
 
-To include the admin tests, pass the seeded admin's credentials as
-variables (they're never stored in the collection):
+To include the admin tests in the main collection, pass the seeded admin's
+credentials as variables (they're never stored in the collection):
 
 ```bash
-newman run api/postman/HustleHub_Part1_Auth.postman_collection.json --insecure   --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
+newman run postman/HustleHub_Part1_Auth.postman_collection.json --insecure \
+  --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
 ```
+
+The rate limit collection (`api/postman/HustleHub_RateLimits.postman_collection.json`)
+proves that the 6th failed login in the window gets `429` with a
+`Retry-After` header and a message whose number of seconds matches it, and
+that the 11th booking by the same user gets `429`. Rate limit counters live
+in memory, so restart the API before running it again to start with a clean
+window.
+
+Both collections can also be imported into Postman (disable SSL certificate
+verification under Settings → General).
 
 ## 11. Security
 
