@@ -12,6 +12,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const mongoose = require('mongoose');
+const { escape } = require('validator');
 const connectDB = require('../src/config/db');
 const User = require('../src/models/User');
 const { hashPassword } = require('../src/utils/password');
@@ -22,7 +23,8 @@ const MIN_PASSWORD_LENGTH = 12;
 async function seedAdmin() {
   const email = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   const password = process.env.ADMIN_PASSWORD || '';
-  const name = (process.env.ADMIN_NAME || 'Administrator').trim();
+  // Escaped exactly like names that come through the register validator.
+  const name = escape((process.env.ADMIN_NAME || 'Administrator').trim());
 
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     logger.error('ADMIN_EMAIL is missing or not a valid email - nothing seeded');
