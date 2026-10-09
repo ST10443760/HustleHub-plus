@@ -310,6 +310,33 @@ All routes are under `https://localhost:5000`. "Logged in" means a valid
   A gig with bookings is deactivated instead of deleted so booking and
   transaction history keeps a valid reference.
 
+### Booking and transaction flow
+
+1. **The client books a gig.** `POST /api/bookings` takes only a `gigId`.
+   Any other field (price, freelancer, client, status) is rejected with a
+   `400`. The client is the logged-in user, and the gig must exist and be
+   active, otherwise the response is `404`.
+2. **The booking is created.** The freelancer and the price come from the
+   gig in the database, never from the request. The booking stores a
+   snapshot of the gig's title and price, so if the freelancer edits the
+   gig later, existing bookings keep what was actually booked.
+3. **The transaction is created in the same database transaction.** The
+   booking and its transaction record are written together using a MongoDB
+   transaction (a Mongoose session with `withTransaction`). If anything
+   fails part-way, neither is saved, so a booking can never exist without
+   its transaction. Each booking has exactly one transaction (enforced by a
+   unique index). Payment is simulated: the transaction is marked
+   `completed`, gets a unique reference such as `TXN-20261009-9F3A1C2B7D4E`,
+   and the response includes a payment confirmation with that reference.
+4. **Income is computed from completed transactions.** `GET /api/income`
+   adds up the logged-in freelancer's transactions with status `completed`
+   (refunded ones are left out) and lists each one with its booking, gig
+   title, amount, date and reference.
+
+Money is stored as a plain number rounded to 2 decimal places, and totals
+are rounded the same way, so amounts like 19.99 add up exactly. Booking
+creation, transaction creation and failed booking attempts are all logged.
+
 ## 7. HTTPS
 
 The API is served over HTTPS using a locally generated, self-signed SSL
