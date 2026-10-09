@@ -62,6 +62,16 @@ function errorHandler(err, req, res, next) {
     err = Object.assign(new AppError(message, status), { stack: err.stack, cause: err.type });
   }
 
+  // CORS refused a disallowed browser origin (see config/security.js).
+  if (err.blockedOrigin) {
+    logger.event('CORS', 'Blocked request from a disallowed origin', {
+      origin: err.blockedOrigin,
+      method: req.method,
+      path: req.originalUrl,
+      ip: req.ip,
+    });
+  }
+
   const statusCode = err.statusCode || 500;
 
   // Full details go to the server log only - never to the client.
