@@ -17,3 +17,4 @@ function validateObjectId(req, res, next) {
 }
 
 module.exports = validateObjectId;
+module.exports.OBJECT_ID_PATTERN = OBJECT_ID_PATTERN;
