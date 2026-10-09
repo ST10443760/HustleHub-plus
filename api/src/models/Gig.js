@@ -5,19 +5,23 @@ const GIG_CATEGORIES = ['design', 'writing', 'development', 'marketing', 'video'
 
 const gigSchema = new mongoose.Schema(
   {
+    // Text is HTML-escaped by the validators before it gets here, and
+    // escaping can make it longer (& becomes &amp;, ' becomes &#x27;).
+    // The user-facing limits (100 / 1000 characters) are enforced in the
+    // validators; these caps leave room for the escaped form.
     title: {
       type: String,
       required: [true, 'Title is required'],
       trim: true,
       minlength: 3,
-      maxlength: 100,
+      maxlength: 600,
     },
     description: {
       type: String,
       required: [true, 'Description is required'],
       trim: true,
       minlength: 10,
-      maxlength: 2000,
+      maxlength: 6000,
     },
     // Stored as a plain Number so totals and income stats are easy to
     // aggregate later.
