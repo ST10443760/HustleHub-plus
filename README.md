@@ -362,9 +362,25 @@ An **RBAC** folder checks access control on `/api/admin/users`:
   first). These two only run when admin credentials are supplied and are
   skipped cleanly otherwise.
 
+A **Gigs** folder registers two fresh freelancers and a fresh client, then
+checks:
+
+- Freelancer creates a gig (`201`, owner is the token's user); client
+  (`403`) and no token (`401`) can't
+- Validation: negative price, empty title, and an unknown `freelancer` field
+  in the body (all `400`)
+- Browsing as a client (`200`, freelancer shown by name only, no emails or
+  password hashes), regex characters in `q` treated as plain text
+- Get by id (`200`), malformed id (`400`), unknown id (`404`)
+- `/api/gigs/mine` returns only the caller's gigs
+- Owner updates (`200`); another freelancer updating or deleting, and a
+  client updating, are all `403`
+- Owner deletes (`200`), after which the gig returns `404`
+
 Every run registers users with a fresh `test-...@example.com` email, so the
 collection can be run repeatedly against the same database. Use
-`npm run clean:test` to clear them out afterwards.
+`npm run clean:test` to clear them out afterwards (it also removes
+their gigs, bookings and transactions).
 
 To run it: import the collection into Postman, disable SSL verification,
 start the server (`npm run dev` inside `api/`), and run the collection — or run it
