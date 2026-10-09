@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { roundMoney } = require('../utils/money');
 
 const BOOKING_STATUSES = ['confirmed', 'cancelled'];
 
@@ -28,10 +29,11 @@ const bookingSchema = new mongoose.Schema(
       default: 'confirmed',
     },
     // Snapshot of the gig price, so later price edits don't rewrite history.
-    priceAtBooking: {
+    price: {
       type: Number,
       required: true,
       min: 0,
+      set: roundMoney,
     },
   },
   {
