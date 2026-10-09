@@ -1,0 +1,139 @@
+
+.gig-page {
+  min-height: 100vh;
+  background: #f3f5fa;
+}
+
+.gig-header {
+  background: #253a70;
+  color: white;
+  text-align: center;
+  padding: 35px 20px;
+}
+
+.gig-header h1 {
+  color: white;
+  margin: 0 0 10px;
+}
+
+.gig-header p {
+  margin: 0;
+  color: #e1e7f5;
+}
+
+.gig-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 35px 20px;
+}
+
+.gig-content h2 {
+  margin-bottom: 20px;
+}
+
+.gig-search {
+  display: block;
+  width: 100%;
+  max-width: 550px;
+  padding: 13px;
+  margin-bottom: 25px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: white;
+  color: #222;
+  font-size: 15px;
+}
+
+.gig-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.gig-card {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+}
+
+.gig-category {
+  display: inline-block;
+  padding: 6px 10px;
+  background: #e8edfa;
+  color: #253a70;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.gig-card h3 {
+  margin: 15px 0;
+}
+
+.gig-card p {
+  color: #555;
+  line-height: 1.5;
+}
+
+.gig-button {
+  width: 100%;
+  margin-top: 15px;
+  padding: 12px;
+  background: #253a70;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.gig-button:hover {
+  background: #17264b;
+}
+
+.gig-empty {
+  margin-top: 25px;
+  color: #555;
+  text-align: center;
+}
+
+.booking-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.booking-form label {
+  font-weight: 600;
+  color: #253a70;
+}
+
+.booking-form input,
+.booking-form textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: white;
+  color: #222;
+  font-size: 15px;
+}
+
+.booking-form textarea {
+  resize: vertical;
+}
+
+.booking-form input:focus,
+.booking-form textarea:focus {
+  outline: 2px solid #253a70;
+  outline-offset: 2px;
+}
+
+.booking-message {
+  margin-top: 20px;
+  padding: 12px;
+  background: #e8edfa;
+  color: #253a70;
+  border-radius: 8px;
+}

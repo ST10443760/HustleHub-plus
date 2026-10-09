@@ -71,3 +71,20 @@
 .login-text {
   margin-top: 20px;
 }
+
+.switch-button {
+  background: none;
+  border: none;
+  color: #253a70;
+  font-weight: bold;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  font-size: inherit;
+}
+
+.switch-button:hover {
+  background: none;
+  color: #17264b;
+}
