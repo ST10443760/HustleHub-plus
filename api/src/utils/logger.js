@@ -25,6 +25,14 @@ function format(level, message, meta) {
   return base;
 }
 
+// "jane.doe@example.com" -> "j***@example.com": enough to spot a pattern
+// in the logs without storing the full address of everyone who mistypes.
+function maskEmail(email) {
+  if (typeof email !== 'string' || !email.includes('@')) return '[invalid]';
+  const [local, domain] = email.split('@');
+  return `${local.charAt(0)}***@${domain}`;
+}
+
 const logger = {
   info(message, meta = {}) {
     console.log(format('INFO', message, meta));
@@ -43,3 +51,4 @@ const logger = {
 };
 
 module.exports = logger;
+module.exports.maskEmail = maskEmail;
