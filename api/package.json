@@ -21,7 +21,8 @@
     "express-validator": "^7.1.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^9.11.1"
+    "mongoose": "^9.11.1",
+    "validator": "^13.15.35"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"
