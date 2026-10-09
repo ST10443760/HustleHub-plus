@@ -74,13 +74,16 @@ function errorHandler(err, req, res, next) {
 
   const statusCode = err.statusCode || 500;
 
-  // Full details go to the server log only - never to the client.
+  // Full details go to the server log only - never to the client. Stack
+  // traces are only logged for unexpected errors (bugs), and never in
+  // production; expected ones (bad input, 401/403/404) don't need them.
+  const logStack = !err.isOperational && process.env.NODE_ENV !== 'production';
   logger.error(err.message, {
     statusCode,
     path: req.originalUrl,
     method: req.method,
     cause: err.cause,
-    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack,
+    stack: logStack ? err.stack : undefined,
   });
 
   const safeMessage =
