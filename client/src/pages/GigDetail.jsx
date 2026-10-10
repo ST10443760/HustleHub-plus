@@ -47,7 +47,7 @@ export default function GigDetail() {
     return () => controller.abort();
   }, [id, validId, reloadKey]);
 
-  if (state.status === 'missing') return <Unavailable />;
+  if (!validId || state.status === 'missing') return <Unavailable />;
   if (state.status === 'loading') return <LoadingState label="Loading gig…" />;
   if (state.status === 'error') {
     return <ErrorState message={state.error} onRetry={() => setReloadKey((key) => key + 1)} />;
