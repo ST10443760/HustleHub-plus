@@ -1005,6 +1005,24 @@ The risk is reduced by:
 - **The role isn't trusted from the token:** a stolen token can't be used to
   gain more rights than the user already has.
 
+## Requirements Traceability
+
+The 11 Part 2 requirements, what was built for each, where, and how it is tested.
+
+| # | Requirement | What was built | Where in the code | How it is tested |
+|---|---|---|---|---|
+| 1 | Full-stack MERN | React client, Express API, MongoDB via Mongoose | `client/`, `api/src/`, `api/src/models/`, `api/src/config/db.js` | Everything below runs against the real stack; fresh-clone run of every README command |
+| 2 | Gig management: freelancers manage only their **own** gigs | Create/read/update/delete gigs; owner always from the token; `requireOwnership` on update and delete; unknown body fields rejected | `api/src/controllers/gigController.js`, `routes/gigRoutes.js`, `middleware/ownership.js`, `middleware/gigValidators.js`; client `pages/MyGigs.jsx`, `pages/GigEditor.jsx`, `components/GigForm.jsx` | Newman **Gigs** folder (other freelancer and client get `403`, `freelancer` in the body is `400`); `MyGigs.test.jsx`, `GigEditor.test.jsx`, `GigForm.test.jsx` |
+| 3 | React frontend: register, log in, browse, book; invalid input handled; nothing sensitive in the UI | Pages per role, inline validation mirroring the API, API text decoded and rendered as text only, only the JWT stored | `client/src/pages/`, `client/src/components/`, `client/src/utils/validation.js`, `utils/text.js` | `Register.test.jsx`, `Login.test.jsx`, `Gigs.test.jsx`, `BookingPanel.test.jsx`, `GigCard.test.jsx` / `GigDetail.test.jsx` (XSS title renders as text) |
+| 4 | Clients book gigs; simulated payment; **every booking creates a transaction linked to both users** | `POST /api/bookings` takes only `gigId`; booking and transaction written together with `withTransaction`; one transaction per booking (unique index) | `api/src/controllers/bookingController.js`, `models/Booking.js`, `models/Transaction.js` | Newman **Bookings** folder; atomicity checked with a forced failure (no booking left behind) and 12 concurrent bookings (each with exactly one transaction) |
+| 5 | Freelancers list gigs, see their bookings; income tracked per freelancer | `/api/bookings/mine` (bookings on their gigs), `/api/income` aggregation over completed transactions | `api/src/controllers/incomeController.js`, `bookingController.js`; client `pages/FreelancerBookings.jsx`, `pages/Income.jsx` | Newman **Income** folder (right freelancer, other freelancer gets 0); `Income.test.jsx` |
+| 6 | Security: JWT on protected routes, RBAC, input sanitised | `protect` (JWT + DB user), `requireRole`, `requireOwnership`, validators, HTML escaping, `express-mongo-sanitize` | `api/src/middleware/` (authMiddleware, ownership, validators, sanitize, validateObjectId) | Newman **Auth**, **RBAC** and **Security** folders; route audit table above; `ProtectedRoute.test.jsx`, `client.test.js` |
+| 7 | Rate limiting on sensitive endpoints with a meaningful response | Login (failed only), register, booking (per user), general; `429` + `Retry-After` + message; strict in production | `api/src/middleware/rateLimiters.js`, `config/rateLimits.js` | Newman **rate limit collection** (6th failed login and 11th booking get `429`); `BookingPanel.test.jsx` and `Login.test.jsx` show the retry message |
+| 8 | Helmet security headers with a restrictive CSP | Explicit Helmet config, CSP without `unsafe-inline`/`unsafe-eval` on the API; client CSP meta tag at build time and as headers in preview | `api/src/config/security.js`, `client/vite.config.js` | Newman **Security** folder (headers); headless-browser check of the built client: 0 CSP violations |
+| 9 | Testing: Postman + Newman for key endpoints; frontend tests for rendering and interaction | Main collection (Auth, RBAC, Gigs, Bookings, Income, Security), rate limit collection, 67 Vitest tests | `api/postman/`, `client/src/**/*.test.js(x)` | `npx newman run ...` and `npm run test:run` (see **Testing**) |
+| 10 | README: features, security, how to run backend and frontend, testing | This document | `README.md`, `api/certs/README.md` | Every command run on a fresh clone |
+| 11 | Demonstration video: auth, gig creation, booking, transaction recording | Recorded walkthrough | See **Demonstration Video** | - |
+
 ## 12. Demonstration Video
 
 https://youtu.be/qTK6iV_0lmI
