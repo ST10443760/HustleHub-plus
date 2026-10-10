@@ -1023,6 +1023,33 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
 | 10 | README: features, security, how to run backend and frontend, testing | This document | `README.md`, `api/certs/README.md` | Every command run on a fresh clone |
 | 11 | Demonstration video: auth, gig creation, booking, transaction recording | Recorded walkthrough | See **Demonstration Video** | - |
 
+## Known Limitations and Part 3 Notes
+
+- **JWT in `localStorage`.** Accepted for this POE; any XSS could read the
+  token. The risk is reduced by escaping, React's text rendering and the
+  strict CSP (see **JWT in localStorage: the trade-off**). An `httpOnly`
+  cookie with CSRF protection is the stronger option for a real deployment.
+- **`trust proxy` is off.** The API uses the connection's IP for rate
+  limiting, so a client can't fake its IP with an `X-Forwarded-For` header.
+  Behind a reverse proxy or load balancer (Part 3), every request would
+  appear to come from the proxy and share one limit: set
+  `app.set('trust proxy', 1)` (the number of proxies in front of the API),
+  never `true`.
+- **Rate limit counters live in memory.** They reset when the API restarts
+  and aren't shared between multiple API instances; a shared store such as
+  Redis would be needed when scaling out.
+- **Dev-only audit finding:** `braces` via `nodemon` (see **Dependency
+  audit**). Production dependencies have 0 known vulnerabilities.
+- **Payments are simulated.** A transaction is created as `completed` with a
+  reference; no payment provider is involved and no money moves.
+- **Not built yet (Part 3):** tax estimation, income dashboard charts,
+  GitHub Actions CI/CD, Docker images, static analysis and cloud logging. The
+  data model is ready for them: amounts are numbers, every record has
+  timestamps, and income is already aggregated per freelancer.
+- **Local HTTPS only.** The self-signed certificate is for development; a
+  deployment needs a real certificate, and the production host should send
+  the client's security headers (including `frame-ancestors 'none'`).
+
 ## 12. Demonstration Video
 
 https://youtu.be/qTK6iV_0lmI
