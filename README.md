@@ -1071,11 +1071,32 @@ https://youtu.be/qTK6iV_0lmI
 | Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
 | Data interception in transit | API served over HTTPS, even in local development |
 
-## 14. API Testing Screenshots
+## Screenshots
 
-Screenshots below show the Postman collection run confirming both successful
-and invalid/error scenarios, matching the automated tests in
-`api/postman/HustleHub_API.postman_collection.json`.
+The images live in `docs/screenshots/`; [`docs/screenshots/README.md`](docs/screenshots/README.md)
+describes what each one shows.
+
+| # | Screenshot | What it shows |
+|---|---|---|
+| 1 | ![Register](docs/screenshots/01-register.png) | Register page with inline validation and the client/freelancer role choice |
+| 2 | ![Login](docs/screenshots/02-login.png) | Login page |
+| 3 | ![Browse gigs](docs/screenshots/03-browse-gigs.png) | Browse gigs with search, category and price filters |
+| 4 | ![Create gig](docs/screenshots/04-create-gig.png) | A freelancer creating a gig |
+| 5 | ![My gigs](docs/screenshots/05-my-gigs.png) | My gigs with Active/Inactive badges and actions |
+| 6 | ![Booking confirmation](docs/screenshots/06-book-confirm.png) | Booking confirmation step with the price and the simulated payment notice |
+| 7 | ![Booking confirmed](docs/screenshots/07-booking-confirmed.png) | Booking confirmed with the transaction reference |
+| 8 | ![Client bookings](docs/screenshots/08-client-bookings.png) | A client's bookings |
+| 9 | ![Freelancer income](docs/screenshots/09-freelancer-income.png) | A freelancer's income page |
+| 10 | ![Admin transactions](docs/screenshots/10-admin-transactions.png) | Admin view of all transactions |
+| 11 | ![Newman pass](docs/screenshots/11-newman-pass.png) | Newman: the main collection passing |
+| 12 | ![Vitest pass](docs/screenshots/12-vitest-pass.png) | Vitest: all frontend tests passing |
+| 13 | ![Security headers](docs/screenshots/13-security-headers.png) | Security headers (CSP, HSTS, nosniff) on a response |
+| 14 | ![Rate limit 429](docs/screenshots/14-rate-limit-429.png) | A `429` with `Retry-After` and the retry message |
+
+## Part 1 API Screenshots
+
+From the Part 1 submission (Postman, API only), kept for reference in
+`docs/screenshots/part1/`.
 
 | Scenario | Screenshot |
 |---|---|
