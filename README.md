@@ -1,4 +1,4 @@
-# HustleHub+ — Backend (Part 1: Secure Foundations)
+# HustleHub+
 
 HustleHub+ is a secure freelance marketplace platform. Freelancers advertise
 services, clients browse and book them, and the platform records the
@@ -7,8 +7,10 @@ obligations. Because the system handles credentials, transaction records,
 and income data, security was treated as a core requirement from the first
 line of code, not something added afterward.
 
-This repository currently covers **Part 1** of the INSY7314 / APDS7311 POE:
-a secure Express API supporting user registration and authenticated login.
+This repository is **Part 2 (Secure Stack)** of the INSY7314 / APDS7311 POE:
+a full MERN application - a React client, an Express API and MongoDB - with
+gig management, bookings, simulated payments, transaction records, income
+tracking and an admin area, built on the secure foundations from Part 1.
 
 **Module:** INSY7314/w (Information Systems 3D) & APDS7311/w (Application
 Development Security)
@@ -19,17 +21,20 @@ Development Security)
 
 ## 1. System Overview
 
-HustleHub+ has three intended user types, though only the foundational
-authentication layer is built in Part 1:
+HustleHub+ has three user types:
 
-- **Clients** — browse available gigs and book freelancer services (Part 2)
-- **Freelancers** — list gigs, manage bookings, and track income (Part 2)
-- **Admins** — oversee the platform (later phase)
+- **Clients** browse active gigs, book them (with a simulated payment) and
+  see their bookings and transactions.
+- **Freelancers** create and manage their own gigs, see the bookings on
+  them, and track their income.
+- **Admins** (created by a seed script, never through sign-up) see every
+  user and transaction and can remove any gig.
 
-Part 1 focuses purely on getting users into the system safely: registering
-an account, logging in, and proving who they are on every subsequent
-request via a signed token — before any marketplace functionality exists on
-top of it.
+Every booking creates a transaction record linked to both the client and the
+freelancer, in the same database transaction. Part 1 delivered the secure
+authentication layer; Part 2 adds the marketplace on top of it, with
+security enforced on every request by the API (the client's checks are
+only for convenience).
 
 ## 2. Architecture
 
