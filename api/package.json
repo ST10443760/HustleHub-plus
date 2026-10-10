@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "start:test": "node scripts/startTest.js",
+    "certs": "node scripts/generateCerts.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "clean:test": "node scripts/cleanTestData.js"
   },
