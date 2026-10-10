@@ -60,8 +60,11 @@ export default defineConfig({
   },
   // `npm run preview` serves the built app with the policy as real headers,
   // plus the same /api proxy, so the production build can be tested end to end.
+  // Same port as dev on purpose: browsers send an Origin header on POSTs, the
+  // proxy passes it on, and the API's CORS only accepts CLIENT_ORIGIN
+  // (http://localhost:5173). Stop the dev server before running preview.
   preview: {
-    port: 4173,
+    port: 5173,
     strictPort: true,
     proxy: apiProxy,
     headers: {
