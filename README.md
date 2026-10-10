@@ -124,6 +124,17 @@ api/                           # Express backend
   certs/                       # local self-signed SSL certificate (see api/certs/README.md)
   postman/                     # Postman collection for API testing
 client/                        # React frontend (Vite)
+  index.html                   # page shell and title
+  vite.config.js               # dev server + /api proxy to the HTTPS API
+  src/
+    main.jsx                   # router, auth provider, global styles
+    App.jsx                    # routes, grouped by role
+    api/                       # fetch wrapper (client.js) and one file per resource
+    context/                   # AuthProvider, useAuth
+    components/                # layout/nav, ProtectedRoute, form field, gig card, booking panel
+    pages/                     # login, register, gigs, gig detail, my bookings, my transactions
+    utils/                     # formatting, entity decoding, validation, token storage
+    styles/                    # global.css (CSS variables, no UI library)
 docs/                          # architecture diagram and screenshots
 ```
 
