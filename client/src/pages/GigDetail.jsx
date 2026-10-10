@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getGig, isValidId } from '../api/gigs';
+import AdminDeleteGig from '../components/AdminDeleteGig';
 import BookingPanel from '../components/BookingPanel';
 import { ErrorState, LoadingState } from '../components/StatusMessage';
 import useAuth from '../context/useAuth';
@@ -63,6 +64,9 @@ export default function GigDetail() {
   const title = decodeEntities(gig.title);
   const freelancerName = gig.freelancer ? decodeEntities(gig.freelancer.name) : 'Unknown freelancer';
   const canBook = user && user.role === 'client' && gig.isActive;
+  // UI only - the API checks ownership and role again on every change.
+  const isOwner = Boolean(user && user.role === 'freelancer' && gig.freelancer && gig.freelancer.id === user.id);
+  const isAdmin = Boolean(user && user.role === 'admin');
 
   return (
     <article className="gig-detail" aria-labelledby="gig-title">
@@ -72,6 +76,7 @@ export default function GigDetail() {
 
       <div className="card gig-detail">
         <h1 id="gig-title">{title}</h1>
+        {!gig.isActive && <span className="badge inactive">Inactive - only you can see this gig</span>}
         <p className="price">{formatMoney(gig.price)}</p>
 
         <dl className="detail-list">
@@ -88,6 +93,16 @@ export default function GigDetail() {
         <h2>About this gig</h2>
         <p className="gig-description">{decodeEntities(gig.description)}</p>
       </div>
+
+      {isOwner && (
+        <div className="button-row">
+          <Link className="button secondary" to={`/freelancer/gigs/${gig.id}/edit`}>
+            Edit this gig
+          </Link>
+        </div>
+      )}
+
+      {isAdmin && <AdminDeleteGig gigId={gig.id} title={title} />}
 
       {canBook && (
         <BookingPanel
