@@ -17,10 +17,8 @@ router.post('/register', registerLimiter, registerValidationRules, handleValidat
 router.post('/login', loginLimiter, loginValidationRules, handleValidationErrors, login);
 
 /**
- * Protected test route - proves the JWT middleware actually works.
- * Requires: Authorization: Bearer <token>
- * This is also just a genuinely useful "who am I" endpoint the frontend
- * will want in Part 2.
+ * "Who am I": returns the logged-in user. The React client calls it on
+ * start-up to check a stored token. Requires: Authorization: Bearer <token>
  */
 router.get('/me', protect, async (req, res, next) => {
   try {
