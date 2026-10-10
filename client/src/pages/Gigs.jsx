@@ -51,8 +51,12 @@ export default function Gigs() {
   const debouncedMax = useDebouncedValue(maxPrice);
   const priceErrors = validatePriceRange(minPrice, maxPrice, MAX_PRICE);
 
-  const [result, setResult] = useState({ status: 'loading', gigs: [], total: 0, error: '' });
   const [reloadKey, setReloadKey] = useState(0);
+  // Each result remembers which filters (and retry) it answers; until the
+  // matching one arrives the page shows "loading".
+  const requestKey = `${JSON.stringify(filters)}:${reloadKey}`;
+  const [result, setResult] = useState({ key: null, status: 'loading', gigs: [], total: 0, error: '' });
+  const view = result.key === requestKey ? result : { status: 'loading', gigs: [], total: 0, error: '' };
 
   function applyFilters(changes) {
     setSearchParams(toSearchParams({ ...filters, page: 1, ...changes }), { replace: true });
@@ -79,24 +83,30 @@ export default function Gigs() {
   }, [debouncedQ, debouncedMin, debouncedMax, setSearchParams]);
 
   // When the URL changes from outside (Back/Forward, a bookmarked link),
-  // bring the inputs in line with it. Text the user is still typing that
-  // already matches the URL (e.g. a trailing space) is left alone.
-  useEffect(() => {
+  // bring the inputs in line with it during render. Text the user is still
+  // typing that already matches the URL (e.g. a trailing space) is left alone.
+  const [syncedFilters, setSyncedFilters] = useState(filters);
+  if (
+    syncedFilters.q !== filters.q ||
+    syncedFilters.minPrice !== filters.minPrice ||
+    syncedFilters.maxPrice !== filters.maxPrice
+  ) {
+    setSyncedFilters(filters);
     setQ((typed) => (typed.trim() === filters.q ? typed : filters.q));
     setMinPrice(filters.minPrice);
     setMaxPrice(filters.maxPrice);
-  }, [filters.q, filters.minPrice, filters.maxPrice]);
+  }
 
   // Load the gigs whenever the filters in the URL change.
   useEffect(() => {
     const controller = new AbortController();
-    setResult((current) => ({ ...current, status: 'loading', error: '' }));
+    const key = `${JSON.stringify(filters)}:${reloadKey}`;
 
     listGigs({ ...filters, limit: GIGS_PAGE_SIZE }, controller.signal)
-      .then((data) => setResult({ status: 'ready', gigs: data.gigs, total: data.total, error: '' }))
+      .then((data) => setResult({ key, status: 'ready', gigs: data.gigs, total: data.total, error: '' }))
       .catch((err) => {
         if (err.name === 'AbortError') return;
-        setResult({ status: 'error', gigs: [], total: 0, error: err.message });
+        setResult({ key, status: 'error', gigs: [], total: 0, error: err.message });
       });
 
     return () => controller.abort();
@@ -114,7 +124,7 @@ export default function Gigs() {
     window.scrollTo(0, 0);
   }
 
-  const totalPages = Math.max(1, Math.ceil(result.total / GIGS_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(view.total / GIGS_PAGE_SIZE));
   const hasFilters = Boolean(filters.q || filters.category || filters.minPrice || filters.maxPrice);
 
   return (
@@ -174,13 +184,13 @@ export default function Gigs() {
         />
       </form>
 
-      {result.status === 'loading' && <LoadingState label="Loading gigs…" />}
+      {view.status === 'loading' && <LoadingState label="Loading gigs…" />}
 
-      {result.status === 'error' && (
-        <ErrorState message={result.error} onRetry={() => setReloadKey((key) => key + 1)} />
+      {view.status === 'error' && (
+        <ErrorState message={view.error} onRetry={() => setReloadKey((key) => key + 1)} />
       )}
 
-      {result.status === 'ready' && result.gigs.length === 0 && (
+      {view.status === 'ready' && view.gigs.length === 0 && (
         <EmptyState title={hasFilters ? 'No gigs match your search' : 'No gigs yet'}>
           {hasFilters ? (
             <button type="button" className="button secondary" onClick={clearFilters}>
@@ -192,13 +202,13 @@ export default function Gigs() {
         </EmptyState>
       )}
 
-      {result.status === 'ready' && result.gigs.length > 0 && (
+      {view.status === 'ready' && view.gigs.length > 0 && (
         <>
           <p className="field-hint" aria-live="polite">
-            {result.total} {result.total === 1 ? 'gig' : 'gigs'} found
+            {view.total} {view.total === 1 ? 'gig' : 'gigs'} found
           </p>
           <div className="gig-grid">
-            {result.gigs.map((gig) => (
+            {view.gigs.map((gig) => (
               <GigCard key={gig.id} gig={gig} />
             ))}
           </div>
