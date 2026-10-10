@@ -82,6 +82,70 @@ Errors raised at any stage are caught by a single centralised error handler
 registered last in the middleware chain, so every error response is
 formatted consistently and never leaks internal details.
 
+### Data model
+
+```mermaid
+erDiagram
+    USER ||--o{ GIG : "offers (freelancer)"
+    USER ||--o{ BOOKING : "makes (client)"
+    USER ||--o{ BOOKING : "receives (freelancer)"
+    GIG ||--o{ BOOKING : "is booked as"
+    BOOKING ||--|| TRANSACTION : "has exactly one"
+    USER ||--o{ TRANSACTION : "pays (client)"
+    USER ||--o{ TRANSACTION : "earns (freelancer)"
+    GIG ||--o{ TRANSACTION : "is paid for in"
+
+    USER {
+        ObjectId _id PK
+        string name "HTML-escaped"
+        string email UK "lowercase"
+        string passwordHash "bcrypt, never selected by default"
+        string role "client, freelancer or admin"
+        date createdAt
+        date updatedAt
+    }
+    GIG {
+        ObjectId _id PK
+        ObjectId freelancer FK "owner, from the token"
+        string title "HTML-escaped"
+        string description "HTML-escaped"
+        number price "1 to 100000, 2 decimals"
+        string category "fixed list"
+        number deliveryDays "1 to 90"
+        boolean isActive
+        date createdAt
+        date updatedAt
+    }
+    BOOKING {
+        ObjectId _id PK
+        ObjectId gig FK
+        ObjectId client FK "from the token"
+        ObjectId freelancer FK "from the gig"
+        string gigTitle "snapshot at booking time"
+        number price "snapshot at booking time"
+        string status "confirmed or cancelled"
+        date createdAt
+        date updatedAt
+    }
+    TRANSACTION {
+        ObjectId _id PK
+        ObjectId booking FK "unique: one per booking"
+        ObjectId gig FK
+        ObjectId client FK
+        ObjectId freelancer FK
+        number amount "rounded to 2 decimals"
+        string status "completed or refunded"
+        string reference UK "TXN-date-random"
+        date createdAt
+        date updatedAt
+    }
+```
+
+Every booking stores a snapshot of the gig's title and price, and has exactly
+one transaction (a unique index on `transaction.booking`). The owner and
+parties on every record come from the verified token and the database,
+never from the request.
+
 ## 3. Project Structure
 
 ```
