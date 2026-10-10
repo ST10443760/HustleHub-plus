@@ -1052,7 +1052,8 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
 
 ## 12. Demonstration Video
 
-https://youtu.be/qTK6iV_0lmI
+- **Part 2:** _link to be added_
+- Part 1: https://youtu.be/qTK6iV_0lmI
 
 ## 13. Security Review Summary
 
