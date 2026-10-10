@@ -215,19 +215,46 @@ proxy skips certificate checks (`secure: false`) only because the local cert
 is self-signed; this setting is dev-only. `CLIENT_ORIGIN` in `api/.env` must
 be `http://localhost:5173` for CORS.
 
-Other client commands: `npm run build` (production build in `client/dist/`)
-and `npm run lint` (oxlint).
+Other client commands: `npm run lint` (oxlint), `npm run test:run` (tests,
+see **Testing**), and `npm run build` / `npm run preview` (below).
 
-What the client does today: register (client or freelancer), log in, browse
-and search gigs, view a gig, book it with a simulated payment confirmation,
-and see your bookings and transactions. Freelancer and admin users can log
-in and see their navigation; their own pages are added next and show a
-"coming soon" page until then.
+**Screens by role**
+
+| Role | Screens |
+|---|---|
+| Anyone | Home, Register (client or freelancer only), Log in |
+| Client | Browse gigs (search, category, price range, pages), Gig detail with **Book this gig** and a simulated payment confirmation, My bookings, My transactions |
+| Freelancer | Browse gigs, My gigs (New, Edit, Activate/Deactivate, Delete with confirmation), New/Edit gig form, Bookings on my gigs, Income (total, booking count, per-booking table), an **Edit** link on their own gig pages |
+| Admin | Browse gigs, Users (name, email, role, joined), All transactions (paginated), **Delete as admin** on any gig page |
+
+A logged-out visitor who opens a protected page is sent to Log in; a
+logged-in user with the wrong role sees a "Not allowed" page. These are
+conveniences only - the API enforces every rule itself.
+
+Deleting a gig (owner or admin) shows the API's own message, because a gig
+that already has bookings is deactivated instead of deleted.
+
+**Running the built client**
+
+With the API running and the dev server stopped:
+
+```bash
+cd client
+npm run build     # production build in client/dist/
+npm run preview   # serves dist/ at http://localhost:5173 with the CSP headers and the /api proxy
+```
+
+Preview deliberately uses the same port as the dev server. Browsers send an
+`Origin` header on POST requests, the proxy passes it on, and the API's CORS
+only accepts `CLIENT_ORIGIN` (`http://localhost:5173`), so the built app has to
+be served from that origin too.
 
 **How the client handles API text.** The API HTML-escapes free text before
 saving it (so `<b>` is stored as `&lt;b&gt;`). The client decodes exactly
 those entities for display (`utils/text.js`) and React renders the result
-as plain text. Nothing is ever rendered as HTML: there is no
+as plain text. The edit gig form also decodes the stored text into its inputs
+and sends back exactly what the freelancer typed, so the API escapes it once
+and text never double-escapes (no `&amp;amp;`). Nothing is ever rendered as HTML: there is no
 `dangerouslySetInnerHTML` and no HTML strings are built, so a gig titled
 `<img src=x onerror=alert(1)>` shows up as those literal characters.
 
@@ -236,8 +263,8 @@ as plain text. Nothing is ever rendered as HTML: there is no
 API later answers `401`, the token is cleared and the user is sent to the
 login page. The client never logs tokens or request data.
 
-The client's own Content-Security-Policy and its automated tests (Vitest +
-React Testing Library) are added in the next batch.
+The client's Content-Security-Policy is described under **Security → Client
+Content-Security-Policy**, and its tests under **Testing → Frontend tests**.
 
 The API runs at `https://localhost:5000`. Because the SSL certificate is
 self-signed (see `api/certs/README.md` for why and how to regenerate it), your
