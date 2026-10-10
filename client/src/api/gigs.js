@@ -22,3 +22,33 @@ export function isValidId(id) {
 export function getGig(id, signal) {
   return apiRequest(`/api/gigs/${encodeURIComponent(id)}`, { signal });
 }
+
+// ---- Freelancer: their own gigs ----
+
+export function listMyGigs(signal) {
+  return apiRequest('/api/gigs/mine', { signal });
+}
+
+// Only these fields are sent; the API rejects anything else (including
+// "freelancer", which it always takes from the token).
+function gigBody({ title, description, price, category, deliveryDays }) {
+  return { title, description, price, category, deliveryDays };
+}
+
+export function createGig(fields) {
+  return apiRequest('/api/gigs', { method: 'POST', body: gigBody(fields) });
+}
+
+export function updateGig(id, fields) {
+  return apiRequest(`/api/gigs/${encodeURIComponent(id)}`, { method: 'PUT', body: gigBody(fields) });
+}
+
+export function setGigActive(id, isActive) {
+  return apiRequest(`/api/gigs/${encodeURIComponent(id)}`, { method: 'PUT', body: { isActive } });
+}
+
+// Resolves to { id, deleted, deactivated, message? } - a gig with bookings
+// is deactivated instead of deleted.
+export function deleteGig(id) {
+  return apiRequest(`/api/gigs/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
