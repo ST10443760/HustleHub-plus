@@ -215,52 +215,102 @@ client/                        # React frontend (Vite)
 docs/                          # architecture diagram and screenshots
 ```
 
-## 4. Getting Started
+## 4. How to Run
 
-The backend and frontend are separate projects, so run each one in its own
-terminal.
+Every command below was run, in this order, on a fresh clone of the
+repository (Windows 11 with Git Bash and PowerShell, plus a Linux container
+for the certificate and Node 22 checks).
 
-**Backend (`api/`)**
+### Requirements
 
-```bash
-cd api
-npm install
-cp .env.example .env      # then set MONGO_URI, JWT_SECRET and CLIENT_ORIGIN inside .env
-npm run dev
-```
+| Tool | Version | Notes |
+|---|---|---|
+| Node.js | **22** (22.22+) or **24** (24.15+) | `engines` is set in both `package.json` files. The client's test tools (jsdom) don't support odd-numbered Node releases |
+| npm | comes with Node | |
+| MongoDB | Atlas cluster or a local replica set | Bookings use multi-document transactions, which need a replica set (every Atlas cluster is one) |
+| OpenSSL | any recent | Only for the local HTTPS certificate. Preinstalled on macOS/Linux; on Windows it comes with Git for Windows |
+| Newman | via `npx` | Only for the Postman tests |
 
-The API needs a MongoDB database. Set `MONGO_URI` in `api/.env` to either a
-local instance (`mongodb://localhost:27017/hustlehub`) or a MongoDB Atlas
-connection string. The real value lives only in `.env`, which is never
-committed. The server connects to the database before it starts listening,
-and exits with a safe error message (never the URI) if it can't connect.
+The backend and frontend are separate projects; run each in its own terminal.
 
-If an Atlas `mongodb+srv://` string fails with `querySrv ECONNREFUSED`,
-Node can't resolve the SRV record on your network. Use the standard
-`mongodb://host1,host2,host3/...` string from Atlas (Connect → Drivers)
-instead.
-
-`CLIENT_ORIGIN` is the only browser origin allowed to call the API
-(`http://localhost:5173` for the Vite dev server). It must be an exact
-origin with no trailing slash, and it is required when `NODE_ENV` is
-`production`.
-
-**Creating the admin account**
-
-Admins can't sign up through `/api/auth/register`, so the admin account is
-created by a seed script. Set `ADMIN_EMAIL`, `ADMIN_NAME` and
-`ADMIN_PASSWORD` (at least 12 characters) in `api/.env`, then:
+### Backend (`api/`)
 
 ```bash
 cd api
-npm run seed:admin
+npm ci                    # exact versions from package-lock.json
+cp .env.example .env      # PowerShell: Copy-Item .env.example .env
 ```
 
-The script is safe to run again: if an account with that email already
-exists it says so and changes nothing. It never logs the password or the
-database URI.
+Then edit `api/.env` (it is git-ignored and never committed):
 
-**Clearing test data**
+| Variable | What to put there |
+|---|---|
+| `MONGO_URI` | Your MongoDB connection string. If an Atlas `mongodb+srv://` string fails with `querySrv ECONNREFUSED`, Node can't resolve the SRV record on your network - use the standard `mongodb://host1,host2,host3/...` string from Atlas (Connect → Drivers) instead |
+| `JWT_SECRET` | A long random string |
+| `JWT_EXPIRES_IN` | Token lifetime, default `1h` |
+| `CLIENT_ORIGIN` | `http://localhost:5173` - the only browser origin the API accepts (exact origin, no trailing slash; required in production) |
+| `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD` | The admin account the seed script creates (password at least 12 characters) |
+| `PORT`, `NODE_ENV` | `5000` and `development` |
+| `RATE_LIMIT_*_MAX` | Leave commented out. Local-testing overrides only, ignored in production |
+
+Generate the local HTTPS certificate **before starting the API**, seed the
+admin, then start the server:
+
+```bash
+npm run certs             # creates api/certs/key.pem and cert.pem (git-ignored)
+npm run seed:admin        # creates the admin account; safe to run again
+npm run dev               # https://localhost:5000 (nodemon)
+```
+
+- `npm run certs` works the same in Git Bash, PowerShell, macOS and Linux.
+  To run OpenSSL by hand instead (and why the raw command fails in Git
+  Bash), see [`api/certs/README.md`](api/certs/README.md).
+- **If the certificate is missing**, the API still starts but on plain
+  **HTTP** and logs a warning. The client proxy and both Postman collections
+  expect HTTPS, so the client then gets `502` errors (Vite logs
+  `EPROTO ... wrong version number`) and Newman fails. Run `npm run certs`
+  and restart.
+- The server connects to MongoDB before it starts listening and exits with a
+  safe message (never the URI) if it can't.
+- Check it: `curl -k https://localhost:5000/api/health`. Browsers and Postman
+  warn about the self-signed certificate - that's expected locally (in
+  Postman, turn off "SSL certificate verification" under Settings → General).
+- Other API scripts: `npm start` (no nodemon), `npm run start:test` (relaxed
+  rate limits for the main Newman run - see **Testing**), `npm run clean:test`
+  (see below).
+
+### Frontend (`client/`)
+
+With the API running, in a second terminal:
+
+```bash
+cd client
+npm ci
+npm run dev               # http://localhost:5173
+```
+
+Open `http://localhost:5173`. Vite proxies every `/api` request to
+`https://localhost:5000`, so the client only ever calls relative `/api/...`
+URLs and no API host or port is hard-coded. The proxy skips certificate
+checks (`secure: false`) only because the local certificate is self-signed;
+this setting is dev-only.
+
+### Built client (production build)
+
+Stop the dev server first (preview uses the same port), keep the API running:
+
+```bash
+cd client
+npm run build             # production build in client/dist/
+npm run preview           # serves dist/ at http://localhost:5173 with the CSP headers and the /api proxy
+```
+
+Preview deliberately uses the same port as the dev server. Browsers send an
+`Origin` header on POST requests, the proxy passes it on, and the API's CORS
+only accepts `CLIENT_ORIGIN` (`http://localhost:5173`), so the built app has to
+be served from that origin too.
+
+### Clearing test data
 
 Newman runs and manual testing create throwaway users
 (`test-...@example.com`, `role-...@example.com`). To remove only those users
@@ -274,25 +324,7 @@ npm run clean:test
 It prints how much it removed, never deletes an admin, and refuses to run
 when `NODE_ENV` is `production`.
 
-**Frontend (`client/`)**
-
-The client needs the API running first (see above), then in a second terminal:
-
-```bash
-cd client
-npm install
-npm run dev      # http://localhost:5173
-```
-
-Open `http://localhost:5173`. In development, Vite proxies every `/api`
-request to the backend at `https://localhost:5000`, so the client only ever
-calls relative `/api/...` URLs and no API host or port is hard-coded. The
-proxy skips certificate checks (`secure: false`) only because the local cert
-is self-signed; this setting is dev-only. `CLIENT_ORIGIN` in `api/.env` must
-be `http://localhost:5173` for CORS.
-
-Other client commands: `npm run lint` (oxlint), `npm run test:run` (tests,
-see **Testing**), and `npm run build` / `npm run preview` (below).
+## 5. Using the App
 
 **Screens by role**
 
@@ -309,21 +341,6 @@ conveniences only - the API enforces every rule itself.
 
 Deleting a gig (owner or admin) shows the API's own message, because a gig
 that already has bookings is deactivated instead of deleted.
-
-**Running the built client**
-
-With the API running and the dev server stopped:
-
-```bash
-cd client
-npm run build     # production build in client/dist/
-npm run preview   # serves dist/ at http://localhost:5173 with the CSP headers and the /api proxy
-```
-
-Preview deliberately uses the same port as the dev server. Browsers send an
-`Origin` header on POST requests, the proxy passes it on, and the API's CORS
-only accepts `CLIENT_ORIGIN` (`http://localhost:5173`), so the built app has to
-be served from that origin too.
 
 **How the client handles API text.** The API HTML-escapes free text before
 saving it (so `<b>` is stored as `&lt;b&gt;`). The client decodes exactly
@@ -342,13 +359,6 @@ login page. The client never logs tokens or request data.
 The client's Content-Security-Policy is described under **Security → Client
 Content-Security-Policy**, and its tests under **Testing → Frontend tests**.
 
-The API runs at `https://localhost:5000`. Because the SSL certificate is
-self-signed (see `api/certs/README.md` for why and how to regenerate it), your
-browser and Postman will warn that the connection isn't trusted — that
-warning is expected for local development. In Postman, disable "SSL
-certificate verification" under Settings → General.
-
-**Health check:** `GET /api/health`
 
 ## 5. Authentication & Password Security
 
