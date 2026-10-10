@@ -133,8 +133,9 @@ client/                        # React frontend (Vite)
     context/                   # AuthProvider, useAuth
     components/                # layout/nav, ProtectedRoute, form field, gig card, booking panel
     pages/                     # login, register, gigs, gig detail, my bookings, my transactions
-    utils/                     # formatting, entity decoding, validation, token storage
+    utils/                     # formatting, entity decoding, validation, token storage, hooks
     styles/                    # global.css (CSS variables, no UI library)
+    test/                      # Vitest setup and a render helper (tests sit next to the code: *.test.jsx)
 docs/                          # architecture diagram and screenshots
 ```
 
