@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { listGigs } from '../api/gigs';
+import FlashMessage from '../components/FlashMessage';
 import FormField from '../components/FormField';
 import GigCard from '../components/GigCard';
 import Pagination from '../components/Pagination';
@@ -133,6 +134,9 @@ export default function Gigs() {
         <h1 id="gigs-title">Browse gigs</h1>
         <p>Find a freelancer for your next project.</p>
       </div>
+
+      {/* e.g. the result of an admin removing a gig */}
+      <FlashMessage />
 
       <form className="filters" role="search" onSubmit={(e) => e.preventDefault()}>
         <FormField
