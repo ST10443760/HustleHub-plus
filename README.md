@@ -837,20 +837,20 @@ and invalid/error scenarios, matching the automated tests in
 
 | Scenario | Screenshot |
 |---|---|
-| Health check | `docs/screenshots/01-health-check.png` |
-| Successful registration (token issued, no password hash leaked) | `docs/screenshots/02-register-success.png` |
-| Duplicate email registration rejected | `docs/screenshots/03-register-duplicate.png` |
-| Invalid registration input rejected | `docs/screenshots/04-register-invalid.png` |
-| Successful login (token issued) | `docs/screenshots/05-login-success.png` |
-| Login with wrong password rejected | `docs/screenshots/06-login-wrong-password.png` |
-| Protected route rejected with no token | `docs/screenshots/07-protected-no-token.png` |
-| Protected route succeeds with valid token | `docs/screenshots/08-protected-valid-token.png` |
+| Health check | `docs/screenshots/part1/01-health-check.png` |
+| Successful registration (token issued, no password hash leaked) | `docs/screenshots/part1/02-register-success.png` |
+| Duplicate email registration rejected | `docs/screenshots/part1/03-register-duplicate.png` |
+| Invalid registration input rejected | `docs/screenshots/part1/04-register-invalid.png` |
+| Successful login (token issued) | `docs/screenshots/part1/05-login-success.png` |
+| Login with wrong password rejected | `docs/screenshots/part1/06-login-wrong-password.png` |
+| Protected route rejected with no token | `docs/screenshots/part1/07-protected-no-token.png` |
+| Protected route succeeds with valid token | `docs/screenshots/part1/08-protected-valid-token.png` |
 
-![Health Check](./docs/screenshots/01-health-check.png)
-![Register Success](./docs/screenshots/02-register-success.png)
-![Register Duplicate](./docs/screenshots/03-register-duplicate.png)
-![Register Invalid](./docs/screenshots/04-register-invalid.png)
-![Login Success](./docs/screenshots/05-login-success.png)
-![Login Wrong Password](./docs/screenshots/06-login-wrong-password.png)
-![Protected No Token](./docs/screenshots/07-protected-no-token.png)
-![Protected Valid Token](./docs/screenshots/08-protected-valid-token.png)
+![Health Check](./docs/screenshots/part1/01-health-check.png)
+![Register Success](./docs/screenshots/part1/02-register-success.png)
+![Register Duplicate](./docs/screenshots/part1/03-register-duplicate.png)
+![Register Invalid](./docs/screenshots/part1/04-register-invalid.png)
+![Login Success](./docs/screenshots/part1/05-login-success.png)
+![Login Wrong Password](./docs/screenshots/part1/06-login-wrong-password.png)
+![Protected No Token](./docs/screenshots/part1/07-protected-no-token.png)
+![Protected Valid Token](./docs/screenshots/part1/08-protected-valid-token.png)
