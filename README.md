@@ -927,15 +927,23 @@ never contain passwords, tokens, the database connection string or the JWT
 secret. Stack traces are logged only for unexpected errors and never in
 production, and they never appear in an API response.
 
-### Known and accepted: dev-only audit findings
+### Dependency audit
 
-`npm audit --omit=dev` reports **0 vulnerabilities** for the API's
-production dependencies. The full `npm audit` reports high-severity
-findings in `braces`, which is only reached through `nodemon` → `chokidar`.
-nodemon is a development tool that watches files and restarts the server;
-it never runs in a deployed API and never handles requests. The only
-available fix (`npm audit fix --force`) downgrades nodemon to 1.x, which is
-a breaking change, so this is accepted for now.
+Results of `npm audit` at submission time:
+
+| Project | `npm audit --omit=dev` (what ships) | `npm audit` (including dev tools) |
+|---|---|---|
+| `api/` | **0 vulnerabilities** | 3 high - all `braces`, dev-only (see below) |
+| `client/` | **0 vulnerabilities** | **0 vulnerabilities** |
+
+**Known and accepted:** the three `api/` findings are one issue in `braces`,
+reached only through `nodemon` → `chokidar` → `braces`. nodemon is a
+development tool that watches files and restarts the server; it never runs
+in a deployed API and never handles requests. The only available fix
+(`npm audit fix --force`) downgrades nodemon to 1.x, which is a breaking
+change, so this is accepted for now. Newman is run with `npx` instead of
+being a dependency, because its own dependency tree adds about 19 more
+dev-only findings.
 
 ### JWT in localStorage: the trade-off
 
