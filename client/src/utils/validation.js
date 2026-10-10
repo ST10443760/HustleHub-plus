@@ -54,3 +54,45 @@ export function validatePriceRange(minPrice, maxPrice, maxAllowed) {
   }
   return errors;
 }
+
+/**
+ * Gig form, mirroring api/src/middleware/gigValidators.js. Takes the raw
+ * form strings and returns { errors, values } where values has trimmed text
+ * and REAL numbers for price and deliveryDays - the API rejects "150" as a
+ * string, so nothing is sent until these convert cleanly.
+ */
+export function validateGig(form, { categories, maxPrice }) {
+  const errors = {};
+  const title = form.title.trim();
+  const description = form.description.trim();
+  const category = form.category;
+  const priceText = String(form.price).trim();
+  const daysText = String(form.deliveryDays).trim();
+
+  // API: 3-100 characters after trimming
+  if (title.length < 3 || title.length > 100) errors.title = 'Title must be 3-100 characters';
+
+  // API: 10-1000 characters after trimming
+  if (description.length < 10 || description.length > 1000) {
+    errors.description = 'Description must be 10-1000 characters';
+  }
+
+  // API: a number from 1 to 100000 with at most 2 decimal places
+  const price = Number(priceText);
+  if (priceText === '') errors.price = 'Price is required';
+  else if (!/^\d+(\.\d{1,2})?$/.test(priceText) || !Number.isFinite(price)) {
+    errors.price = 'Enter a price like 150 or 149.99';
+  } else if (price < 1 || price > maxPrice) errors.price = `Price must be between 1 and ${maxPrice}`;
+
+  // API: a whole number from 1 to 90
+  const deliveryDays = Number(daysText);
+  if (daysText === '') errors.deliveryDays = 'Delivery days is required';
+  else if (!/^\d+$/.test(daysText) || deliveryDays < 1 || deliveryDays > 90) {
+    errors.deliveryDays = 'Delivery days must be a whole number from 1 to 90';
+  }
+
+  // API: one of the fixed categories
+  if (!categories.includes(category)) errors.category = 'Choose a category';
+
+  return { errors, values: { title, description, price, category, deliveryDays } };
+}
