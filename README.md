@@ -573,8 +573,8 @@ logged. This lays the groundwork for the cloud logging required in Part 3.
 
 ## 10. Testing
 
-A Postman collection (`api/postman/HustleHub_Part1_Auth.postman_collection.json`)
-covers both valid and invalid scenarios:
+The main Postman collection (`api/postman/HustleHub_API.postman_collection.json`)
+starts with an **Auth** set covering valid and invalid scenarios:
 
 - Health check
 - Successful registration (+ automated checks that a token is returned and
@@ -661,23 +661,28 @@ The rate limits themselves are proven by a separate collection that runs
 against the strict defaults.
 
 ```bash
-npm install -g newman
+cd api
 
 # 1. Main collection, against relaxed limits
-cd api
-npm run start:test          # in one terminal (refuses to run in production)
-newman run postman/HustleHub_Part1_Auth.postman_collection.json --insecure
+npm run start:test          # terminal 1 (refuses to run in production)
+npx newman run postman/HustleHub_API.postman_collection.json --insecure     # terminal 2
 
 # 2. Rate limit collection, against the strict defaults
-npm run dev                 # restart without start:test, so the strict limits apply
-newman run postman/HustleHub_RateLimits.postman_collection.json --insecure
+#    stop start:test, then start the API normally so the strict limits apply
+npm run dev                 # terminal 1
+npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure    # terminal 2
 ```
+
+`npx` downloads Newman on first use; `npm install -g newman` and then plain
+`newman run ...` works too. Expected result: the main collection runs 80
+requests / 134 assertions (85 / 145 with admin credentials), the rate limit
+collection 20 requests / 26 assertions, all passing.
 
 To include the admin tests in the main collection, pass the seeded admin's
 credentials as variables (they're never stored in the collection):
 
 ```bash
-newman run postman/HustleHub_Part1_Auth.postman_collection.json --insecure \
+npx newman run postman/HustleHub_API.postman_collection.json --insecure \
   --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
 ```
 
@@ -947,7 +952,7 @@ https://youtu.be/qTK6iV_0lmI
 
 Screenshots below show the Postman collection run confirming both successful
 and invalid/error scenarios, matching the automated tests in
-`api/postman/HustleHub_Part1_Auth.postman_collection.json`.
+`api/postman/HustleHub_API.postman_collection.json`.
 
 | Scenario | Screenshot |
 |---|---|
