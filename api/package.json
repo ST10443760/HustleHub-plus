@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "HustleHub+ secure backend API (Part 1 - Secure Foundations)",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
