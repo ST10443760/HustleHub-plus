@@ -36,6 +36,38 @@ authentication layer; Part 2 adds the marketplace on top of it, with
 security enforced on every request by the API (the client's checks are
 only for convenience).
 
+## Features
+
+**For clients**
+- Register and log in (role chosen at sign-up: client or freelancer)
+- Browse active gigs with search, category and price filters and pagination
+- Gig detail page and booking with a confirmation step; payment is simulated
+  and every booking returns a transaction reference
+- My bookings and My transactions
+
+**For freelancers**
+- Create, edit, activate/deactivate and delete their own gigs (a gig that
+  already has bookings is deactivated instead of deleted)
+- See the bookings on their gigs, with the client's name
+- Income page: total earned, number of bookings and a per-booking table
+
+**For admins**
+- List all users and all transactions (paginated)
+- Remove any gig, with the same delete-or-deactivate rule
+
+**Security and quality**
+- JWT authentication with the role read from the database on every request;
+  RBAC and ownership checks on every route
+- Validation with unknown fields rejected, HTML escaping, NoSQL operator
+  stripping, regex-safe search
+- Rate limiting (login, register, booking, plus a general limit), Helmet
+  with a strict CSP on the API and the client, CORS locked to the client
+- Bookings and their transactions written atomically in one MongoDB
+  transaction; money stored as numbers rounded to 2 decimals
+- Security event logging without secrets; no stack traces in responses
+- 100+ automated API assertions (Newman) and 67 frontend tests (Vitest +
+  React Testing Library)
+
 ## 2. Architecture
 
 The system follows a MERN architecture: a **React** frontend, an
