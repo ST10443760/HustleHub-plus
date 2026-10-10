@@ -679,7 +679,31 @@ Also set: `Strict-Transport-Security` (1 year, including subdomains),
 `Cross-Origin-Resource-Policy: same-origin` and
 `Cross-Origin-Embedder-Policy: require-corp`. `X-Powered-By` is removed.
 
-The React client gets its own CSP, which comes with the frontend.
+### Client Content-Security-Policy
+
+The built React app has its own CSP, again with no `unsafe-inline` or
+`unsafe-eval`:
+
+```
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'
+```
+
+- **Built app:** a small Vite plugin (`client/vite.config.js`) adds it to
+  `dist/index.html` as a `<meta http-equiv="Content-Security-Policy">` tag at
+  build time. The build produces one script file and one stylesheet, both
+  same-origin, with no inline scripts, inline styles or event handler
+  attributes, so nothing has to be loosened. The app also never uses inline
+  `style` attributes, and all API calls go to the same origin (`/api`).
+- **`npm run preview`:** serves the same policy as a real response header,
+  plus `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY`.
+  `frame-ancestors` only works as a header - browsers ignore it in a meta
+  tag - which is why it's only in the preview headers. A production host
+  should send the same headers.
+- **`npm run dev` has no CSP on purpose.** The Vite dev server injects inline
+  scripts for hot module reloading, which this policy would (correctly) block.
+  Use `npm run build` + `npm run preview` to see the app under the real policy.
 
 ### CORS
 
