@@ -4,7 +4,7 @@ import { formatCategory } from '../utils/format';
 import { validateGig } from '../utils/validation';
 import FormField from './FormField';
 
-export const EMPTY_GIG = { title: '', description: '', price: '', category: '', deliveryDays: '' };
+const EMPTY_GIG = { title: '', description: '', price: '', category: '', deliveryDays: '' };
 
 function messageFor(err) {
   if (err.status === 403) return 'You can only change your own gigs.';
