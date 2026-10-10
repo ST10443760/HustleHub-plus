@@ -38,33 +38,45 @@ The system follows a MERN architecture: a **React** frontend, an
 kept users in memory; Part 2 replaces that with MongoDB, so accounts and all
 marketplace data now persist across server restarts.
 
-![Architecture Diagram](./docs/architecture-diagram.png)
+```mermaid
+flowchart LR
+    user(["Browser"])
 
-*(Diagram shows the client communicating over HTTPS with the Express
-backend, the security middleware layer requests pass through before
-reaching application logic, and the boundary of what is considered "our
-system" versus external actors.)*
+    subgraph client["React client - Vite, port 5173"]
+        ui["Pages and components<br/>React escapes all text<br/>strict CSP on the built app"]
+        apiClient["api/client.js<br/>relative /api URLs + Bearer token"]
+        proxy["Vite proxy<br/>dev and preview"]
+    end
 
-The request flow through the backend is:
+    subgraph api["Express API - https://localhost:5000"]
+        direction TB
+        pipeline["1. request log<br/>2. Helmet headers + CSP<br/>3. CORS locked to CLIENT_ORIGIN<br/>4. general rate limit<br/>5. JSON body parser, 10kb<br/>6. NoSQL operator sanitiser"]
+        routes["Routers<br/>protect - requireRole - route rate limit<br/>validators - validateObjectId - requireOwnership"]
+        controllers["Controllers"]
+        models["Mongoose models<br/>User, Gig, Booking, Transaction"]
+        errors["Central error handler<br/>safe JSON errors only"]
+        pipeline --> routes --> controllers --> models
+        routes -. "4xx" .-> errors
+        controllers -. "errors" .-> errors
+    end
 
+    db[("MongoDB Atlas<br/>replica set, transactions")]
+
+    user --> ui --> apiClient --> proxy
+    proxy -- "HTTPS, self-signed cert" --> pipeline
+    models --> db
 ```
-Client (browser / Postman)
-      │  HTTPS
-      ▼
-Middleware pipeline (Helmet, CORS, body parsing, request logging)
-      │
-      ▼
-Router  ──────────────►  JWT verification middleware (protected routes only)
-      │
-      ▼
-Auth controller (register / login logic)
-      │
-      ▼
-bcryptjs (password hashing)  +  input validation
-      │
-      ▼
-MongoDB (Mongoose models)
-```
+
+Every request passes through the same middleware pipeline, in this order,
+before any route runs: a request log line, Helmet's security headers, CORS
+(locked to `CLIENT_ORIGIN`), the general rate limit, the JSON body parser
+(10kb limit) and the NoSQL operator sanitiser. Each router then adds its own
+checks - `protect` (JWT + user loaded from the database), `requireRole`,
+route-specific rate limits, validators, `validateObjectId` and
+`requireOwnership` - before the controller talks to MongoDB through Mongoose.
+
+> `docs/architecture-diagram.png` is the Part 1 diagram (API only). The
+> Mermaid diagrams in this README are the current ones.
 
 Errors raised at any stage are caught by a single centralised error handler
 registered last in the middleware chain, so every error response is
