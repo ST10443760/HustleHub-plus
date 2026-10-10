@@ -199,16 +199,44 @@ when `NODE_ENV` is `production`.
 
 **Frontend (`client/`)**
 
+The client needs the API running first (see above), then in a second terminal:
+
 ```bash
 cd client
 npm install
-npm run dev
+npm run dev      # http://localhost:5173
 ```
 
-The frontend runs at `http://localhost:5173`. In development, Vite proxies
-every `/api` request to the backend at `https://localhost:5000`, so start the
-backend first. The proxy skips certificate checks (`secure: false`) only
-because the local cert is self-signed; this setting is dev-only.
+Open `http://localhost:5173`. In development, Vite proxies every `/api`
+request to the backend at `https://localhost:5000`, so the client only ever
+calls relative `/api/...` URLs and no API host or port is hard-coded. The
+proxy skips certificate checks (`secure: false`) only because the local cert
+is self-signed; this setting is dev-only. `CLIENT_ORIGIN` in `api/.env` must
+be `http://localhost:5173` for CORS.
+
+Other client commands: `npm run build` (production build in `client/dist/`)
+and `npm run lint` (oxlint).
+
+What the client does today: register (client or freelancer), log in, browse
+and search gigs, view a gig, book it with a simulated payment confirmation,
+and see your bookings and transactions. Freelancer and admin users can log
+in and see their navigation; their own pages are added next and show a
+"coming soon" page until then.
+
+**How the client handles API text.** The API HTML-escapes free text before
+saving it (so `<b>` is stored as `&lt;b&gt;`). The client decodes exactly
+those entities for display (`utils/text.js`) and React renders the result
+as plain text. Nothing is ever rendered as HTML: there is no
+`dangerouslySetInnerHTML` and no HTML strings are built, so a gig titled
+`<img src=x onerror=alert(1)>` shows up as those literal characters.
+
+**Session.** Only the JWT is stored, in `localStorage` (see the trade-off under
+**Security**). On start-up the client checks it with `GET /api/auth/me`; if the
+API later answers `401`, the token is cleared and the user is sent to the
+login page. The client never logs tokens or request data.
+
+The client's own Content-Security-Policy and its automated tests (Vitest +
+React Testing Library) are added in the next batch.
 
 The API runs at `https://localhost:5000`. Because the SSL certificate is
 self-signed (see `api/certs/README.md` for why and how to regenerate it), your
