@@ -577,6 +577,54 @@ window.
 Both collections can also be imported into Postman (disable SSL certificate
 verification under Settings → General).
 
+### Frontend tests
+
+The React client is tested with **Vitest** and **React Testing Library**
+(jsdom). Tests sit next to the code they cover (`*.test.js` / `*.test.jsx`).
+No test touches the network: the api modules (or `fetch`) are mocked, and the
+setup file makes any unmocked `fetch` fail loudly.
+
+```bash
+cd client
+npm run test:run   # run everything once
+npm test           # watch mode while developing
+```
+
+There are 67 tests across 16 files, covering both rendering and user interaction:
+
+- **Utilities:** `decodeEntities` (every entity the API produces, single-pass
+  decoding), rand and date formatting, and the register and gig validation
+  rules that mirror the API.
+- **API client:** adds the Bearer header, unwraps `{ success, data }`, throws
+  the server's error message, gives a generic message on a network failure or a
+  non-JSON reply, passes on the 429 retry message, clears the session and calls
+  the logout handler on a 401 (but not for a failed login), and refuses
+  absolute URLs.
+- **Register and Login:** inline errors for bad input; only client and
+  freelancer are offered as roles; valid, trimmed data is submitted; the server's
+  message on a duplicate email; the generic login error; the 429 retry message.
+- **ProtectedRoute:** logged-out visitors go to login, the wrong role sees
+  "Not allowed", the right role sees the page.
+- **XSS:** a gig titled `<img src=x onerror=alert(1)>` (escaped, as the API
+  stores it) renders as plain text in the gig card and on the gig page, and no
+  `img` element is created.
+- **Gigs page:** loading, list, empty and error (with retry) states; the
+  search is debounced (fake timers prove there is no request per keystroke);
+  the category filter changes the request; an invalid price range is blocked.
+- **Gig detail by role:** clients see Book, the owner sees Edit, admins see
+  Delete as admin and never Book.
+- **Booking panel:** the confirmation shows the price and the simulated payment
+  notice, Cancel closes it, a double click on Confirm books only once, success
+  shows the transaction reference, and a 429 shows the retry message.
+- **Gig form and edit page:** bad price and delivery days are blocked, price and
+  delivery days are sent as numbers, the edit form is pre-filled with decoded
+  text and saves the raw text (no `&amp;amp;`), and someone else's gig can't be
+  edited.
+- **My gigs:** activate/deactivate, a confirmation before deleting, and the
+  server's message telling "deleted" apart from "deactivated".
+- **Income** (totals, items, empty state with R 0,00) and **admin Users** (rows
+  rendered, no password field anywhere).
+
 ## 11. Security
 
 Security is layered: every request passes through several independent
