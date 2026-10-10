@@ -19,7 +19,25 @@ Development Security)
 
 ---
 
-## 1. System Overview
+## Contents
+
+1. [Overview](#1-overview)
+2. [Features](#2-features)
+3. [Architecture](#3-architecture)
+4. [Project Structure](#4-project-structure)
+5. [How to Run](#5-how-to-run)
+6. [Using the App](#6-using-the-app)
+7. [API](#7-api)
+8. [Security](#8-security)
+9. [Testing](#9-testing)
+10. [Requirements Traceability](#10-requirements-traceability)
+11. [Known Limitations and Part 3 Notes](#11-known-limitations-and-part-3-notes)
+12. [Screenshots](#12-screenshots)
+13. [Demonstration Video](#13-demonstration-video)
+
+Appendix: [Part 1 API Screenshots](#appendix-part-1-api-screenshots)
+
+## 1. Overview
 
 HustleHub+ has three user types:
 
@@ -36,7 +54,7 @@ authentication layer; Part 2 adds the marketplace on top of it, with
 security enforced on every request by the API (the client's checks are
 only for convenience).
 
-## Features
+## 2. Features
 
 **For clients**
 - Register and log in (role chosen at sign-up: client or freelancer)
@@ -68,7 +86,7 @@ only for convenience).
 - 100+ automated API assertions (Newman) and 67 frontend tests (Vitest +
   React Testing Library)
 
-## 2. Architecture
+## 3. Architecture
 
 The system follows a MERN architecture: a **React** frontend, an
 **Express/Node** backend and a **MongoDB** database (via Mongoose). Part 1
@@ -183,7 +201,7 @@ one transaction (a unique index on `transaction.booking`). The owner and
 parties on every record come from the verified token and the database,
 never from the request.
 
-## 3. Project Structure
+## 4. Project Structure
 
 ```
 api/                           # Express backend
@@ -252,7 +270,7 @@ client/                        # React frontend (Vite)
 docs/                          # architecture diagram and screenshots
 ```
 
-## 4. How to Run
+## 5. How to Run
 
 Every command below was run, in this order, on a fresh clone of the
 repository (Windows 11 with Git Bash and PowerShell, plus a Linux container
@@ -361,7 +379,7 @@ npm run clean:test
 It prints how much it removed, never deletes an admin, and refuses to run
 when `NODE_ENV` is `production`.
 
-## 5. Using the App
+## 6. Using the App
 
 **Screens by role**
 
@@ -396,50 +414,9 @@ login page. The client never logs tokens or request data.
 The client's Content-Security-Policy is described under **Security → Client
 Content-Security-Policy**, and its tests under **Testing → Frontend tests**.
 
+## 7. API
 
-## 5. Authentication & Password Security
-
-Registration (`POST /api/auth/register`) accepts a name, email, and
-password. Before anything is stored, the password is hashed using
-**bcryptjs** with a salt round factor of 10 — the plain-text password is
-never written to storage, logged, or included in any API response. Login
-(`POST /api/auth/login`) re-hashes the submitted password using the same
-algorithm and compares it against the stored hash; the two are never
-compared as plain text.
-
-We chose `bcryptjs` (a pure JavaScript implementation) over the native
-`bcrypt` package specifically to avoid `bcrypt`'s native-compilation
-dependency chain, which pulled in several high/critical npm audit
-vulnerabilities in build tooling unrelated to our own code. `bcryptjs`
-exposes an identical API (`hash()`, `compare()`) with no native build step,
-which also simplifies setup for every team member regardless of OS.
-
-Duplicate registrations are rejected with a generic `409` response, and
-failed logins (wrong password or unknown email) both return the same
-generic `"Invalid email or password"` message and status code — this is
-deliberate: distinguishing between "wrong password" and "no such account"
-would let an attacker enumerate valid registered emails.
-
-## 6. Token-Based Authentication (JWT)
-
-On successful registration or login, the API issues a JSON Web Token
-containing only the user's `id` and `role` in its payload — never the
-password hash or other sensitive fields, since a JWT payload is signed but
-not encrypted and can be decoded by anyone holding the token.
-
-Every route except the health check, register and login is wrapped in a
-`protect` middleware that:
-
-1. Reads the token from the `Authorization: Bearer <token>` header
-2. Verifies its signature against `JWT_SECRET`
-3. Loads the user from the database, confirming they still exist and
-   taking their role from the database rather than the token
-4. Attaches the authenticated user to `req.user` for the controller to use
-
-Missing, expired, or tampered tokens all return the same generic `401`
-response. The JWT secret is read from an environment variable
-(`process.env.JWT_SECRET`) and is never hard-coded in source or committed
-to the repository.
+All routes are under `https://localhost:5000` (the client reaches them through its `/api` proxy). "Logged in" means a valid `Authorization: Bearer <token>` header. Every response is `{ "success": true, "data": ... }` or `{ "success": false, "error": "..." }`.
 
 ### Roles and access control
 
@@ -471,10 +448,7 @@ string. Admins only bypass this on routes that explicitly allow it. Malformed
 ids are rejected with a `400` by `validateObjectId` before they reach the
 database.
 
-### API endpoints
-
-All routes are under `https://localhost:5000`. "Logged in" means a valid
-`Authorization: Bearer <token>` header.
+### Endpoints
 
 | Method | Path | Who can call it | Notes |
 |---|---|---|---|
@@ -568,26 +542,137 @@ Money is stored as a plain number rounded to 2 decimal places, and totals
 are rounded the same way, so amounts like 19.99 add up exactly. Booking
 creation, transaction creation and failed booking attempts are all logged.
 
-## 7. HTTPS
+## 8. Security
 
-The API is served over HTTPS using a locally generated, self-signed SSL
-certificate (`api/certs/cert.pem`, `api/certs/key.pem`). `server.js` reads these
-files and starts an `https` server rather than plain `http`. See
-`api/certs/README.md` for exact instructions to regenerate the certificate,
-since certificate/key files are excluded from git via `.gitignore` and must
-be generated locally by anyone cloning the repository. HTTPS matters even
-in local development because it's the same code path that will run in
-production — testing over plain HTTP would hide any issues specific to a
-TLS connection.
+Security is layered: every request passes through several independent
+checks, so a gap in one is caught by another.
 
-## 8. Input Validation & Error Handling
+### Route audit
 
-Every field the API accepts is validated using `express-validator` before
-it reaches a controller: names and emails are trimmed and format-checked,
-emails are normalised, passwords must meet a minimum length and
-complexity rule, and free text is HTML-escaped (see **Security** below). Invalid input is rejected with a
-`400` response listing the specific validation failures, without ever
-executing any business logic against unvalidated data.
+Every route and its middleware, read from the running Express app. Every
+request also passes the global pipeline first (Helmet, CORS, the general
+rate limit, body parsing with a 10kb cap, the NoSQL sanitiser).
+
+| Method | Route | Middleware, in order | Who |
+|---|---|---|---|
+| GET | `/api/health` | - | Anyone |
+| POST | `/api/auth/register` | registerLimiter → validators (role only client/freelancer) | Anyone |
+| POST | `/api/auth/login` | loginLimiter → validators | Anyone |
+| GET | `/api/auth/me` | protect | Logged in |
+| GET | `/api/admin/users` | protect → requireRole(admin) | Admin |
+| GET | `/api/admin/transactions` | protect → requireRole(admin) → pagination validators | Admin |
+| DELETE | `/api/admin/gigs/:id` | protect → requireRole(admin) → validateObjectId | Admin |
+| GET | `/api/gigs` | protect → query validators (exact params) | Logged in |
+| GET | `/api/gigs/mine` | protect → requireRole(freelancer) | Freelancer (own gigs only, by query) |
+| GET | `/api/gigs/:id` | protect → validateObjectId (+ inactive gigs only for the owner, in the controller) | Logged in |
+| POST | `/api/gigs` | protect → requireRole(freelancer) → body validators (exact fields) | Freelancer (owner = token user) |
+| PUT | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** → body validators | Owner only |
+| DELETE | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** | Owner only |
+| POST | `/api/bookings` | protect → requireRole(client) → bookingLimiter (per user) → validators (gigId only) | Client |
+| GET | `/api/bookings/mine` | protect → requireRole(client, freelancer) | Own bookings only, by query |
+| GET | `/api/bookings/:id` | protect → validateObjectId → **requireOwnership** (client or freelancer) | The booking's two parties |
+| GET | `/api/transactions/mine` | protect → requireRole(client, freelancer) | Own transactions only, by query |
+| GET | `/api/income` | protect → requireRole(freelancer) | Own income only, by query |
+
+Every route except health, register and login requires a valid JWT; every
+role-restricted route uses `requireRole`; every route that reads or changes
+one specific gig or booking validates the id and checks ownership (or, for
+reading a gig, that it is active or yours). The "mine" routes never take an
+id from the request: they filter by `req.user.id`.
+
+### Authentication and passwords
+
+Registration (`POST /api/auth/register`) accepts a name, email, and
+password. Before anything is stored, the password is hashed using
+**bcryptjs** with a salt round factor of 10 — the plain-text password is
+never written to storage, logged, or included in any API response. Login
+(`POST /api/auth/login`) re-hashes the submitted password using the same
+algorithm and compares it against the stored hash; the two are never
+compared as plain text.
+
+We chose `bcryptjs` (a pure JavaScript implementation) over the native
+`bcrypt` package specifically to avoid `bcrypt`'s native-compilation
+dependency chain, which pulled in several high/critical npm audit
+vulnerabilities in build tooling unrelated to our own code. `bcryptjs`
+exposes an identical API (`hash()`, `compare()`) with no native build step,
+which also simplifies setup for every team member regardless of OS.
+
+Duplicate registrations are rejected with a generic `409` response, and
+failed logins (wrong password or unknown email) both return the same
+generic `"Invalid email or password"` message and status code — this is
+deliberate: distinguishing between "wrong password" and "no such account"
+would let an attacker enumerate valid registered emails.
+
+Passwords are hashed with **bcryptjs** (10 salt rounds) and never stored,
+logged or returned. The hash field is excluded from every query by default.
+Login always runs a bcrypt comparison, against a dummy hash when the email
+doesn't exist, so an unknown email takes as long as a wrong password and
+response times can't be used to find valid accounts. Both cases return the
+same `401 Invalid email or password`.
+
+### JWT and roles
+
+On successful registration or login, the API issues a JSON Web Token
+containing only the user's `id` and `role` in its payload — never the
+password hash or other sensitive fields, since a JWT payload is signed but
+not encrypted and can be decoded by anyone holding the token.
+
+Every route except the health check, register and login is wrapped in a
+`protect` middleware that:
+
+1. Reads the token from the `Authorization: Bearer <token>` header
+2. Verifies its signature against `JWT_SECRET`
+3. Loads the user from the database, confirming they still exist and
+   taking their role from the database rather than the token
+4. Attaches the authenticated user to `req.user` for the controller to use
+
+Missing, expired, or tampered tokens all return the same generic `401`
+response. The JWT secret is read from an environment variable
+(`process.env.JWT_SECRET`) and is never hard-coded in source or committed
+to the repository.
+
+A deleted user's token stops working straight away, because `protect` loads the user on every request.
+
+### RBAC and ownership
+
+- `requireRole(...)` restricts each route to the roles in the API table.
+  A wrong role gets a generic `403` that doesn't say which role was needed.
+- `requireOwnership(...)` loads the record and checks the logged-in user
+  owns it (a gig's freelancer; a booking's client or freelancer), comparing
+  against the user from the token and database, never an id from the request.
+  Missing records are `404`, someone else's are `403`.
+- Price, freelancer, client and status on a booking always come from the
+  database and the token, never the request.
+- Admins can't self-register; the one admin account is created by
+  `npm run seed:admin`.
+
+### Validation and sanitising
+
+- **Validation (express-validator).** Every route that accepts input has a
+  rule set. Types are checked with `typeof` (so an array or object can't
+  slip through as a string), lengths and ranges are enforced, categories and
+  roles come from fixed lists, and ids must be exactly 24 hex characters.
+  Unknown fields are rejected with a `400` rather than ignored, so a
+  request can't set `freelancer`, `price`, `role` or `isActive` by adding
+  them to the body.
+- **HTML escaping.** Every free-text field that other users see (gig title,
+  description and category, and the user's name) is trimmed and
+  HTML-escaped before it's saved, so `<script>` is stored as
+  `&lt;script&gt;` and can't run in a browser.
+- **NoSQL operator stripping.** A global middleware (express-mongo-sanitize)
+  removes any key starting with `$` or containing `.` from the body, query
+  string and route params before any route runs, so `{ "$gt": "" }` can
+  never reach a Mongoose query. This is defence in depth on top of the
+  validators, which already reject such input.
+- **Search** text is escaped before it's used in a regex, so `.*` matches
+  only the literal text `.*`.
+- **Body limits.** Request bodies are capped at 10kb (`413`), and malformed
+  JSON gets a clear `400`.
+
+### Error handling
+
+Invalid input is rejected with a `400` that lists the validation failures,
+before any controller or database code runs.
 
 All errors — validation failures, authentication failures, or unexpected
 exceptions — pass through a single centralised error handler
@@ -600,15 +685,169 @@ exceptions — pass through a single centralised error handler
 - Never includes a stack trace, file path, or configuration value in any
   client-facing response
 
-## 9. Logging
+### Rate limiting
 
-A shared logging utility (`utils/logger.js`) is used throughout the
-codebase instead of raw `console.log`, so log output stays consistent and
-timestamped. Security-relevant events are logged with an `event()` helper:
-see **Security → Logging** below for the full list and what is never
-logged. This lays the groundwork for the cloud logging required in Part 3.
+| Limiter | Applies to | Limit | Counted per |
+|---|---|---|---|
+| Login | `POST /api/auth/login` | 5 **failed** attempts per 15 minutes (successful logins don't count) | IP |
+| Register | `POST /api/auth/register` | 10 per hour | IP |
+| Booking | `POST /api/bookings` | 10 per 10 minutes | Logged-in user (IP if none) |
+| General | Everything under `/api` | 100 per 15 minutes | IP |
 
-## 10. Testing
+Going over a limit returns `429` with a `Retry-After` header and
+`{ "success": false, "error": "Too many requests, please try again in N seconds." }`.
+The standard `RateLimit` and `RateLimit-Policy` headers are sent; the legacy
+`X-RateLimit-*` headers are off. Every hit is logged with the limiter name
+and IP.
+
+For local testing, each limit's max can be raised with `RATE_LIMIT_LOGIN_MAX`,
+`RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_BOOKING_MAX` and
+`RATE_LIMIT_GENERAL_MAX` (`npm run start:test` does this). These overrides are
+**ignored when `NODE_ENV` is `production`**, so the strict values above
+always apply in a deployed API.
+
+### Security headers (Helmet)
+
+Helmet is configured explicitly. The API's Content-Security-Policy is built
+from scratch, with no `unsafe-inline` or `unsafe-eval` anywhere:
+
+| Directive | Value |
+|---|---|
+| `default-src` | `'self'` |
+| `script-src` | `'self'` |
+| `style-src` | `'self'` |
+| `img-src` | `'self' data:` |
+| `connect-src` | `'self'` and `CLIENT_ORIGIN` |
+| `object-src` | `'none'` |
+| `frame-ancestors` | `'none'` |
+| `base-uri` | `'self'` |
+| `form-action` | `'self'` |
+
+Also set: `Strict-Transport-Security` (1 year, including subdomains),
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
+`X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`,
+`Cross-Origin-Resource-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`. `X-Powered-By` is removed.
+
+### Client Content-Security-Policy
+
+The built React app has its own CSP, again with no `unsafe-inline` or
+`unsafe-eval`:
+
+```
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'
+```
+
+- **Built app:** a small Vite plugin (`client/vite.config.js`) adds it to
+  `dist/index.html` as a `<meta http-equiv="Content-Security-Policy">` tag at
+  build time. The build produces one script file and one stylesheet, both
+  same-origin, with no inline scripts, inline styles or event handler
+  attributes, so nothing has to be loosened. The app also never uses inline
+  `style` attributes, and all API calls go to the same origin (`/api`).
+- **`npm run preview`:** serves the same policy as a real response header,
+  plus `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY`.
+  `frame-ancestors` only works as a header - browsers ignore it in a meta
+  tag - which is why it's only in the preview headers. A production host
+  should send the same headers.
+- **`npm run dev` has no CSP on purpose.** The Vite dev server injects inline
+  scripts for hot module reloading, which this policy would (correctly) block.
+  Use `npm run build` + `npm run preview` to see the app under the real policy.
+
+### CORS
+
+CORS is locked to the single origin in `CLIENT_ORIGIN`, never a wildcard.
+Only `GET`, `POST`, `PUT` and `DELETE` and only the `Authorization` and
+`Content-Type` headers are allowed. A request or preflight from any other
+origin gets a generic `403 Origin not allowed` with no
+`Access-Control-Allow-Origin` header, and is logged. Requests with no
+`Origin` header (Postman, curl, server-to-server) aren't cross-origin
+browser requests, so CORS doesn't apply to them.
+
+### HTTPS
+
+The API is served over HTTPS using a locally generated, self-signed SSL
+certificate (`api/certs/cert.pem`, `api/certs/key.pem`). `server.js` reads these
+files and starts an `https` server rather than plain `http`. See
+`api/certs/README.md` for exact instructions to regenerate the certificate,
+since certificate/key files are excluded from git via `.gitignore` and must
+be generated locally by anyone cloning the repository. HTTPS matters even
+in local development because it's the same code path that will run in
+production — testing over plain HTTP would hide any issues specific to a
+TLS connection.
+
+### Logging
+
+All logging goes through `utils/logger.js`. Security events are logged with
+`logger.event`: registrations, successful and failed logins, bookings,
+transactions and failed bookings, gig changes, admin actions, denied role
+and ownership checks, rate limit hits, blocked CORS origins and stripped
+NoSQL operators. Failed logins are logged identically whether or not the
+email exists, with a masked email (`j***@example.com`) and the IP. Logs
+never contain passwords, tokens, the database connection string or the JWT
+secret. Stack traces are logged only for unexpected errors and never in
+production, and they never appear in an API response.
+
+### Dependency audit
+
+Results of `npm audit` at submission time:
+
+| Project | `npm audit --omit=dev` (what ships) | `npm audit` (including dev tools) |
+|---|---|---|
+| `api/` | **0 vulnerabilities** | 3 high - all `braces`, dev-only (see below) |
+| `client/` | **0 vulnerabilities** | **0 vulnerabilities** |
+
+**Known and accepted:** the three `api/` findings are one issue in `braces`,
+reached only through `nodemon` → `chokidar` → `braces`. nodemon is a
+development tool that watches files and restarts the server; it never runs
+in a deployed API and never handles requests. The only available fix
+(`npm audit fix --force`) downgrades nodemon to 1.x, which is a breaking
+change, so this is accepted for now. Newman is run with `npx` instead of
+being a dependency, because its own dependency tree adds about 19 more
+dev-only findings.
+
+### JWT in localStorage: the trade-off
+
+The React client keeps the JWT in `localStorage`, which is acceptable
+for this POE but has a known risk: **any script running on the page can read
+`localStorage`**, so a single XSS bug would let an attacker steal the token
+and act as the user until it expires. An `httpOnly` cookie would hide the
+token from scripts, but brings CSRF protection and cookie configuration
+with it.
+
+The risk is reduced by:
+
+- **Escaping on the way in:** all user-supplied text is HTML-escaped
+  before it's stored.
+- **React's default escaping on the way out:** JSX escapes values when it
+  renders them, and the client never uses `dangerouslySetInnerHTML` or builds
+  HTML strings (checked by a test with an `<img onerror>` title).
+- **A strict CSP on the client and the API:** `script-src 'self'` with no
+  `unsafe-inline` or `unsafe-eval` blocks injected inline scripts and scripts
+  from other origins, even if markup did get in.
+- **Short-lived tokens:** tokens expire after 1 hour (`JWT_EXPIRES_IN`).
+- **The role isn't trusted from the token:** a stolen token can't be used to
+  gain more rights than the user already has.
+
+### Security review summary
+
+| Concern | How it's addressed |
+|---|---|
+| Plain-text password storage | Never stored — hashed with bcryptjs before persisting |
+| Credential stuffing / enumeration | Identical generic error and timing for wrong password vs unknown email; failed logins rate limited (5 per 15 min per IP) |
+| Unauthorised access to protected routes | JWT required and verified on every protected request |
+| Token tampering | Signature verification via `JWT_SECRET`; invalid signatures rejected |
+| Injection / malformed input | express-validator rejects invalid input and unknown fields; global middleware strips `$` and `.` keys |
+| Cross-site scripting | Text fields HTML-escaped before saving; strict CSP with no `unsafe-inline` |
+| Privilege escalation / IDOR | Role read from the database on every request; RBAC on every route; ownership checks on gigs and bookings |
+| Brute force and abuse | Rate limits on login, register and booking, plus a general limit across the API |
+| Cross-origin abuse | CORS locked to `CLIENT_ORIGIN`; other origins get a `403` and no CORS headers |
+| Clickjacking and MIME sniffing | `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` |
+| Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
+| Data interception in transit | API served over HTTPS, even in local development |
+
+## 9. Testing
 
 The main Postman collection (`api/postman/HustleHub_API.postman_collection.json`)
 starts with an **Auth** set covering valid and invalid scenarios:
@@ -781,231 +1020,7 @@ There are 67 tests across 16 files, covering both rendering and user interaction
 - **Income** (totals, items, empty state with R 0,00) and **admin Users** (rows
   rendered, no password field anywhere).
 
-## 11. Security
-
-Security is layered: every request passes through several independent
-checks, so a gap in one is caught by another.
-
-### Route audit
-
-Every route and its middleware, read from the running Express app. Every
-request also passes the global pipeline first (Helmet, CORS, the general
-rate limit, body parsing with a 10kb cap, the NoSQL sanitiser).
-
-| Method | Route | Middleware, in order | Who |
-|---|---|---|---|
-| GET | `/api/health` | - | Anyone |
-| POST | `/api/auth/register` | registerLimiter → validators (role only client/freelancer) | Anyone |
-| POST | `/api/auth/login` | loginLimiter → validators | Anyone |
-| GET | `/api/auth/me` | protect | Logged in |
-| GET | `/api/admin/users` | protect → requireRole(admin) | Admin |
-| GET | `/api/admin/transactions` | protect → requireRole(admin) → pagination validators | Admin |
-| DELETE | `/api/admin/gigs/:id` | protect → requireRole(admin) → validateObjectId | Admin |
-| GET | `/api/gigs` | protect → query validators (exact params) | Logged in |
-| GET | `/api/gigs/mine` | protect → requireRole(freelancer) | Freelancer (own gigs only, by query) |
-| GET | `/api/gigs/:id` | protect → validateObjectId (+ inactive gigs only for the owner, in the controller) | Logged in |
-| POST | `/api/gigs` | protect → requireRole(freelancer) → body validators (exact fields) | Freelancer (owner = token user) |
-| PUT | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** → body validators | Owner only |
-| DELETE | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** | Owner only |
-| POST | `/api/bookings` | protect → requireRole(client) → bookingLimiter (per user) → validators (gigId only) | Client |
-| GET | `/api/bookings/mine` | protect → requireRole(client, freelancer) | Own bookings only, by query |
-| GET | `/api/bookings/:id` | protect → validateObjectId → **requireOwnership** (client or freelancer) | The booking's two parties |
-| GET | `/api/transactions/mine` | protect → requireRole(client, freelancer) | Own transactions only, by query |
-| GET | `/api/income` | protect → requireRole(freelancer) | Own income only, by query |
-
-Every route except health, register and login requires a valid JWT; every
-role-restricted route uses `requireRole`; every route that reads or changes
-one specific gig or booking validates the id and checks ownership (or, for
-reading a gig, that it is active or yours). The "mine" routes never take an
-id from the request: they filter by `req.user.id`.
-
-### Validation and sanitising
-
-- **Validation (express-validator).** Every route that accepts input has a
-  rule set. Types are checked with `typeof` (so an array or object can't
-  slip through as a string), lengths and ranges are enforced, categories and
-  roles come from fixed lists, and ids must be exactly 24 hex characters.
-  Unknown fields are rejected with a `400` rather than ignored, so a
-  request can't set `freelancer`, `price`, `role` or `isActive` by adding
-  them to the body.
-- **HTML escaping.** Every free-text field that other users see (gig title,
-  description and category, and the user's name) is trimmed and
-  HTML-escaped before it's saved, so `<script>` is stored as
-  `&lt;script&gt;` and can't run in a browser.
-- **NoSQL operator stripping.** A global middleware (express-mongo-sanitize)
-  removes any key starting with `$` or containing `.` from the body, query
-  string and route params before any route runs, so `{ "$gt": "" }` can
-  never reach a Mongoose query. This is defence in depth on top of the
-  validators, which already reject such input.
-- **Search** text is escaped before it's used in a regex, so `.*` matches
-  only the literal text `.*`.
-- **Body limits.** Request bodies are capped at 10kb (`413`), and malformed
-  JSON gets a clear `400`.
-
-### Passwords
-
-Passwords are hashed with **bcryptjs** (10 salt rounds) and never stored,
-logged or returned. The hash field is excluded from every query by default.
-Login always runs a bcrypt comparison, against a dummy hash when the email
-doesn't exist, so an unknown email takes as long as a wrong password and
-response times can't be used to find valid accounts. Both cases return the
-same `401 Invalid email or password`.
-
-### JWT and roles
-
-Tokens are signed with `JWT_SECRET` and carry only the user id and role.
-On every protected request, `protect` verifies the signature and then
-**loads the user from the database** and uses the role stored there, not the
-one in the token, so a role change takes effect immediately and a deleted
-user's token stops working.
-
-### RBAC and ownership
-
-- `requireRole(...)` restricts each route to the roles in the API table.
-  A wrong role gets a generic `403` that doesn't say which role was needed.
-- `requireOwnership(...)` loads the record and checks the logged-in user
-  owns it (a gig's freelancer; a booking's client or freelancer), comparing
-  against the user from the token and database, never an id from the request.
-  Missing records are `404`, someone else's are `403`.
-- Price, freelancer, client and status on a booking always come from the
-  database and the token, never the request.
-- Admins can't self-register; the one admin account is created by
-  `npm run seed:admin`.
-
-### Rate limiting
-
-| Limiter | Applies to | Limit | Counted per |
-|---|---|---|---|
-| Login | `POST /api/auth/login` | 5 **failed** attempts per 15 minutes (successful logins don't count) | IP |
-| Register | `POST /api/auth/register` | 10 per hour | IP |
-| Booking | `POST /api/bookings` | 10 per 10 minutes | Logged-in user (IP if none) |
-| General | Everything under `/api` | 100 per 15 minutes | IP |
-
-Going over a limit returns `429` with a `Retry-After` header and
-`{ "success": false, "error": "Too many requests, please try again in N seconds." }`.
-The standard `RateLimit` and `RateLimit-Policy` headers are sent; the legacy
-`X-RateLimit-*` headers are off. Every hit is logged with the limiter name
-and IP.
-
-For local testing, each limit's max can be raised with `RATE_LIMIT_LOGIN_MAX`,
-`RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_BOOKING_MAX` and
-`RATE_LIMIT_GENERAL_MAX` (`npm run start:test` does this). These overrides are
-**ignored when `NODE_ENV` is `production`**, so the strict values above
-always apply in a deployed API.
-
-### Security headers (Helmet)
-
-Helmet is configured explicitly. The API's Content-Security-Policy is built
-from scratch, with no `unsafe-inline` or `unsafe-eval` anywhere:
-
-| Directive | Value |
-|---|---|
-| `default-src` | `'self'` |
-| `script-src` | `'self'` |
-| `style-src` | `'self'` |
-| `img-src` | `'self' data:` |
-| `connect-src` | `'self'` and `CLIENT_ORIGIN` |
-| `object-src` | `'none'` |
-| `frame-ancestors` | `'none'` |
-| `base-uri` | `'self'` |
-| `form-action` | `'self'` |
-
-Also set: `Strict-Transport-Security` (1 year, including subdomains),
-`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
-`X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`,
-`Cross-Origin-Resource-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp`. `X-Powered-By` is removed.
-
-### Client Content-Security-Policy
-
-The built React app has its own CSP, again with no `unsafe-inline` or
-`unsafe-eval`:
-
-```
-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
-connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'
-```
-
-- **Built app:** a small Vite plugin (`client/vite.config.js`) adds it to
-  `dist/index.html` as a `<meta http-equiv="Content-Security-Policy">` tag at
-  build time. The build produces one script file and one stylesheet, both
-  same-origin, with no inline scripts, inline styles or event handler
-  attributes, so nothing has to be loosened. The app also never uses inline
-  `style` attributes, and all API calls go to the same origin (`/api`).
-- **`npm run preview`:** serves the same policy as a real response header,
-  plus `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`,
-  `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY`.
-  `frame-ancestors` only works as a header - browsers ignore it in a meta
-  tag - which is why it's only in the preview headers. A production host
-  should send the same headers.
-- **`npm run dev` has no CSP on purpose.** The Vite dev server injects inline
-  scripts for hot module reloading, which this policy would (correctly) block.
-  Use `npm run build` + `npm run preview` to see the app under the real policy.
-
-### CORS
-
-CORS is locked to the single origin in `CLIENT_ORIGIN`, never a wildcard.
-Only `GET`, `POST`, `PUT` and `DELETE` and only the `Authorization` and
-`Content-Type` headers are allowed. A request or preflight from any other
-origin gets a generic `403 Origin not allowed` with no
-`Access-Control-Allow-Origin` header, and is logged. Requests with no
-`Origin` header (Postman, curl, server-to-server) aren't cross-origin
-browser requests, so CORS doesn't apply to them.
-
-### Logging
-
-All logging goes through `utils/logger.js`. Security events are logged with
-`logger.event`: registrations, successful and failed logins, bookings,
-transactions and failed bookings, gig changes, admin actions, denied role
-and ownership checks, rate limit hits, blocked CORS origins and stripped
-NoSQL operators. Failed logins are logged identically whether or not the
-email exists, with a masked email (`j***@example.com`) and the IP. Logs
-never contain passwords, tokens, the database connection string or the JWT
-secret. Stack traces are logged only for unexpected errors and never in
-production, and they never appear in an API response.
-
-### Dependency audit
-
-Results of `npm audit` at submission time:
-
-| Project | `npm audit --omit=dev` (what ships) | `npm audit` (including dev tools) |
-|---|---|---|
-| `api/` | **0 vulnerabilities** | 3 high - all `braces`, dev-only (see below) |
-| `client/` | **0 vulnerabilities** | **0 vulnerabilities** |
-
-**Known and accepted:** the three `api/` findings are one issue in `braces`,
-reached only through `nodemon` → `chokidar` → `braces`. nodemon is a
-development tool that watches files and restarts the server; it never runs
-in a deployed API and never handles requests. The only available fix
-(`npm audit fix --force`) downgrades nodemon to 1.x, which is a breaking
-change, so this is accepted for now. Newman is run with `npx` instead of
-being a dependency, because its own dependency tree adds about 19 more
-dev-only findings.
-
-### JWT in localStorage: the trade-off
-
-The React client keeps the JWT in `localStorage`, which is acceptable
-for this POE but has a known risk: **any script running on the page can read
-`localStorage`**, so a single XSS bug would let an attacker steal the token
-and act as the user until it expires. An `httpOnly` cookie would hide the
-token from scripts, but brings CSRF protection and cookie configuration
-with it.
-
-The risk is reduced by:
-
-- **Escaping on the way in:** all user-supplied text is HTML-escaped
-  before it's stored.
-- **React's default escaping on the way out:** JSX escapes values when it
-  renders them, and the client never uses `dangerouslySetInnerHTML` or builds
-  HTML strings (checked by a test with an `<img onerror>` title).
-- **A strict CSP on the client and the API:** `script-src 'self'` with no
-  `unsafe-inline` or `unsafe-eval` blocks injected inline scripts and scripts
-  from other origins, even if markup did get in.
-- **Short-lived tokens:** tokens expire after 1 hour (`JWT_EXPIRES_IN`).
-- **The role isn't trusted from the token:** a stolen token can't be used to
-  gain more rights than the user already has.
-
-## Requirements Traceability
+## 10. Requirements Traceability
 
 The 11 Part 2 requirements, what was built for each, where, and how it is tested.
 
@@ -1023,7 +1038,7 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
 | 10 | README: features, security, how to run backend and frontend, testing | This document | `README.md`, `api/certs/README.md` | Every command run on a fresh clone |
 | 11 | Demonstration video: auth, gig creation, booking, transaction recording | Recorded walkthrough | See **Demonstration Video** | - |
 
-## Known Limitations and Part 3 Notes
+## 11. Known Limitations and Part 3 Notes
 
 - **JWT in `localStorage`.** Accepted for this POE; any XSS could read the
   token. The risk is reduced by escaping, React's text rendering and the
@@ -1050,29 +1065,7 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
   deployment needs a real certificate, and the production host should send
   the client's security headers (including `frame-ancestors 'none'`).
 
-## 12. Demonstration Video
-
-- **Part 2:** _link to be added_
-- Part 1: https://youtu.be/qTK6iV_0lmI
-
-## 13. Security Review Summary
-
-| Concern | How it's addressed |
-|---|---|
-| Plain-text password storage | Never stored — hashed with bcryptjs before persisting |
-| Credential stuffing / enumeration | Identical generic error and timing for wrong password vs unknown email; failed logins rate limited (5 per 15 min per IP) |
-| Unauthorised access to protected routes | JWT required and verified on every protected request |
-| Token tampering | Signature verification via `JWT_SECRET`; invalid signatures rejected |
-| Injection / malformed input | express-validator rejects invalid input and unknown fields; global middleware strips `$` and `.` keys |
-| Cross-site scripting | Text fields HTML-escaped before saving; strict CSP with no `unsafe-inline` |
-| Privilege escalation / IDOR | Role read from the database on every request; RBAC on every route; ownership checks on gigs and bookings |
-| Brute force and abuse | Rate limits on login, register and booking, plus a general limit across the API |
-| Cross-origin abuse | CORS locked to `CLIENT_ORIGIN`; other origins get a `403` and no CORS headers |
-| Clickjacking and MIME sniffing | `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` |
-| Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
-| Data interception in transit | API served over HTTPS, even in local development |
-
-## Screenshots
+## 12. Screenshots
 
 The images live in `docs/screenshots/`; [`docs/screenshots/README.md`](docs/screenshots/README.md)
 describes what each one shows.
@@ -1094,7 +1087,12 @@ describes what each one shows.
 | 13 | ![Security headers](docs/screenshots/13-security-headers.png) | Security headers (CSP, HSTS, nosniff) on a response |
 | 14 | ![Rate limit 429](docs/screenshots/14-rate-limit-429.png) | A `429` with `Retry-After` and the retry message |
 
-## Part 1 API Screenshots
+## 13. Demonstration Video
+
+- **Part 2:** _link to be added_
+- Part 1: https://youtu.be/qTK6iV_0lmI
+
+## Appendix: Part 1 API Screenshots
 
 From the Part 1 submission (Postman, API only), kept for reference in
 `docs/screenshots/part1/`.
