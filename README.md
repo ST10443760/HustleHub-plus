@@ -787,7 +787,7 @@ a breaking change, so this is accepted for now.
 
 ### JWT in localStorage: the trade-off
 
-The React client will keep the JWT in `localStorage`, which is acceptable
+The React client keeps the JWT in `localStorage`, which is acceptable
 for this POE but has a known risk: **any script running on the page can read
 `localStorage`**, so a single XSS bug would let an attacker steal the token
 and act as the user until it expires. An `httpOnly` cookie would hide the
@@ -799,10 +799,11 @@ The risk is reduced by:
 - **Escaping on the way in:** all user-supplied text is HTML-escaped
   before it's stored.
 - **React's default escaping on the way out:** JSX escapes values when it
-  renders them, and the client won't use `dangerouslySetInnerHTML`.
-- **A strict CSP:** `script-src 'self'` with no `unsafe-inline` or
-  `unsafe-eval` blocks injected inline scripts and scripts from other
-  origins, even if markup did get in.
+  renders them, and the client never uses `dangerouslySetInnerHTML` or builds
+  HTML strings (checked by a test with an `<img onerror>` title).
+- **A strict CSP on the client and the API:** `script-src 'self'` with no
+  `unsafe-inline` or `unsafe-eval` blocks injected inline scripts and scripts
+  from other origins, even if markup did get in.
 - **Short-lived tokens:** tokens expire after 1 hour (`JWT_EXPIRES_IN`).
 - **The role isn't trusted from the token:** a stolen token can't be used to
   gain more rights than the user already has.
