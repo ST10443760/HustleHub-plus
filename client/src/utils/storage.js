@@ -10,22 +10,26 @@
  */
 const TOKEN_KEY = 'hustlehub.token';
 
-let memoryToken = null; // fallback when localStorage is unavailable
+let memoryToken = null; // fallback ONLY when localStorage can't be used
 
+// When storage works it is the single source of truth - so a logout in
+// another tab (which clears it) logs this tab out too, instead of an
+// in-memory copy quietly keeping the old session alive.
 export function readToken() {
   try {
-    return window.localStorage.getItem(TOKEN_KEY) || memoryToken;
+    return window.localStorage.getItem(TOKEN_KEY);
   } catch {
     return memoryToken;
   }
 }
 
 export function saveToken(token) {
-  memoryToken = token;
   try {
     window.localStorage.setItem(TOKEN_KEY, token);
+    memoryToken = null;
   } catch {
     // Storage blocked - the in-memory copy keeps this tab logged in.
+    memoryToken = token;
   }
 }
 
