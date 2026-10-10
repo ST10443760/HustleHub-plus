@@ -2,8 +2,8 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import useAuth from '../context/useAuth';
 import { decodeEntities } from '../utils/text';
 
-// Nav links per role. Freelancer and admin pages arrive in the next batch;
-// their routes show a "coming soon" page until then.
+// Nav links per role. The API enforces the same role rules on every request;
+// these only decide which links each role sees.
 const NAV_LINKS = {
   client: [
     { to: '/gigs', label: 'Browse gigs' },
