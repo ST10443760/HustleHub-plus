@@ -71,4 +71,11 @@ export default defineConfig({
       'X-Frame-Options': 'DENY',
     },
   },
+  // Vitest: components render in jsdom; no test touches the real network.
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    include: ['src/**/*.test.{js,jsx}'],
+    restoreMocks: true,
+  },
 })
