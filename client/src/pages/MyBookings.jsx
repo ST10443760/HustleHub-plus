@@ -11,7 +11,6 @@ export default function MyBookings() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setState({ status: 'loading', bookings: [], error: '' });
 
     listMyBookings(controller.signal)
       .then((data) => setState({ status: 'ready', bookings: data.bookings, error: '' }))
@@ -32,7 +31,13 @@ export default function MyBookings() {
 
       {state.status === 'loading' && <LoadingState label="Loading your bookings…" />}
       {state.status === 'error' && (
-        <ErrorState message={state.error} onRetry={() => setReloadKey((key) => key + 1)} />
+        <ErrorState
+          message={state.error}
+          onRetry={() => {
+            setState({ status: 'loading', bookings: [], error: '' });
+            setReloadKey((key) => key + 1);
+          }}
+        />
       )}
 
       {state.status === 'ready' && state.bookings.length === 0 && (

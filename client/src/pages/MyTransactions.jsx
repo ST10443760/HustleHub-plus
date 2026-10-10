@@ -11,7 +11,6 @@ export default function MyTransactions() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setState({ status: 'loading', transactions: [], error: '' });
 
     listMyTransactions(controller.signal)
       .then((data) => setState({ status: 'ready', transactions: data.transactions, error: '' }))
@@ -32,7 +31,13 @@ export default function MyTransactions() {
 
       {state.status === 'loading' && <LoadingState label="Loading your transactions…" />}
       {state.status === 'error' && (
-        <ErrorState message={state.error} onRetry={() => setReloadKey((key) => key + 1)} />
+        <ErrorState
+          message={state.error}
+          onRetry={() => {
+            setState({ status: 'loading', transactions: [], error: '' });
+            setReloadKey((key) => key + 1);
+          }}
+        />
       )}
 
       {state.status === 'ready' && state.transactions.length === 0 && (
