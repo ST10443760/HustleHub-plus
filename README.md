@@ -749,6 +749,39 @@ There are 67 tests across 16 files, covering both rendering and user interaction
 Security is layered: every request passes through several independent
 checks, so a gap in one is caught by another.
 
+### Route audit
+
+Every route and its middleware, read from the running Express app. Every
+request also passes the global pipeline first (Helmet, CORS, the general
+rate limit, body parsing with a 10kb cap, the NoSQL sanitiser).
+
+| Method | Route | Middleware, in order | Who |
+|---|---|---|---|
+| GET | `/api/health` | - | Anyone |
+| POST | `/api/auth/register` | registerLimiter → validators (role only client/freelancer) | Anyone |
+| POST | `/api/auth/login` | loginLimiter → validators | Anyone |
+| GET | `/api/auth/me` | protect | Logged in |
+| GET | `/api/admin/users` | protect → requireRole(admin) | Admin |
+| GET | `/api/admin/transactions` | protect → requireRole(admin) → pagination validators | Admin |
+| DELETE | `/api/admin/gigs/:id` | protect → requireRole(admin) → validateObjectId | Admin |
+| GET | `/api/gigs` | protect → query validators (exact params) | Logged in |
+| GET | `/api/gigs/mine` | protect → requireRole(freelancer) | Freelancer (own gigs only, by query) |
+| GET | `/api/gigs/:id` | protect → validateObjectId (+ inactive gigs only for the owner, in the controller) | Logged in |
+| POST | `/api/gigs` | protect → requireRole(freelancer) → body validators (exact fields) | Freelancer (owner = token user) |
+| PUT | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** → body validators | Owner only |
+| DELETE | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** | Owner only |
+| POST | `/api/bookings` | protect → requireRole(client) → bookingLimiter (per user) → validators (gigId only) | Client |
+| GET | `/api/bookings/mine` | protect → requireRole(client, freelancer) | Own bookings only, by query |
+| GET | `/api/bookings/:id` | protect → validateObjectId → **requireOwnership** (client or freelancer) | The booking's two parties |
+| GET | `/api/transactions/mine` | protect → requireRole(client, freelancer) | Own transactions only, by query |
+| GET | `/api/income` | protect → requireRole(freelancer) | Own income only, by query |
+
+Every route except health, register and login requires a valid JWT; every
+role-restricted route uses `requireRole`; every route that reads or changes
+one specific gig or booking validates the id and checks ownership (or, for
+reading a gig, that it is active or yours). The "mine" routes never take an
+id from the request: they filter by `req.user.id`.
+
 ### Validation and sanitising
 
 - **Validation (express-validator).** Every route that accepts input has a
