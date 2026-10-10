@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { listGigs } from '../api/gigs';
 import FormField from '../components/FormField';
@@ -58,16 +58,34 @@ export default function Gigs() {
     setSearchParams(toSearchParams({ ...filters, page: 1, ...changes }), { replace: true });
   }
 
-  // Push the debounced search and price range into the URL (back to page 1).
+  // Latest filters, read by the effect below without re-running it.
+  const filtersRef = useRef(filters);
   useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  // Push the debounced search and price range into the URL (back to page 1).
+  // Runs only when what the user typed settles - not when the URL changes on
+  // its own (Back button), which would otherwise be overwritten.
+  useEffect(() => {
+    const current = filtersRef.current;
     const rangeErrors = validatePriceRange(debouncedMin, debouncedMax, MAX_PRICE);
     if (Object.keys(rangeErrors).length > 0) return;
-    if (debouncedQ === filters.q && debouncedMin === filters.minPrice && debouncedMax === filters.maxPrice) return;
+    if (debouncedQ === current.q && debouncedMin === current.minPrice && debouncedMax === current.maxPrice) return;
     setSearchParams(
-      toSearchParams({ ...filters, page: 1, q: debouncedQ, minPrice: debouncedMin, maxPrice: debouncedMax }),
+      toSearchParams({ ...current, page: 1, q: debouncedQ, minPrice: debouncedMin, maxPrice: debouncedMax }),
       { replace: true }
     );
-  }, [debouncedQ, debouncedMin, debouncedMax, filters, setSearchParams]);
+  }, [debouncedQ, debouncedMin, debouncedMax, setSearchParams]);
+
+  // When the URL changes from outside (Back/Forward, a bookmarked link),
+  // bring the inputs in line with it. Text the user is still typing that
+  // already matches the URL (e.g. a trailing space) is left alone.
+  useEffect(() => {
+    setQ((typed) => (typed.trim() === filters.q ? typed : filters.q));
+    setMinPrice(filters.minPrice);
+    setMaxPrice(filters.maxPrice);
+  }, [filters.q, filters.minPrice, filters.maxPrice]);
 
   // Load the gigs whenever the filters in the URL change.
   useEffect(() => {
