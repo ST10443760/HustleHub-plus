@@ -24,28 +24,34 @@ export default function GigDetail() {
   const { user } = useAuth();
   const validId = isValidId(id);
 
-  const [state, setState] = useState({ status: validId ? 'loading' : 'missing', gig: null, error: '' });
   const [reloadKey, setReloadKey] = useState(0);
+  // Each result remembers which request it answers. Until the result for
+  // the current id (and retry) arrives, the page shows "loading" - so
+  // nothing has to be reset when the id changes.
+  const requestKey = `${id}:${reloadKey}`;
+  const [result, setResult] = useState({ key: null, status: 'loading', gig: null, error: '' });
 
   useEffect(() => {
     if (!validId) return undefined;
 
     const controller = new AbortController();
-    setState({ status: 'loading', gig: null, error: '' });
+    const key = `${id}:${reloadKey}`;
 
     getGig(id, controller.signal)
-      .then((data) => setState({ status: 'ready', gig: data.gig, error: '' }))
+      .then((data) => setResult({ key, status: 'ready', gig: data.gig, error: '' }))
       .catch((err) => {
         if (err.name === 'AbortError') return;
         if (err.status === 404 || err.status === 400) {
-          setState({ status: 'missing', gig: null, error: '' });
+          setResult({ key, status: 'missing', gig: null, error: '' });
         } else {
-          setState({ status: 'error', gig: null, error: err.message });
+          setResult({ key, status: 'error', gig: null, error: err.message });
         }
       });
 
     return () => controller.abort();
   }, [id, validId, reloadKey]);
+
+  const state = result.key === requestKey ? result : { status: 'loading' };
 
   if (!validId || state.status === 'missing') return <Unavailable />;
   if (state.status === 'loading') return <LoadingState label="Loading gig…" />;
@@ -88,7 +94,7 @@ export default function GigDetail() {
           gigId={gig.id}
           title={title}
           price={gig.price}
-          onUnavailable={() => setState({ status: 'missing', gig: null, error: '' })}
+          onUnavailable={() => setResult({ key: requestKey, status: 'missing', gig: null, error: '' })}
         />
       )}
     </article>
