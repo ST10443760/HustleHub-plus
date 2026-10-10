@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "HustleHub+ Part 1 - Auth API",
-    "description": "Registration, login, and JWT-protected route testing for HustleHub+ Part 1 (Secure Foundations). Covers valid and invalid scenarios per the rubric requirement.",
+    "name": "HustleHub+ API",
+    "description": "Full HustleHub+ API test suite: auth, RBAC, gigs, bookings, income and security. Run against the API started with npm run start:test (relaxed rate limits). Rate limits are tested by the separate HustleHub_RateLimits collection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
