@@ -27,7 +27,10 @@ function startServer() {
     // certs locally yet) - but this is NOT the required setup, only a
     // convenience so npm run dev doesn't hard-crash. See certs/README.md
     // for how to generate your own local cert.
-    logger.warn('No SSL certificate found in /certs - falling back to plain HTTP. See certs/README.md.');
+    logger.warn(
+      'No SSL certificate found in api/certs - falling back to plain HTTP. The client proxy and the Postman ' +
+        'collections expect HTTPS and will fail. Run "npm run certs" and restart. See certs/README.md.'
+    );
     http.createServer(app).listen(PORT, () => {
       logger.info(`HustleHub+ API listening on http://localhost:${PORT} (HTTPS NOT active)`);
     });
