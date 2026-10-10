@@ -252,8 +252,11 @@ api/                           # Express backend
     seedAdmin.js               # creates the admin account (npm run seed:admin)
     cleanTestData.js           # removes test users and their data (npm run clean:test)
     startTest.js               # starts the API with relaxed rate limits (npm run start:test)
+    generateCerts.js           # creates the local HTTPS certificate (npm run certs)
   certs/                       # local self-signed SSL certificate (see api/certs/README.md)
-  postman/                     # Postman collection for API testing
+  postman/
+    HustleHub_API.postman_collection.json         # main API tests (Auth, RBAC, Gigs, Bookings, Income, Security)
+    HustleHub_RateLimits.postman_collection.json  # rate limit tests (strict server)
 client/                        # React frontend (Vite)
   index.html                   # page shell and title
   vite.config.js               # dev server + /api proxy to the HTTPS API
@@ -267,7 +270,9 @@ client/                        # React frontend (Vite)
     utils/                     # formatting, entity decoding, validation, token storage, hooks
     styles/                    # global.css (CSS variables, no UI library)
     test/                      # Vitest setup and a render helper (tests sit next to the code: *.test.jsx)
-docs/                          # architecture diagram and screenshots
+docs/
+  architecture-diagram.png     # Part 1 diagram (the Mermaid diagrams in this README are current)
+  screenshots/                 # Part 2 screenshots + README of what each shows; part1/ = Part 1 screenshots
 ```
 
 ## 5. How to Run
