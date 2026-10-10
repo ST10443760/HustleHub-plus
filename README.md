@@ -489,6 +489,34 @@ All routes are under `https://localhost:5000`. "Logged in" means a valid
    (refunded ones are left out) and lists each one with its booking, gig
    title, amount, date and reference.
 
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant UI as React client
+    participant API as Express API
+    participant DB as MongoDB Atlas
+
+    C->>UI: Book this gig, then Confirm booking
+    UI->>API: POST /api/bookings with only gigId and the Bearer token
+    API->>DB: protect - verify JWT, load user and role
+    DB-->>API: user (role client)
+    Note over API: requireRole(client), booking rate limit per user,<br/>validator rejects any field except gigId
+    API->>DB: start session, withTransaction
+    API->>DB: find gig (inside the transaction)
+    alt gig missing or inactive
+        DB-->>API: none or inactive
+        API->>DB: abort - nothing is saved
+        API-->>UI: 404 Gig not found
+    else gig is active
+        API->>DB: insert Booking (client from token, freelancer, title and price from gig)
+        API->>DB: insert Transaction (amount, completed, TXN reference)
+        API->>DB: commit - both saved, or neither
+        API-->>UI: 201 booking, transaction, simulated payment confirmation
+        UI-->>C: Booking confirmed, reference TXN-...
+    end
+```
+
 Money is stored as a plain number rounded to 2 decimal places, and totals
 are rounded the same way, so amounts like 19.99 add up exactly. Booking
 creation, transaction creation and failed booking attempts are all logged.
