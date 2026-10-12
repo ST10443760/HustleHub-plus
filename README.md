@@ -290,6 +290,7 @@ client/                        # React frontend (Vite)
 docs/
   architecture-diagram.png     # Part 1 diagram (the Mermaid diagrams in this README are current)
   screenshots/                 # Part 2 screenshots + README of what each shows; part1/ = Part 1 screenshots
+  test-evidence/               # saved Newman and Vitest output from real runs + README
 ```
 
 ## 6. How to Run
