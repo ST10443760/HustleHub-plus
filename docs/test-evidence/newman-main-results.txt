@@ -1,0 +1,430 @@
+newman
+
+HustleHub+ API
+
+→ Health Check
+  GET https://localhost:5000/api/health [200 OK, 1.04kB, 40ms]
+
+→ Register - Success
+  POST https://localhost:5000/api/auth/register [201 Created, 1.54kB, 310ms]
+  √  Status is 201
+  √  Returns a token
+  √  No password hash leaked
+
+→ Register - Duplicate Email (should fail)
+  POST https://localhost:5000/api/auth/register [409 Conflict, 1.18kB, 77ms]
+  √  Status is 409
+  √  No stack trace in response
+
+→ Register - Invalid Input (should fail)
+  POST https://localhost:5000/api/auth/register [400 Bad Request, 1.24kB, 9ms]
+  √  Status is 400
+
+→ Login - Success
+  POST https://localhost:5000/api/auth/login [200 OK, 1.54kB, 167ms]
+  √  Status is 200
+  √  Returns a token
+
+→ Login - Wrong Password (should fail)
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.17kB, 159ms]
+  √  Status is 401
+  √  Generic error message (no user enumeration)
+
+→ Login - Unknown Email (should fail)
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.17kB, 163ms]
+  √  Status is 401
+  √  Same generic message as wrong password
+
+→ Protected Route - No Token (should fail)
+  GET https://localhost:5000/api/auth/me [401 Unauthorized, 1.06kB, 6ms]
+  √  Status is 401
+
+→ Protected Route - Invalid Token (should fail)
+  GET https://localhost:5000/api/auth/me [401 Unauthorized, 1.07kB, 7ms]
+  √  Status is 401
+
+→ Protected Route - Valid Token (should succeed)
+  GET https://localhost:5000/api/auth/me [200 OK, 1.21kB, 178ms]
+  √  Status is 200
+  √  Returns the authenticated user
+
+□ RBAC
+└ Register Client (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.54kB, 220ms]
+  √  Status is 201
+  √  Role is client
+
+└ Register Freelancer (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.55kB, 253ms]
+  √  Status is 201
+  √  Role is freelancer
+
+└ Admin Users - No Token (should fail)
+  GET https://localhost:5000/api/admin/users [401 Unauthorized, 1.06kB, 5ms]
+  √  Status is 401
+
+└ Admin Users - Client Token (should fail)
+  GET https://localhost:5000/api/admin/users [403 Forbidden, 1.07kB, 100ms]
+  √  Status is 403
+  √  Generic message, required role not revealed
+
+└ Admin Users - Freelancer Token (should fail)
+  GET https://localhost:5000/api/admin/users [403 Forbidden, 1.07kB, 67ms]
+  √  Status is 403
+  √  Generic message, required role not revealed
+
+└ Register - Admin Role (should fail)
+  POST https://localhost:5000/api/auth/register [400 Bad Request, 1.18kB, 7ms]
+  √  Status is 400
+  √  No token issued
+
+└ Admin Login (skipped without admin credentials)
+  POST https://localhost:5000/api/auth/login [200 OK, 1.53kB, 167ms]
+  √  Status is 200
+  √  Logged in as admin
+
+└ Admin Users - Admin Token (skipped without admin credentials)
+  GET https://localhost:5000/api/admin/users [200 OK, 2.37kB, 197ms]
+  √  Status is 200
+  √  Returns users with no password hashes
+  √  Newest first
+
+□ Gigs
+└ Register Freelancer A (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.55kB, 236ms]
+  √  Status is 201
+
+└ Register Freelancer B (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.55kB, 251ms]
+  √  Status is 201
+
+└ Register Client (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.54kB, 213ms]
+  √  Status is 201
+
+└ Create Gig - Freelancer A
+  POST https://localhost:5000/api/gigs [201 Created, 1.33kB, 161ms]
+  √  Status is 201
+  √  Owner is the logged-in freelancer
+
+└ Create Gig - Client (should fail)
+  POST https://localhost:5000/api/gigs [403 Forbidden, 1.07kB, 74ms]
+  √  Status is 403
+
+└ Create Gig - No Token (should fail)
+  POST https://localhost:5000/api/gigs [401 Unauthorized, 1.06kB, 4ms]
+  √  Status is 401
+
+└ Create Gig - Negative Price (should fail)
+  POST https://localhost:5000/api/gigs [400 Bad Request, 1.06kB, 78ms]
+  √  Status is 400
+
+└ Create Gig - Empty Title (should fail)
+  POST https://localhost:5000/api/gigs [400 Bad Request, 1.05kB, 104ms]
+  √  Status is 400
+
+└ Create Gig - Unknown Field freelancer (should fail)
+  POST https://localhost:5000/api/gigs [400 Bad Request, 1.07kB, 60ms]
+  √  Status is 400
+  √  Rejected as a field that is not allowed
+
+└ Create Gig - Freelancer B
+  POST https://localhost:5000/api/gigs [201 Created, 1.34kB, 119ms]
+  √  Status is 201
+
+└ Browse Gigs - Client
+  GET https://localhost:5000/api/gigs?limit=50 [200 OK, 2.05kB, 319ms]
+  √  Status is 200
+  √  Paginated list of active gigs
+  √  Freelancer shows name only
+  √  No password hashes, emails or stack traces
+
+└ Browse Gigs - Regex Characters in q
+  GET https://localhost:5000/api/gigs?q=.* [200 OK, 1.05kB, 143ms]
+  √  Status is 200
+  √  Treated as plain text, not a pattern
+
+└ Get Gig by Id - Client
+  GET https://localhost:5000/api/gigs/6accf373c33552045a2038ca [200 OK, 1.36kB, 227ms]
+  √  Status is 200
+  √  Returns the gig
+  √  No password hashes, emails or stack traces
+
+└ Get Gig - Malformed Id (should fail)
+  GET https://localhost:5000/api/gigs/not-a-real-id [400 Bad Request, 1.03kB, 105ms]
+  √  Status is 400
+
+└ Get Gig - Unknown Id (should fail)
+  GET https://localhost:5000/api/gigs/ffdff6afcbb2521af6958000 [404 Not Found, 1.03kB, 188ms]
+  √  Status is 404
+
+└ My Gigs - Freelancer A
+  GET https://localhost:5000/api/gigs/mine [200 OK, 1.33kB, 150ms]
+  √  Status is 200
+  √  Only gigs owned by the caller
+
+└ Update Gig - Owner
+  PUT https://localhost:5000/api/gigs/6accf373c33552045a2038ca [200 OK, 1.34kB, 237ms]
+  √  Status is 200
+  √  Changes saved
+
+└ Update Gig - Other Freelancer (should fail)
+  PUT https://localhost:5000/api/gigs/6accf373c33552045a2038ca [403 Forbidden, 1.07kB, 128ms]
+  √  Status is 403
+
+└ Delete Gig - Other Freelancer (should fail)
+  DELETE https://localhost:5000/api/gigs/6accf373c33552045a2038ca [403 Forbidden, 1.07kB, 174ms]
+  √  Status is 403
+
+└ Update Gig - Client (should fail)
+  PUT https://localhost:5000/api/gigs/6accf373c33552045a2038ca [403 Forbidden, 1.07kB, 65ms]
+  √  Status is 403
+
+└ Delete Gig - Owner
+  DELETE https://localhost:5000/api/gigs/6accf373c33552045a2038ca [200 OK, 1.11kB, 283ms]
+  √  Status is 200
+  √  Deleted (no bookings)
+
+└ Get Gig After Delete (should fail)
+  GET https://localhost:5000/api/gigs/6accf373c33552045a2038ca [404 Not Found, 1.03kB, 149ms]
+  √  Status is 404
+
+□ Bookings
+└ Register Client (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.54kB, 262ms]
+  √  Status is 201
+
+└ Register Freelancer A (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.56kB, 223ms]
+  √  Status is 201
+
+└ Register Freelancer B (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.56kB, 320ms]
+  √  Status is 201
+
+└ Freelancer A Creates Gig (setup)
+  POST https://localhost:5000/api/gigs [201 Created, 1.34kB, 152ms]
+  √  Status is 201
+
+└ Freelancer A Creates Second Gig (setup)
+  POST https://localhost:5000/api/gigs [201 Created, 1.33kB, 154ms]
+  √  Status is 201
+
+└ Freelancer A Deactivates Second Gig (setup)
+  PUT https://localhost:5000/api/gigs/6accf378c33552045a2038d0 [200 OK, 1.33kB, 189ms]
+  √  Status is 200
+
+└ Book Gig - Client
+  POST https://localhost:5000/api/bookings [201 Created, 1.96kB, 321ms]
+  √  Status is 201
+  √  Price comes from the gig
+  √  Client and freelancer come from the token and the gig
+  √  Transaction created with the booking
+  √  No password hashes, emails or stack traces
+
+└ Book Gig - Price in Body (should fail)
+  POST https://localhost:5000/api/bookings [400 Bad Request, 1.19kB, 62ms]
+  √  Status is 400
+
+└ Book Gig - Freelancer in Body (should fail)
+  POST https://localhost:5000/api/bookings [400 Bad Request, 1.19kB, 72ms]
+  √  Status is 400
+
+└ Book Gig - Status in Body (should fail)
+  POST https://localhost:5000/api/bookings [400 Bad Request, 1.19kB, 66ms]
+  √  Status is 400
+
+└ Book Gig - Freelancer Token (should fail)
+  POST https://localhost:5000/api/bookings [403 Forbidden, 1.07kB, 71ms]
+  √  Status is 403
+
+└ Book Gig - No Token (should fail)
+  POST https://localhost:5000/api/bookings [401 Unauthorized, 1.06kB, 4ms]
+  √  Status is 401
+
+└ Book Gig - Malformed gigId (should fail)
+  POST https://localhost:5000/api/bookings [400 Bad Request, 1.16kB, 79ms]
+  √  Status is 400
+
+└ Book Gig - Unknown gigId (should fail)
+  POST https://localhost:5000/api/bookings [404 Not Found, 1.15kB, 231ms]
+  √  Status is 404
+
+└ Book Gig - Inactive Gig (should fail)
+  POST https://localhost:5000/api/bookings [404 Not Found, 1.15kB, 236ms]
+  √  Status is 404
+
+└ My Bookings - Client
+  GET https://localhost:5000/api/bookings/mine [200 OK, 1.39kB, 223ms]
+  √  Status is 200
+  √  Includes the booking
+  √  Other party shown by name only
+  √  No password hashes, emails or stack traces
+
+└ My Bookings - Gig Freelancer
+  GET https://localhost:5000/api/bookings/mine [200 OK, 1.38kB, 236ms]
+  √  Status is 200
+  √  Includes the booking
+  √  No password hashes, emails or stack traces
+
+└ My Bookings - Other Freelancer
+  GET https://localhost:5000/api/bookings/mine [200 OK, 1.02kB, 157ms]
+  √  Status is 200
+  √  Does not include the booking
+
+└ Get Booking - Client
+  GET https://localhost:5000/api/bookings/6accf379c33552045a2038d1 [200 OK, 1.42kB, 180ms]
+  √  Status is 200
+  √  No password hashes, emails or stack traces
+
+└ Get Booking - Gig Freelancer
+  GET https://localhost:5000/api/bookings/6accf379c33552045a2038d1 [200 OK, 1.42kB, 219ms]
+  √  Status is 200
+
+└ Get Booking - Other Freelancer (should fail)
+  GET https://localhost:5000/api/bookings/6accf379c33552045a2038d1 [403 Forbidden, 1.07kB, 141ms]
+  √  Status is 403
+
+└ My Transactions - Client
+  GET https://localhost:5000/api/transactions/mine [200 OK, 1.44kB, 217ms]
+  √  Status is 200
+  √  Includes the booking
+  √  Has the reference from the booking
+  √  No password hashes, emails or stack traces
+
+└ My Transactions - Gig Freelancer
+  GET https://localhost:5000/api/transactions/mine [200 OK, 1.43kB, 231ms]
+  √  Status is 200
+  √  Includes the booking
+
+└ My Transactions - Other Freelancer
+  GET https://localhost:5000/api/transactions/mine [200 OK, 1.03kB, 135ms]
+  √  Status is 200
+  √  Does not include the booking
+
+└ Freelancer A Raises Gig Price
+  PUT https://localhost:5000/api/gigs/6accf378c33552045a2038cf [200 OK, 1.34kB, 216ms]
+  √  Status is 200
+
+└ Get Booking - Price Unchanged After Gig Edit
+  GET https://localhost:5000/api/bookings/6accf379c33552045a2038d1 [200 OK, 1.42kB, 227ms]
+  √  Status is 200
+  √  Booking keeps the price it was booked at
+
+□ Income
+└ Income - Gig Freelancer
+  GET https://localhost:5000/api/income [200 OK, 1.22kB, 197ms]
+  √  Status is 200
+  √  Total equals the price the gig was booked at
+  √  One item for the booking
+
+└ Income - Other Freelancer
+  GET https://localhost:5000/api/income [200 OK, 1.06kB, 153ms]
+  √  Status is 200
+  √  Nothing earned
+
+└ Income - Client (should fail)
+  GET https://localhost:5000/api/income [403 Forbidden, 1.07kB, 77ms]
+  √  Status is 403
+
+└ Admin Transactions - Client (should fail)
+  GET https://localhost:5000/api/admin/transactions [403 Forbidden, 1.07kB, 66ms]
+  √  Status is 403
+
+└ Admin Transactions - Admin (skipped without admin credentials)
+  GET https://localhost:5000/api/admin/transactions?limit=5 [200 OK, 1.91kB, 673ms]
+  √  Status is 200
+  √  Paginated, newest first, names only
+  √  No password hashes, emails or stack traces
+
+□ Security
+└ Register Client (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.54kB, 256ms]
+  √  Status is 201
+
+└ Register Freelancer (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.56kB, 238ms]
+  √  Status is 201
+
+└ Freelancer Creates Gig (setup)
+  POST https://localhost:5000/api/gigs [201 Created, 1.33kB, 148ms]
+  √  Status is 201
+
+└ Security Headers
+  GET https://localhost:5000/api/health [200 OK, 1.04kB, 6ms]
+  √  Status is 200
+  √  Strict Content-Security-Policy
+  √  nosniff, no-referrer and HSTS
+  √  No X-Powered-By header
+
+└ Login - Operator in Email (should fail)
+  POST https://localhost:5000/api/auth/login [400 Bad Request, 1.17kB, 3ms]
+  √  Status is 400
+  √  Generic error shape, no stack trace
+
+└ Browse Gigs - Operator in Query (should fail)
+  GET https://localhost:5000/api/gigs?category[$ne]=design [400 Bad Request, 1.05kB, 72ms]
+  √  Status is 400
+  √  Generic error shape, no stack trace
+
+└ CORS - Disallowed Origin
+  GET https://localhost:5000/api/health [403 Forbidden, 906B, 2ms]
+  √  No Access-Control-Allow-Origin header
+  √  Status is 403
+  √  Generic error shape, no stack trace
+
+└ CORS - Allowed Origin
+  GET https://localhost:5000/api/health [200 OK, 1.09kB, 3ms]
+  √  Status is 200
+  √  Echoes only the client origin
+
+└ Malformed JSON (should fail)
+  POST https://localhost:5000/api/auth/login [400 Bad Request, 1.05kB, 4ms]
+  √  Status is 400
+  √  Clear message
+  √  Generic error shape, no stack trace
+
+└ Oversized Body (should fail)
+  POST https://localhost:5000/api/auth/login [413 Payload Too Large, 1.05kB, 5ms]
+  √  Status is 413
+  √  Clear message
+  √  Generic error shape, no stack trace
+
+└ Admin Delete Gig - Client (should fail)
+  DELETE https://localhost:5000/api/admin/gigs/6accf380c33552045a2038d5 [403 Forbidden, 1.07kB, 74ms]
+  √  Status is 403
+
+└ Admin Delete Gig - Freelancer (should fail)
+  DELETE https://localhost:5000/api/admin/gigs/6accf380c33552045a2038d5 [403 Forbidden, 1.07kB, 83ms]
+  √  Status is 403
+
+└ Admin Delete Gig - Admin (skipped without admin credentials)
+  DELETE https://localhost:5000/api/admin/gigs/6accf380c33552045a2038d5 [200 OK, 1.11kB, 285ms]
+  √  Status is 200
+  √  Gig deleted (no bookings)
+
+└ Get Gig After Admin Delete (skipped without admin credentials)
+  GET https://localhost:5000/api/gigs/6accf380c33552045a2038d5 [404 Not Found, 1.03kB, 152ms]
+  √  Status is 404
+
+┌─────────────────────────┬────────────────────┬───────────────────┐
+│                         │           executed │            failed │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│              iterations │                  1 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│                requests │                 85 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│            test-scripts │                 84 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│      prerequest-scripts │                 20 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│              assertions │                145 │                 0 │
+├─────────────────────────┴────────────────────┴───────────────────┤
+│ total run duration: 19.6s                                        │
+├──────────────────────────────────────────────────────────────────┤
+│ total data received: 19.99kB (approx)                            │
+├──────────────────────────────────────────────────────────────────┤
+│ average response time: 149ms [min: 2ms, max: 673ms, s.d.: 106ms] │
+└──────────────────────────────────────────────────────────────────┘
+(node:52208) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
