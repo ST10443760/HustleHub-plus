@@ -1,0 +1,113 @@
+(node:37424) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
+newman
+
+HustleHub+ - Rate Limits
+
+□ Login Limiter
+└ Failed Login 1 of 5
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.15kB, 219ms]
+  √  Status is 401
+
+└ Failed Login 2 of 5
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.15kB, 202ms]
+  √  Status is 401
+
+└ Failed Login 3 of 5
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.15kB, 162ms]
+  √  Status is 401
+
+└ Failed Login 4 of 5
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.15kB, 208ms]
+  √  Status is 401
+
+└ Failed Login 5 of 5
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.15kB, 182ms]
+  √  Status is 401
+
+└ Failed Login 6 (rate limited)
+  POST https://localhost:5000/api/auth/login [429 Too Many Requests, 1.19kB, 8ms]
+  √  Status is 429
+  √  Retry-After header with a sensible number of seconds
+  √  Meaningful message that matches Retry-After
+  √  Standard RateLimit headers, no legacy X-RateLimit headers
+
+□ Booking Limiter
+└ Register Client (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.53kB, 297ms]
+  √  Status is 201
+
+└ Register Freelancer (setup)
+  POST https://localhost:5000/api/auth/register [201 Created, 1.54kB, 232ms]
+  √  Status is 201
+
+└ Freelancer Creates Gig (setup)
+  POST https://localhost:5000/api/gigs [201 Created, 1.33kB, 160ms]
+  √  Status is 201
+
+└ Booking 1 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 342ms]
+  √  Status is 201
+
+└ Booking 2 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 342ms]
+  √  Status is 201
+
+└ Booking 3 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 424ms]
+  √  Status is 201
+
+└ Booking 4 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 375ms]
+  √  Status is 201
+
+└ Booking 5 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 398ms]
+  √  Status is 201
+
+└ Booking 6 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 337ms]
+  √  Status is 201
+
+└ Booking 7 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 326ms]
+  √  Status is 201
+
+└ Booking 8 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 331ms]
+  √  Status is 201
+
+└ Booking 9 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 371ms]
+  √  Status is 201
+
+└ Booking 10 of 10
+  POST https://localhost:5000/api/bookings [201 Created, 1.93kB, 429ms]
+  √  Status is 201
+
+└ Booking 11 (rate limited)
+  POST https://localhost:5000/api/bookings [429 Too Many Requests, 1.2kB, 124ms]
+  √  Status is 429
+  √  Retry-After header with a sensible number of seconds
+  √  Meaningful message that matches Retry-After
+  √  Standard RateLimit headers, no legacy X-RateLimit headers
+
+┌─────────────────────────┬────────────────────┬───────────────────┐
+│                         │           executed │            failed │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│              iterations │                  1 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│                requests │                 20 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│            test-scripts │                 20 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│      prerequest-scripts │                  3 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│              assertions │                 26 │                 0 │
+├─────────────────────────┴────────────────────┴───────────────────┤
+│ total run duration: 7s                                           │
+├──────────────────────────────────────────────────────────────────┤
+│ total data received: 10.05kB (approx)                            │
+├──────────────────────────────────────────────────────────────────┤
+│ average response time: 273ms [min: 8ms, max: 429ms, s.d.: 110ms] │
+└──────────────────────────────────────────────────────────────────┘
