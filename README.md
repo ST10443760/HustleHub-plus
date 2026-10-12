@@ -1179,24 +1179,103 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
 ## 12. Screenshots
 
 The images live in `docs/screenshots/`; [`docs/screenshots/README.md`](docs/screenshots/README.md)
-describes what each one shows.
+describes what each one should show.
 
-| # | Screenshot | What it shows |
-|---|---|---|
-| 1 | ![Register](docs/screenshots/01-register.png) | Register page with inline validation and the client/freelancer role choice |
-| 2 | ![Login](docs/screenshots/02-login.png) | Login page |
-| 3 | ![Browse gigs](docs/screenshots/03-browse-gigs.png) | Browse gigs with search, category and price filters |
-| 4 | ![Create gig](docs/screenshots/04-create-gig.png) | A freelancer creating a gig |
-| 5 | ![My gigs](docs/screenshots/05-my-gigs.png) | My gigs with Active/Inactive badges and actions |
-| 6 | ![Booking confirmation](docs/screenshots/06-book-confirm.png) | Booking confirmation step with the price and the simulated payment notice |
-| 7 | ![Booking confirmed](docs/screenshots/07-booking-confirmed.png) | Booking confirmed with the transaction reference |
-| 8 | ![Client bookings](docs/screenshots/08-client-bookings.png) | A client's bookings |
-| 9 | ![Freelancer income](docs/screenshots/09-freelancer-income.png) | A freelancer's income page |
-| 10 | ![Admin transactions](docs/screenshots/10-admin-transactions.png) | Admin view of all transactions |
-| 11 | ![Newman pass](docs/screenshots/11-newman-pass.png) | Newman: the main collection passing |
-| 12 | ![Vitest pass](docs/screenshots/12-vitest-pass.png) | Vitest: all frontend tests passing |
-| 13 | ![Security headers](docs/screenshots/13-security-headers.png) | Security headers (CSP, HSTS, nosniff) on a response |
-| 14 | ![Rate limit 429](docs/screenshots/14-rate-limit-429.png) | A `429` with `Retry-After` and the retry message |
+**01-register**
+
+![Register page showing inline "Name is required", "Email is required" and "Password is required" errors and a role choice of only Client or Freelancer](docs/screenshots/01-register.png)
+
+_Invalid input is caught next to each field before anything is sent, and the only roles on offer are client and freelancer; admin can never be chosen (the API rejects it too)._
+
+**02-login**
+
+![Login page showing the generic "Invalid email or password" message with the password field masked](docs/screenshots/02-login.png)
+
+_A failed login shows the same generic message whether the email exists or not, so accounts can't be enumerated._
+
+**03-browse-gigs**
+
+![Browse gigs page for a logged-in client with search, category and price filters and gig cards showing prices in rand and freelancer names](docs/screenshots/03-browse-gigs.png)
+
+_Clients browse active gigs with search and filters; each gig shows its freelancer by name only, never their email._
+
+**04-create-gig**
+
+![New gig form filled in by a freelancer with title, description, price, delivery days and category](docs/screenshots/04-create-gig.png)
+
+_Freelancers create gigs through a form whose limits mirror the API validators; there is no owner field, because the API takes the owner from the login token._
+
+**05-my-gigs**
+
+![My gigs page for a freelancer listing only their own gigs with Active and Inactive badges and a confirmation that a gig is now inactive](docs/screenshots/05-my-gigs.png)
+
+_A freelancer sees and manages only their own gigs (edit, activate/deactivate, delete)._
+
+**06-book-confirm**
+
+![Booking confirmation step on a gig page showing the gig title, the price R 450,00 and the "Payment is simulated" notice](docs/screenshots/06-book-confirm.png)
+
+_The price shown comes from the gig in the database; the booking request sends only the gig id, and the payment is simulated._
+
+**07-booking-confirmed**
+
+![Booking confirmed message with the transaction reference TXN-20261012-889A22AF615D](docs/screenshots/07-booking-confirmed.png)
+
+_Every booking immediately creates a transaction record; its reference is returned with the confirmation._
+
+**08-client-bookings**
+
+![My bookings page for a client listing three confirmed bookings with gig, freelancer, price and date](docs/screenshots/08-client-bookings.png)
+
+_A client sees only their own bookings, each keeping the price it was booked at._
+
+**09-freelancer-income**
+
+![Income page for a freelancer showing R 750,00 earned from 2 bookings with each transaction reference](docs/screenshots/09-freelancer-income.png)
+
+_Income is computed from completed transactions and attributed to the right freelancer; reference TXN-20261012-889A22AF615D from screenshot 7 appears here, linking the booking to this freelancer._
+
+**10-admin-transactions**
+
+![Admin all transactions page listing each reference with its client, freelancer, amount, status and date](docs/screenshots/10-admin-transactions.png)
+
+_Admin-only view: every transaction is linked to both the client and the freelancer of its booking, including the same reference again._
+
+**11-newman-pass**
+
+![Terminal summary of the main Newman run with 80 requests and 134 assertions, 0 failed (editor pane redacted)](docs/screenshots/11-newman-pass.png)
+
+_The main Postman collection passes (this run without admin credentials, so the 5 admin requests were skipped; the committed evidence file has the full 85 / 145 run). The editor pane was blacked out because it showed the local .env._
+
+**11b-newman-rate-limits**
+
+![Terminal summary of the rate limit Newman run with 20 requests and 26 assertions, 0 failed](docs/screenshots/11b-newman-rate-limits.png)
+
+_Against the strict limits, the 6th failed login and the 11th booking are refused with 429, a Retry-After header and a meaningful message._
+
+**12-vitest-pass**
+
+![Terminal summary of Vitest showing 16 test files and 67 tests passed (editor pane redacted)](docs/screenshots/12-vitest-pass.png)
+
+_All frontend tests pass. The editor pane was blacked out because it showed the local .env._
+
+**13-security-headers**
+
+![Browser DevTools showing API response headers including Content-Security-Policy, Cross-Origin policies, Referrer-Policy no-referrer, Strict-Transport-Security and X-Content-Type-Options nosniff](docs/screenshots/13-security-headers.png)
+
+_The API sends a strict CSP (default-src 'self', frame-ancestors 'none', no unsafe-inline), HSTS, nosniff and no-referrer, and no X-Powered-By. (Captured on the relaxed test server, hence the 10000 RateLimit policy.)_
+
+**13b-security-headers-continued**
+
+![The same response headers scrolled further, showing X-Frame-Options DENY, X-Permitted-Cross-Domain-Policies none and X-XSS-Protection 0](docs/screenshots/13b-security-headers-continued.png)
+
+_The rest of the Helmet headers, including X-Frame-Options DENY against clickjacking._
+
+**14-rate-limit-429**
+
+![Login page showing "Too many requests, please try again in 896 seconds." after repeated failed logins](docs/screenshots/14-rate-limit-429.png)
+
+_Rate limiting with a meaningful response: after 5 failed logins the 6th is refused and the user is told how long to wait._
 
 ## 13. Demonstration Video
 
