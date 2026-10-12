@@ -566,6 +566,14 @@ creation, transaction creation and failed booking attempts are all logged.
 Security is layered: every request passes through several independent
 checks, so a gap in one is caught by another.
 
+**All authentication, authorisation and ownership checks are enforced by the
+API.** Every rule (who is logged in, which role may call a route, who owns a
+gig or a booking, which fields a request may set) is checked by the server on
+every request. The React client only hides what a user can't use: hiding a
+button or a page is a convenience, not security, and calling the API
+directly with Postman or curl gets exactly the same `401`/`403`/`400`
+responses.
+
 ### Route audit
 
 Every route and its middleware, read from the running Express app. Every
