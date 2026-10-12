@@ -2,10 +2,11 @@
 
 HustleHub+ is a secure freelance marketplace platform. Freelancers advertise
 services, clients browse and book them, and the platform records the
-resulting transactions, tracks freelancer income, and estimates tax
-obligations. Because the system handles credentials, transaction records,
-and income data, security was treated as a core requirement from the first
-line of code, not something added afterward.
+resulting transactions and tracks freelancer income. (Tax estimation and
+income charts are planned for Part 3 and are not built yet.) Because the
+system handles credentials, transaction records and income data, security
+was treated as a core requirement from the first line of code, not something
+added afterward.
 
 This repository is **Part 2 (Secure Stack)** of the INSY7314 / APDS7311 POE:
 a full MERN application - a React client, an Express API and MongoDB - with
