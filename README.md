@@ -1051,9 +1051,7 @@ npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure  
 ```
 
 `npx` downloads Newman on first use; `npm install -g newman` and then plain
-`newman run ...` works too. Expected result: the main collection runs 80
-requests / 134 assertions (85 / 145 with admin credentials), the rate limit
-collection 20 requests / 26 assertions, all passing.
+`newman run ...` works too.
 
 To include the admin tests in the main collection, pass the seeded admin's
 credentials as variables (they're never stored in the collection):
@@ -1072,6 +1070,18 @@ window.
 
 Both collections can also be imported into Postman (disable SSL certificate
 verification under Settings → General).
+
+### Test evidence
+
+Real output from fresh runs on 12 October 2026 is committed in
+[`docs/test-evidence/`](docs/test-evidence/README.md) as plain text, alongside
+screenshots of the same runs:
+
+| Suite | How to run it | Result | Evidence |
+|---|---|---|---|
+| Main Postman collection (Newman) | API on `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure` with the admin credentials | **85 requests, 145 assertions, 0 failed** (80 / 134 without admin credentials, when the 5 admin requests are skipped) | [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt), [screenshot 11](docs/screenshots/11-newman-pass.png) |
+| Rate limit collection (Newman) | API freshly started with `npm run dev` (strict limits), then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure` | **20 requests, 26 assertions, 0 failed** | [`newman-rate-limits-results.txt`](docs/test-evidence/newman-rate-limits-results.txt), [screenshot 11b](docs/screenshots/11b-newman-rate-limits.png), [screenshot 14](docs/screenshots/14-rate-limit-429.png) |
+| Frontend (Vitest + React Testing Library) | `npm run test:run` in `client/` | **16 files, 67 tests passed** | [`vitest-results.txt`](docs/test-evidence/vitest-results.txt), [screenshot 12](docs/screenshots/12-vitest-pass.png) |
 
 ### Frontend tests
 
