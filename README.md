@@ -297,13 +297,16 @@ for the certificate and Node 22 checks).
 
 ### Requirements
 
-| Tool | Version | Notes |
+| Dependency | Version | Used for |
 |---|---|---|
-| Node.js | **22** (22.22+) or **24** (24.15+) | `engines` is set in both `package.json` files. The client's test tools (jsdom) don't support odd-numbered Node releases |
-| npm | comes with Node | |
-| MongoDB | Atlas cluster or a local replica set | Bookings use multi-document transactions, which need a replica set (every Atlas cluster is one) |
-| OpenSSL | any recent | Only for the local HTTPS certificate. Preinstalled on macOS/Linux; on Windows it comes with Git for Windows |
-| Newman | via `npx` | Only for the Postman tests |
+| Node.js | **22 or newer** (22.22+ or 24.15+; the client's test tools don't support odd-numbered releases) | Running the API, building the client and all tests. `engines` is set in both `package.json` files |
+| npm | comes with Node | Installing packages (`npm ci`) and running the scripts |
+| Git | any recent | Cloning the repository. On Windows, Git for Windows also provides OpenSSL |
+| A MongoDB database | MongoDB Atlas (free tier) or a local MongoDB running as a replica set | Storing all data. Bookings use multi-document transactions, which need a replica set (every Atlas cluster is one). See **Getting a MONGO_URI** |
+| OpenSSL | any recent, used through `npm run certs` | Creating the local self-signed HTTPS certificate |
+| Newman | 6, used through `npx` (nothing to install) | Running the Postman collections from the command line |
+
+All other dependencies are installed by `npm ci` from the lock files.
 
 The backend and frontend are separate projects; run each in its own terminal.
 
@@ -315,17 +318,52 @@ npm ci                    # exact versions from package-lock.json
 cp .env.example .env      # PowerShell: Copy-Item .env.example .env
 ```
 
-Then edit `api/.env` (it is git-ignored and never committed):
+Then edit `api/.env`. It is git-ignored and never committed; the values below
+are the **placeholders** from `.env.example`, never real ones. These are all
+the variables the code reads:
 
-| Variable | What to put there |
-|---|---|
-| `MONGO_URI` | Your MongoDB connection string. If an Atlas `mongodb+srv://` string fails with `querySrv ECONNREFUSED`, Node can't resolve the SRV record on your network - use the standard `mongodb://host1,host2,host3/...` string from Atlas (Connect → Drivers) instead |
-| `JWT_SECRET` | A long random string |
-| `JWT_EXPIRES_IN` | Token lifetime, default `1h` |
-| `CLIENT_ORIGIN` | `http://localhost:5173` - the only browser origin the API accepts (exact origin, no trailing slash; required in production) |
-| `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PASSWORD` | The admin account the seed script creates (password at least 12 characters) |
-| `PORT`, `NODE_ENV` | `5000` and `development` |
-| `RATE_LIMIT_*_MAX` | Leave commented out. Local-testing overrides only, ignored in production |
+| Variable | Required? | Purpose | Placeholder |
+|---|---|---|---|
+| `MONGO_URI` | **Required** | MongoDB connection string (see **Getting a MONGO_URI**) | `mongodb://localhost:27017/hustlehub` |
+| `JWT_SECRET` | **Required** | Secret that signs the login tokens. Use a long random string | `replace_with_a_long_random_secret` |
+| `JWT_EXPIRES_IN` | Optional (default `1h`) | How long a login token stays valid | `1h` |
+| `CLIENT_ORIGIN` | Optional in development (default `http://localhost:5173`), **required in production** | The only browser origin the API accepts (CORS) and allows in the CSP. Exact origin, no trailing slash | `http://localhost:5173` |
+| `ADMIN_EMAIL` | **Required for** `npm run seed:admin` | Email of the admin account the seed script creates | `admin@example.com` |
+| `ADMIN_PASSWORD` | **Required for** `npm run seed:admin` | Its password, at least 12 characters | `replace_with_a_strong_password` |
+| `ADMIN_NAME` | Optional (default `Administrator`) | Its display name | `HustleHub Admin` |
+| `PORT` | Optional (default `5000`) | API port. The client proxy and the Postman collections expect `5000` | `5000` |
+| `NODE_ENV` | Optional (default `development`) | `production` forces the strict rate limits, requires `CLIENT_ORIGIN` and leaves stack traces out of the logs | `development` |
+| `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_BOOKING_MAX`, `RATE_LIMIT_GENERAL_MAX` | Optional, local testing only | Raise a rate limit's maximum. **Ignored when `NODE_ENV` is `production`**. `npm run start:test` sets them for you, so leave them commented out | commented out |
+
+The **client needs no env file**: it only calls relative `/api/...` URLs, and
+the Vite proxy forwards them to the API.
+
+#### Getting a MONGO_URI
+
+**MongoDB Atlas (free, what this project was tested on):**
+
+1. Create a free account at <https://www.mongodb.com/cloud/atlas> and create a
+   free (M0) cluster.
+2. **Database Access** → Add New Database User. Give it a username and a
+   password made of **plain letters and numbers only** (symbols such as
+   `@`, `:` or `/` would have to be URL-encoded in the connection string),
+   with the "Read and write to any database" role.
+3. **Network Access** → Add IP Address → **Add Current IP Address**.
+4. **Connect** → Drivers, and copy the connection string. Put your database
+   user's password in place of `<password>`, and add the database name
+   `hustlehub` after the host, before the `?`:
+   `mongodb+srv://<user>:<password>@<your-cluster-host>/hustlehub?retryWrites=true&w=majority`
+5. Paste it into `api/.env` as `MONGO_URI`. If the `mongodb+srv://` string
+   fails with `querySrv ECONNREFUSED`, see **Troubleshooting**.
+
+**Local MongoDB:** `mongodb://localhost:27017/hustlehub`. A plain
+(standalone) local MongoDB starts the API and serves everything except
+bookings, because MongoDB only allows multi-document transactions on a
+replica set; checked against a standalone MongoDB 8.0, the booking
+transaction is refused. Run it as a single-node replica set (MongoDB's
+documented setup): start `mongod` with `--replSet rs0` (or set
+`replication.replSetName: rs0` in `mongod.cfg` and restart the service), then
+run `rs.initiate()` once in `mongosh`. The same URI then works.
 
 Generate the local HTTPS certificate **before starting the API**, seed the
 admin, then start the server:
