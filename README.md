@@ -86,8 +86,9 @@ only for convenience).
 - Bookings and their transactions written atomically in one MongoDB
   transaction; money stored as numbers rounded to 2 decimals
 - Security event logging without secrets; no stack traces in responses
-- 100+ automated API assertions (Newman) and 67 frontend tests (Vitest +
-  React Testing Library)
+- 171 automated API assertions in Newman (145 in the main collection, 26 in
+  the rate limit collection) and 67 frontend tests (Vitest + React Testing
+  Library), all passing
 
 ## 3. What Changed Since Part 1
 
