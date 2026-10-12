@@ -436,6 +436,21 @@ npm run clean:test
 It prints how much it removed, never deletes an admin, and refuses to run
 when `NODE_ENV` is `production`.
 
+## Troubleshooting
+
+The problems below all came up while building and testing this project.
+
+| Problem | Cause | Fix |
+|---|---|---|
+| The API exits with `MongoDB connection failed {"errorName":"Error","code":"ECONNREFUSED"}`, and the SRV lookup (`querySrv ECONNREFUSED`) fails, although Atlas is reachable | On some Windows networks Node can't resolve the DNS SRV record that a `mongodb+srv://` string needs | Use the **standard, non-SRV** connection string: in Atlas, Connect → Drivers, choose the older driver version / "Legacy URI String" option, which gives `mongodb://host1:27017,host2:27017,host3:27017/hustlehub?replicaSet=...&ssl=true&authSource=admin`. Add `/hustlehub` as the database name and put it in `MONGO_URI` |
+| The API exits with `MongoDB connection failed` (other codes) | Wrong user or password, or your IP isn't allowed | Check the database user and password, and add your current IP under Atlas **Network Access** |
+| The API logs `No SSL certificate found in api/certs - falling back to plain HTTP`; the client shows errors and Vite logs `EPROTO ... wrong version number` (`502`); Newman fails | `api/certs/key.pem` and `cert.pem` don't exist, so the API runs on HTTP while the proxy and Postman expect HTTPS | Run `npm run certs` in `api/` and restart the API |
+| Every save, login or booking in the browser fails with **"Origin not allowed"** (`403`) | The client isn't on `http://localhost:5173`, the only origin `CLIENT_ORIGIN` allows (for example, preview or dev ended up on another port) | Run the client on port 5173 (both `npm run dev` and `npm run preview` use it), keep `CLIENT_ORIGIN=http://localhost:5173` with no trailing slash, and use `http://localhost:5173`, not `127.0.0.1` |
+| `Port 5173 is already in use` (Vite) | Another dev or preview server is running. Both refuse to switch ports, because any other port would fail CORS | Stop the other one (Ctrl+C in its terminal) and start again |
+| `EADDRINUSE: address already in use :::5000` (API) | Another copy of the API is still running | Stop it. To find it: Windows `netstat -ano \| findstr :5000` then `taskkill /PID <pid> /F`; macOS/Linux `lsof -i :5000`. Don't just change `PORT`: the client proxy and the Postman collections expect 5000 |
+| `429 Too many requests, please try again in N seconds` while testing repeatedly | The strict limits are working (5 failed logins per 15 min, 10 registrations per hour, 10 bookings per 10 min) | Start the API with `npm run start:test` (relaxed limits, refused in production) for repeated manual or Newman testing. The counters live in memory, so restarting the API also clears them |
+| Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the transaction that writes the booking and its transaction record together | Use Atlas, or run the local MongoDB as a single-node replica set (see **Getting a MONGO_URI**) |
+
 ## 6. Using the App
 
 **Screens by role**
