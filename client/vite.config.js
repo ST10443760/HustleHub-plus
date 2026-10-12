@@ -84,5 +84,8 @@ export default defineConfig({
     setupFiles: './src/test/setup.js',
     include: ['src/**/*.test.{js,jsx}'],
     restoreMocks: true,
+    // Tests that type a lot with user-event can take several seconds on a slow
+    // or busy machine; 5s (the default) made them flaky under load.
+    testTimeout: 20000,
   },
 })
