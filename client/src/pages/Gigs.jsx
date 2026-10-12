@@ -84,8 +84,10 @@ export default function Gigs() {
   }, [debouncedQ, debouncedMin, debouncedMax, setSearchParams]);
 
   // When the URL changes from outside (Back/Forward, a bookmarked link),
-  // bring the inputs in line with it during render. Text the user is still
-  // typing that already matches the URL (e.g. a trailing space) is left alone.
+  // bring the inputs in line with it during render. A change that is just our
+  // own debounced push arriving (the URL now equals the debounced values) is
+  // NOT synced back: the user may already have typed more since, and copying
+  // the older pushed value into the input would wipe those keystrokes.
   const [syncedFilters, setSyncedFilters] = useState(filters);
   if (
     syncedFilters.q !== filters.q ||
@@ -93,9 +95,13 @@ export default function Gigs() {
     syncedFilters.maxPrice !== filters.maxPrice
   ) {
     setSyncedFilters(filters);
-    setQ((typed) => (typed.trim() === filters.q ? typed : filters.q));
-    setMinPrice(filters.minPrice);
-    setMaxPrice(filters.maxPrice);
+    const fromOwnPush =
+      filters.q === debouncedQ && filters.minPrice === debouncedMin && filters.maxPrice === debouncedMax;
+    if (!fromOwnPush) {
+      setQ((typed) => (typed.trim() === filters.q ? typed : filters.q));
+      setMinPrice(filters.minPrice);
+      setMaxPrice(filters.maxPrice);
+    }
   }
 
   // Load the gigs whenever the filters in the URL change.
