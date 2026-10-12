@@ -589,7 +589,7 @@ id from the request: they filter by `req.user.id`.
 
 Registration (`POST /api/auth/register`) accepts a name, email, and
 password. Before anything is stored, the password is hashed using
-**bcryptjs** with a salt round factor of 10 — the plain-text password is
+**bcryptjs** with a salt round factor of 10, so the plain-text password is
 never written to storage, logged, or included in any API response. Login
 (`POST /api/auth/login`) re-hashes the submitted password using the same
 algorithm and compares it against the stored hash; the two are never
@@ -604,7 +604,7 @@ which also simplifies setup for every team member regardless of OS.
 
 Duplicate registrations are rejected with a generic `409` response, and
 failed logins (wrong password or unknown email) both return the same
-generic `"Invalid email or password"` message and status code — this is
+generic `"Invalid email or password"` message and status code. This is
 deliberate: distinguishing between "wrong password" and "no such account"
 would let an attacker enumerate valid registered emails.
 
@@ -618,7 +618,7 @@ same `401 Invalid email or password`.
 ### JWT and roles
 
 On successful registration or login, the API issues a JSON Web Token
-containing only the user's `id` and `role` in its payload — never the
+containing only the user's `id` and `role` in its payload, never the
 password hash or other sensitive fields, since a JWT payload is signed but
 not encrypted and can be decoded by anyone holding the token.
 
@@ -679,8 +679,8 @@ A deleted user's token stops working straight away, because `protect` loads the 
 Invalid input is rejected with a `400` that lists the validation failures,
 before any controller or database code runs.
 
-All errors — validation failures, authentication failures, or unexpected
-exceptions — pass through a single centralised error handler
+All errors (validation failures, authentication failures, or unexpected
+exceptions) pass through a single centralised error handler
 (`middleware/errorHandler.js`). This handler:
 
 - Logs the error to the server console only (stack traces only for
@@ -779,7 +779,7 @@ files and starts an `https` server rather than plain `http`. See
 since certificate/key files are excluded from git via `.gitignore` and must
 be generated locally by anyone cloning the repository. HTTPS matters even
 in local development because it's the same code path that will run in
-production — testing over plain HTTP would hide any issues specific to a
+production; testing over plain HTTP would hide any issues specific to a
 TLS connection.
 
 ### Logging
@@ -839,7 +839,7 @@ The risk is reduced by:
 
 | Concern | How it's addressed |
 |---|---|
-| Plain-text password storage | Never stored — hashed with bcryptjs before persisting |
+| Plain-text password storage | Never stored: hashed with bcryptjs before persisting |
 | Credential stuffing / enumeration | Identical generic error and timing for wrong password vs unknown email; failed logins rate limited (5 per 15 min per IP) |
 | Unauthorised access to protected routes | JWT required and verified on every protected request |
 | Token tampering | Signature verification via `JWT_SECRET`; invalid signatures rejected |
