@@ -712,6 +712,27 @@ exceptions) pass through a single centralised error handler
 - Never includes a stack trace, file path, or configuration value in any
   client-facing response
 
+Every error has the same shape, `{ "success": false, "error": "<message>" }`.
+Real responses from the running API:
+
+| Situation | Status | `error` message |
+|---|---|---|
+| Unknown route (`GET /api/nope?token=abc`) | `404` | `Route not found: GET /api/nope` (the query string is never echoed back) |
+| Malformed id (`GET /api/gigs/not-an-id`) | `400` | `Invalid id` |
+| Gig that doesn't exist | `404` | `Gig not found` |
+| No token / tampered token | `401` | `Not authenticated - no token provided` / `Not authenticated - invalid or expired token` |
+| Wrong password **or** unknown email | `401` | `Invalid email or password` (identical for both) |
+| Client calling an admin route | `403` | `You do not have permission to perform this action` (doesn't say which role is needed) |
+| Malformed JSON body | `400` | `Request body is not valid JSON` |
+| Body over 10kb | `413` | `Request body is too large` |
+| Request from another origin | `403` | `Origin not allowed` |
+| Operator object in the login email | `400` | `Must be a valid email address` |
+| 6th failed login in 15 minutes | `429` | `Too many requests, please try again in 899 seconds.` |
+| Any unexpected server error | `500` | `Something went wrong. Please try again later.` |
+
+The full error, with its stack trace in development only, goes to the
+server log, never to the client.
+
 ### Rate limiting
 
 | Limiter | Applies to | Limit | Counted per |
