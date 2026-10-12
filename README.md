@@ -1279,8 +1279,15 @@ _Rate limiting with a meaningful response: after 5 failed logins the 6th is refu
 
 ## 13. Demonstration Video
 
-- **Part 2:** _link to be added_
-- Part 1: https://youtu.be/qTK6iV_0lmI
+**Part 2:** https://youtu.be/H5GcOdMPQNw
+
+[![Watch the demo](https://img.youtube.com/vi/H5GcOdMPQNw/hqdefault.jpg)](https://youtu.be/H5GcOdMPQNw)
+
+The video shows registration and login, gig creation, booking creation and
+viewing, transaction recording, role-based access, the security headers, the
+tests and rate limiting.
+
+Part 1 (API only): https://youtu.be/qTK6iV_0lmI
 
 ## Appendix: Part 1 API Screenshots
 
