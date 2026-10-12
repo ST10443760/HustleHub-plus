@@ -56,6 +56,10 @@ export default defineConfig({
   plugins: [react(), cspMetaTag()],
   server: {
     port: 5173,
+    // Fail loudly if 5173 is taken instead of quietly moving to 5174: the API's
+    // CORS only accepts CLIENT_ORIGIN (http://localhost:5173), so any other
+    // port would break every POST with "Origin not allowed".
+    strictPort: true,
     proxy: apiProxy,
   },
   // `npm run preview` serves the built app with the policy as real headers,
