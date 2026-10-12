@@ -87,6 +87,19 @@ only for convenience).
 - 100+ automated API assertions (Newman) and 67 frontend tests (Vitest +
   React Testing Library)
 
+## What Changed Since Part 1
+
+| Area | Part 1 | Part 2 (this submission) |
+|---|---|---|
+| Data | Users kept in memory (lost on restart) | MongoDB via Mongoose: users, gigs, bookings and transactions, with indexes |
+| Features | Register, log in, one protected test route | The full marketplace: gig management, browsing and search, bookings with simulated payment, transaction records, income, an admin area |
+| Frontend | None (Postman only) | React client (Vite) with pages for every role |
+| Access control | JWT `protect` and a basic `requireRole` | Role read from the database on every request, `requireRole` on every role-restricted route, ownership checks (`requireOwnership`) on gigs and bookings, admin created only by a seed script |
+| Input handling | express-validator on register and login | Validators on every route with unknown fields rejected, HTML escaping, NoSQL operator stripping, strict id checks, regex-safe search |
+| Abuse protection | None | Rate limits on login, register and booking, plus a general limit |
+| Headers | Helmet defaults | Explicit Helmet config with a strict CSP on the API, a separate CSP on the built client, CORS locked to the client origin |
+| Tests | One Postman collection (auth) | Main Postman collection (Auth, RBAC, Gigs, Bookings, Income, Security), a rate limit collection, and 67 Vitest + React Testing Library tests |
+
 ## 3. Architecture
 
 The system follows a MERN architecture: a **React** frontend, an
