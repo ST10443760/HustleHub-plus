@@ -24,17 +24,19 @@ Development Security)
 
 1. [Overview](#1-overview)
 2. [Features](#2-features)
-3. [Architecture](#3-architecture)
-4. [Project Structure](#4-project-structure)
-5. [How to Run](#5-how-to-run)
-6. [Using the App](#6-using-the-app)
-7. [API](#7-api)
-8. [Security](#8-security)
-9. [Testing](#9-testing)
-10. [Requirements Traceability](#10-requirements-traceability)
-11. [Known Limitations and Part 3 Notes](#11-known-limitations-and-part-3-notes)
-12. [Screenshots](#12-screenshots)
-13. [Demonstration Video](#13-demonstration-video)
+3. [What Changed Since Part 1](#3-what-changed-since-part-1)
+4. [Architecture](#4-architecture)
+5. [Project Structure](#5-project-structure)
+6. [How to Run](#6-how-to-run)
+7. [Troubleshooting](#7-troubleshooting)
+8. [Using the App](#8-using-the-app)
+9. [API](#9-api)
+10. [Security](#10-security)
+11. [Testing](#11-testing)
+12. [Requirements Traceability](#12-requirements-traceability)
+13. [Known Limitations and Part 3 Notes](#13-known-limitations-and-part-3-notes)
+14. [Screenshots](#14-screenshots)
+15. [Demonstration Video](#15-demonstration-video)
 
 Appendix: [Part 1 API Screenshots](#appendix-part-1-api-screenshots)
 
@@ -87,7 +89,7 @@ only for convenience).
 - 100+ automated API assertions (Newman) and 67 frontend tests (Vitest +
   React Testing Library)
 
-## What Changed Since Part 1
+## 3. What Changed Since Part 1
 
 | Area | Part 1 | Part 2 (this submission) |
 |---|---|---|
@@ -100,7 +102,7 @@ only for convenience).
 | Headers | Helmet defaults | Explicit Helmet config with a strict CSP on the API, a separate CSP on the built client, CORS locked to the client origin |
 | Tests | One Postman collection (auth) | Main Postman collection (Auth, RBAC, Gigs, Bookings, Income, Security), a rate limit collection, and 67 Vitest + React Testing Library tests |
 
-## 3. Architecture
+## 4. Architecture
 
 The system follows a MERN architecture: a **React** frontend, an
 **Express/Node** backend and a **MongoDB** database (via Mongoose). Part 1
@@ -215,7 +217,7 @@ one transaction (a unique index on `transaction.booking`). The owner and
 parties on every record come from the verified token and the database,
 never from the request.
 
-## 4. Project Structure
+## 5. Project Structure
 
 ```
 api/                           # Express backend
@@ -289,7 +291,7 @@ docs/
   screenshots/                 # Part 2 screenshots + README of what each shows; part1/ = Part 1 screenshots
 ```
 
-## 5. How to Run
+## 6. How to Run
 
 Every command below was run, in this order, on a fresh clone of the
 repository (Windows 11 with Git Bash and PowerShell, plus a Linux container
@@ -436,7 +438,7 @@ npm run clean:test
 It prints how much it removed, never deletes an admin, and refuses to run
 when `NODE_ENV` is `production`.
 
-## Troubleshooting
+## 7. Troubleshooting
 
 The problems below all came up while building and testing this project.
 
@@ -451,7 +453,7 @@ The problems below all came up while building and testing this project.
 | `429 Too many requests, please try again in N seconds` while testing repeatedly | The strict limits are working (5 failed logins per 15 min, 10 registrations per hour, 10 bookings per 10 min) | Start the API with `npm run start:test` (relaxed limits, refused in production) for repeated manual or Newman testing. The counters live in memory, so restarting the API also clears them |
 | Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the transaction that writes the booking and its transaction record together | Use Atlas, or run the local MongoDB as a single-node replica set (see **Getting a MONGO_URI**) |
 
-## 6. Using the App
+## 8. Using the App
 
 **Screens by role**
 
@@ -486,7 +488,7 @@ login page. The client never logs tokens or request data.
 The client's Content-Security-Policy is described under **Security → Client
 Content-Security-Policy**, and its tests under **Testing → Frontend tests**.
 
-## 7. API
+## 9. API
 
 All routes are under `https://localhost:5000` (the client reaches them through its `/api` proxy). "Logged in" means a valid `Authorization: Bearer <token>` header. Every response is `{ "success": true, "data": ... }` or `{ "success": false, "error": "..." }`.
 
@@ -614,7 +616,7 @@ Money is stored as a plain number rounded to 2 decimal places, and totals
 are rounded the same way, so amounts like 19.99 add up exactly. Booking
 creation, transaction creation and failed booking attempts are all logged.
 
-## 8. Security
+## 10. Security
 
 Security is layered: every request passes through several independent
 checks, so a gap in one is caught by another.
@@ -948,7 +950,7 @@ The risk is reduced by:
 | Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
 | Data interception in transit | API served over HTTPS, even in local development |
 
-## 9. Testing
+## 11. Testing
 
 The main Postman collection (`api/postman/HustleHub_API.postman_collection.json`)
 starts with an **Auth** set covering valid and invalid scenarios:
@@ -1131,7 +1133,7 @@ There are 67 tests across 16 files, covering both rendering and user interaction
 - **Income** (totals, items, empty state with R 0,00) and **admin Users** (rows
   rendered, no password field anywhere).
 
-## 10. Requirements Traceability
+## 12. Requirements Traceability
 
 The 11 Part 2 requirements, what was built for each, where, and how it is tested.
 
@@ -1149,7 +1151,7 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
 | 10 | README: features, security, how to run backend and frontend, testing | This document | `README.md`, `api/certs/README.md` | Every command run on a fresh clone | This README; every command run on a fresh clone |
 | 11 | Demonstration video: auth, gig creation, booking, transaction recording | Recorded walkthrough | See **Demonstration Video** | Watching the video | [Demo video](https://youtu.be/H5GcOdMPQNw) |
 
-## 11. Known Limitations and Part 3 Notes
+## 13. Known Limitations and Part 3 Notes
 
 - **JWT in `localStorage`.** Accepted for this POE; any XSS could read the
   token. The risk is reduced by escaping, React's text rendering and the
@@ -1176,7 +1178,7 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
   deployment needs a real certificate, and the production host should send
   the client's security headers (including `frame-ancestors 'none'`).
 
-## 12. Screenshots
+## 14. Screenshots
 
 The images live in `docs/screenshots/`; [`docs/screenshots/README.md`](docs/screenshots/README.md)
 describes what each one should show.
@@ -1277,7 +1279,7 @@ _The rest of the Helmet headers, including X-Frame-Options DENY against clickjac
 
 _Rate limiting with a meaningful response: after 5 failed logins the 6th is refused and the user is told how long to wait._
 
-## 13. Demonstration Video
+## 15. Demonstration Video
 
 **Part 2:** https://youtu.be/H5GcOdMPQNw
 
