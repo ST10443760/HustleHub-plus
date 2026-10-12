@@ -363,11 +363,12 @@ the Vite proxy forwards them to the API.
 **Local MongoDB:** `mongodb://localhost:27017/hustlehub`. A plain
 (standalone) local MongoDB starts the API and serves everything except
 bookings, because MongoDB only allows multi-document transactions on a
-replica set; checked against a standalone MongoDB 8.0, the booking
-transaction is refused. Run it as a single-node replica set (MongoDB's
-documented setup): start `mongod` with `--replSet rs0` (or set
+replica set (checked: on a standalone MongoDB 8.0 the booking transaction
+is refused). To use a local database, run it as a single-node replica set as
+MongoDB documents it: start `mongod` with `--replSet rs0` (or set
 `replication.replSetName: rs0` in `mongod.cfg` and restart the service), then
-run `rs.initiate()` once in `mongosh`. The same URI then works.
+run `rs.initiate()` once in `mongosh`, and keep the same URI. This project was
+tested on Atlas; the local replica-set setup was not run here.
 
 Generate the local HTTPS certificate **before starting the API**, seed the
 admin, then start the server:
