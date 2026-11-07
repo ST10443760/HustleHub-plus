@@ -26,14 +26,16 @@ RUN npm run build \
 # ---- Runtime ----
 FROM nginxinc/nginx-unprivileged:1.31.7-alpine3.24 AS runtime
 # Drop the stock pages (they name the server) before adding our own files.
-USER root
-RUN rm -rf /usr/share/nginx/html/*
+# Also pull in Alpine security fixes released after the base image was built.
+USER 0
+RUN apk upgrade --no-cache \
+ && rm -rf /usr/share/nginx/html/*
 COPY --chown=root:root nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build --chown=root:root /app/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build --chown=root:root /app/dist /usr/share/nginx/html
 
 # The base image already runs as the unprivileged nginx user (uid 101).
-USER 101
+USER 101:101
 EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
