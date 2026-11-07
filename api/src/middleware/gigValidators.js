@@ -19,7 +19,10 @@ const UNKNOWN_FIELDS_MESSAGE = 'Request contains fields that are not allowed';
 
 const isText = (value) => typeof value === 'string';
 const isNumber = (value) => typeof value === 'number' && Number.isFinite(value);
-const hasAtMostTwoDecimals = (value) => /^\d+(\.\d{1,2})?$/.test(String(value));
+// Whole number, or a dot and 1-2 decimals. Written as two plain alternatives
+// (no quantifier nested inside another), so it always runs in linear time.
+const TWO_DECIMALS = /^(?:\d+|\d+\.\d\d?)$/;
+const hasAtMostTwoDecimals = (value) => TWO_DECIMALS.test(String(value));
 
 // Builds the field rules shared by create (all required) and update (all optional).
 function gigFieldRules({ optional }) {
