@@ -620,6 +620,148 @@ Money is stored as a plain number rounded to 2 decimal places, and totals
 are rounded the same way, so amounts like 19.99 add up exactly. Booking
 creation, transaction creation and failed booking attempts are all logged.
 
+### Tax estimation
+
+Freelancers get an estimate of the South African income tax on what they
+earned through HustleHub+, on the **Income dashboard** (`/income`) and from
+`GET /api/income/tax-estimate`. It is a planning aid, not tax advice: the
+API returns a disclaimer with every estimate and the dashboard shows it
+next to the figures.
+
+**How the estimate is calculated**
+
+1. **Gross income.** All of the freelancer's `completed` transactions
+   whose date falls in the selected tax year are added up (refunded ones
+   are left out). This total is treated as taxable income.
+2. **Sliding scale.** Each slice of that income is taxed at its bracket's
+   rate: the first R245 100 at 18%, the next slice up to R383 100 at 26%,
+   and so on. The sum is the *tax before rebate*.
+3. **Primary rebate.** The primary rebate (R17 820 for the 2027 tax year)
+   is subtracted. The result is never allowed to go below zero, so anyone
+   earning the tax-free threshold (R99 000) or less pays R0.
+4. **Summary figures.** Take-home = gross − estimated tax. Effective rate =
+   estimated tax ÷ gross × 100 (0% when gross is 0).
+
+**Tax tables used**
+
+The brackets, rebate and threshold come from the SARS page
+[Rates of Tax for Individuals](https://www.sars.gov.za/tax-rates/income-tax/rates-of-tax-for-individuals/),
+checked on 7 November 2026. They live as data in
+[`api/src/config/tax.js`](api/src/config/tax.js), with the source and date
+in a comment.
+
+| `taxYear` | Period | SARS name | Primary rebate | Tax-free threshold (under 65) |
+|---|---|---|---|---|
+| `2026` (current) | 1 March 2026 to 28 February 2027 | 2027 tax year | R17 820 | R99 000 |
+| `2025` | 1 March 2025 to 28 February 2026 | 2026 tax year | R17 235 | R95 750 |
+| `2024` | 1 March 2024 to 28 February 2025 | 2025 tax year | R17 235 | R95 750 |
+| `2023` | 1 March 2023 to 29 February 2024 | 2024 tax year | R17 235 | R95 750 |
+
+SARS lists the 2025 and 2026 tax years as "no changes", so those two use
+the 2024 tax year's brackets. 2027 tax year brackets (the current year):
+
+| Taxable income (R) | Rate of tax (R) |
+|---|---|
+| 0 to 245 100 | 18% of taxable income |
+| 245 101 to 383 100 | 44 118 + 26% of taxable income above 245 100 |
+| 383 101 to 530 200 | 79 998 + 31% of taxable income above 383 100 |
+| 530 201 to 695 800 | 125 599 + 36% of taxable income above 530 200 |
+| 695 801 to 887 000 | 185 215 + 39% of taxable income above 695 800 |
+| 887 001 to 1 878 600 | 259 783 + 41% of taxable income above 887 000 |
+| 1 878 601 and above | 666 339 + 45% of taxable income above 1 878 600 |
+
+The calculator works the tax out bracket by bracket rather than copying
+SARS's fixed amounts, and a unit test checks that this gives exactly the
+SARS base amount (44 118, 79 998, ...) at the bottom of every bracket, and
+that tax at the threshold equals the rebate. That catches a typo in the
+config.
+
+**Worked example** (the same numbers are asserted in
+[`api/test/taxCalculator.test.js`](api/test/taxCalculator.test.js)):
+a freelancer earns **R300 000** in the 2027 tax year.
+
+| Step | Calculation | Amount |
+|---|---|---|
+| First bracket | 18% × R245 100 | R44 118.00 |
+| Second bracket | 26% × (R300 000 − R245 100) = 26% × R54 900 | R14 274.00 |
+| Tax before rebate | R44 118 + R14 274 | R58 392.00 |
+| Less primary rebate | R58 392 − R17 820 | **R40 572.00 estimated tax** |
+| Take-home | R300 000 − R40 572 | **R259 428.00** |
+| Effective rate | R40 572 ÷ R300 000 × 100 = 13.524% | **13.52%** |
+
+**Money and dates**
+
+- Amounts are summed as whole cents in the database query, and the
+  calculator works in integer cents and hundredths of a cent, so there is
+  no floating point drift. The total tax is rounded to the cent once,
+  half up, at the end. Breakdown lines are rounded on their own for
+  display, so in rare cases they can differ from the total by a cent.
+  Every amount in the response is a number with at most 2 decimals.
+- A tax year runs from 1 March to the last day of February. Its start and
+  end, and the monthly buckets, are worked out in South African time
+  (UTC+02:00, no daylight saving), so a booking at 00:30 on 1 March counts
+  in the new tax year even though it is still 28 February in UTC.
+- Without `taxYear`, the API uses the tax year containing today. If the
+  tables for a new tax year haven't been added to `config/tax.js` yet, it
+  falls back to the newest year that is configured. It never guesses rates.
+
+**Assumptions and limitations**
+
+- Resident individual **under 65**: only the primary rebate is applied
+  (no secondary or tertiary rebate).
+- **No deductions**: no business expenses, retirement fund contributions
+  or medical scheme credits.
+- **No UIF**, provisional tax payments, or income from outside HustleHub+.
+- **Income to date is treated as the whole year's taxable income.** It is
+  not projected forward, so early in the tax year the estimate is low.
+- Only the tax years in the table above are supported. Any other
+  `taxYear` gets a `400`.
+
+**The endpoint**
+
+`GET /api/income/tax-estimate?taxYear=2026` runs protect →
+requireRole(freelancer) → query validation. The freelancer is always taken
+from the verified token, never from the request. Clients and admins get
+`403`, no token gets `401`. `taxYear` must be a single 4-digit year that is
+in the table, and any other query parameter (for example `freelancerId`)
+is rejected with `400` by `checkExact`. The query uses the existing
+`{ freelancer, status, createdAt }` index on transactions, and each request
+is logged as an `INCOME` event with the user id and tax year only. The
+general API rate limiter applies. Response (`data`):
+
+```json
+{
+  "taxYear": { "label": "1 March 2026 to 28 February 2027 (SARS 2027 tax year)", "start": "2026-03-01", "end": "2027-02-28" },
+  "totals": { "gross": 300000, "taxBeforeRebate": 58392, "estimatedTax": 40572, "takeHome": 259428, "effectiveRatePercent": 13.52 },
+  "rebate": 17820,
+  "taxFreeThreshold": 99000,
+  "breakdown": [{ "from": 0, "to": 245100, "ratePercent": 18, "amountInBracket": 245100, "tax": 44118 }, "... 7 brackets, the top one has to: null"],
+  "monthly": [{ "month": "2026-03", "income": 0, "bookings": 0 }, "... all 12 months, March to February"],
+  "assumptions": ["Resident individual under 65, so only the primary rebate applies.", "..."],
+  "disclaimer": "This is an estimate for planning only, not tax advice and not a SARS assessment. ...",
+  "source": { "name": "SARS - Rates of Tax for Individuals", "url": "https://www.sars.gov.za/...", "checkedOn": "2026-11-07" },
+  "availableTaxYears": [2026, 2025, 2024, 2023]
+}
+```
+
+**The dashboard** (`client/src/pages/Income.jsx`) has a tax year selector,
+four summary cards (total earned, estimated tax, take-home, effective
+rate), a monthly income bar chart, the tax-by-bracket table with the
+rebate, an assumptions and disclaimer panel, and the existing per-booking
+income table. The chart (`components/MonthlyIncomeChart.jsx`) is
+hand-drawn SVG with no chart library, so the strict client CSP
+(`style-src 'self'`, no `'unsafe-inline'`) needed no change. It uses only
+SVG attributes and CSS classes, no inline styles and no
+`dangerouslySetInnerHTML`. It has an `aria-label` summary, and the same
+figures are in a visually hidden table for screen readers.
+
+**Tests:** `api/test/` (run with `npm test` in `api/`, Node's built-in test
+runner, no database or secrets needed) covers the calculator, tax-year
+dates, config consistency and the response builder. The Newman **Income**
+folder covers the endpoint (200 with values, 403 for client and admin,
+401 without a token, 400 for a bad `taxYear` or an unknown parameter).
+`Income.test.jsx` and `MonthlyIncomeChart.test.jsx` cover the dashboard.
+
 ## 10. Security
 
 Security is layered: every request passes through several independent
