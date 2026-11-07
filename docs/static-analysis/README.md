@@ -14,7 +14,7 @@ Both folders hold the same files:
 | File | Tool | What it is |
 |---|---|---|
 | `eslint-api.json` | ESLint | Every ESLint message for `api/`, in ESLint's JSON format (file, line, rule, severity, message). Paths are absolute paths on the machine that ran it |
-| `eslint-api.txt` | ESLint | The same, as the readable report `npm run lint` prints (stylish format) |
+| `eslint-api.txt` | ESLint | The same, as the readable report `npm run lint` prints (stylish format). ESLint prints nothing when there are no findings, so in `final/` this file (and `eslint-client.txt`) is empty |
 | `eslint-client.json` | ESLint | Every ESLint message for `client/`, JSON |
 | `eslint-client.txt` | ESLint | The same, readable |
 | `semgrep.json` | Semgrep | Semgrep's JSON output: each finding with rule id, severity, file, line and the matched code, plus scan errors and skipped files |
