@@ -659,6 +659,7 @@ rate limit, body parsing with a 10kb cap, the NoSQL sanitiser).
 | GET | `/api/bookings/:id` | protect → validateObjectId → **requireOwnership** (client or freelancer) | The booking's two parties |
 | GET | `/api/transactions/mine` | protect → requireRole(client, freelancer) | Own transactions only, by query |
 | GET | `/api/income` | protect → requireRole(freelancer) | Own income only, by query |
+| GET | `/api/income/tax-estimate` | protect → requireRole(freelancer) → validators (`taxYear` only, checkExact) | Own income only, by query |
 
 Every route except health, register and login requires a valid JWT; every
 role-restricted route uses `requireRole`; every route that reads or changes
