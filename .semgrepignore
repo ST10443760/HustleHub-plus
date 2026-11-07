@@ -1,0 +1,10 @@
+# Semgrep scans everything except installed packages, build output and the
+# scanners' own result files. Source, tests, scripts and config are all
+# scanned. (Having this file replaces Semgrep's default ignore list, which
+# would otherwise skip test folders.)
+node_modules/
+client/dist/
+coverage/
+semgrep-results/
+eslint-results/
+docs/static-analysis/
