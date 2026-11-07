@@ -28,6 +28,13 @@ describe('client security headers', () => {
     expect(SECURITY_HEADERS['Content-Security-Policy']).toBe(CSP_HEADER);
   });
 
+  it('includes the permissions and site isolation headers', () => {
+    expect(SECURITY_HEADERS['Permissions-Policy']).toMatch(/camera=\(\)/);
+    expect(SECURITY_HEADERS['Cross-Origin-Resource-Policy']).toBe('same-origin');
+    expect(SECURITY_HEADERS['Cross-Origin-Opener-Policy']).toBe('same-origin');
+    expect(SECURITY_HEADERS['Cross-Origin-Embedder-Policy']).toBe('require-corp');
+  });
+
   it('npm run preview sends exactly the shared headers', () => {
     expect(viteConfig.preview.headers).toEqual(SECURITY_HEADERS);
   });
@@ -53,6 +60,7 @@ describe('client security headers', () => {
     expect(Object.keys(blocks)).toEqual(expect.arrayContaining(['/', '/assets/', '/api/']));
     expect(blocks['/']).toContain(SNIPPET);
     expect(blocks['/assets/']).toContain(SNIPPET);
+    expect(blocks['/healthz']).toContain(SNIPPET);
     // The api sends its own Helmet headers.
     expect(blocks['/api/']).not.toContain(SNIPPET);
   });
