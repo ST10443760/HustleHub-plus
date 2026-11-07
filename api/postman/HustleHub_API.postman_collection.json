@@ -53,6 +53,22 @@
   "item": [
     {
       "name": "Health Check",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+              "pm.test('Says ok and nothing else', () => {",
+              "  pm.expect(pm.response.json()).to.eql({ success: true, data: { status: 'ok' } });",
+              "});",
+              "pm.test('Not behind the rate limiter', () => {",
+              "  pm.expect(pm.response.headers.has('RateLimit')).to.be.false;",
+              "});"
+            ]
+          }
+        }
+      ],
       "request": {
         "method": "GET",
         "url": "{{base_url}}/api/health"
