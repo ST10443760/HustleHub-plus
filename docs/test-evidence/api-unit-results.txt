@@ -1,0 +1,78 @@
+
+> hustlehub-backend@1.0.0 test
+> node --test "test/**/*.test.js"
+
+✔ roundMoney rounds to 2 decimals (3.3406ms)
+✔ roundMoney removes floating point noise (0.6807ms)
+✔ uses the strict limits when no overrides are set (4.8218ms)
+✔ applies an override outside production (0.4803ms)
+✔ ignores overrides in production (0.8671ms)
+✔ ignores overrides that are not positive whole numbers (0.4996ms)
+▶ worked example (same numbers as the README)
+  ✔ R300 000 income in the 2027 tax year (5.18ms)
+✔ worked example (same numbers as the README) (8.2648ms)
+▶ zero and low incomes
+  ✔ zero income gives zero everything (1.0842ms)
+  ✔ income below the tax-free threshold pays no tax (0.5401ms)
+  ✔ income exactly on the threshold pays no tax (0.5251ms)
+  ✔ R1 above the threshold pays 18 cents (0.5097ms)
+✔ zero and low incomes (3.6129ms)
+▶ bracket boundaries match the SARS base amounts
+  ✔ R245100 (0.7977ms)
+  ✔ R383100 (0.417ms)
+  ✔ R530200 (0.4124ms)
+  ✔ R695800 (0.5004ms)
+  ✔ R887000 (0.5885ms)
+  ✔ R1878600 (0.3638ms)
+✔ bracket boundaries match the SARS base amounts (4.1541ms)
+▶ inside every bracket
+  ✔ R200000 (3.2211ms)
+  ✔ R300000 (0.2821ms)
+  ✔ R450000 (0.1763ms)
+  ✔ R600000 (0.4763ms)
+  ✔ R800000 (0.0748ms)
+  ✔ R1000000 (0.0488ms)
+  ✔ R2000000 (0.0407ms)
+✔ inside every bracket (4.9159ms)
+✔ a high income is taxed at 45% at the top (0.4153ms)
+▶ rounding
+  ✔ rounds half a cent up (0.8011ms)
+  ✔ rounds the total once, to the cent (0.4694ms)
+  ✔ rounds the income to the cent first (0.3096ms)
+  ✔ summing many small amounts does not drift (0.5096ms)
+  ✔ bracket amounts always add up to the income (0.6336ms)
+✔ rounding (3.774ms)
+▶ rejects invalid input
+  ✔ negative income (2.0218ms)
+  ✔ NaN and Infinity (0.5969ms)
+  ✔ a string, even a numeric one (0.5267ms)
+  ✔ missing income (0.506ms)
+  ✔ missing tax table (0.5103ms)
+✔ rejects invalid input (4.8269ms)
+✔ tax table for the year starting March 2026 is consistent (4.6408ms)
+✔ tax table for the year starting March 2025 is consistent (0.6884ms)
+✔ tax table for the year starting March 2024 is consistent (0.3815ms)
+✔ tax table for the year starting March 2023 is consistent (0.53ms)
+✔ supported years are listed newest first (2.8206ms)
+✔ tax tables cannot be changed at runtime (0.674ms)
+✔ defaults to the tax year containing today (3.5022ms)
+✔ falls back to the newest configured year when tables are missing (2.3161ms)
+✔ fills every month of the tax year, zeros included (4.9888ms)
+✔ adds the months up in cents and estimates the tax (1.5155ms)
+✔ ignores rows outside the tax year (1.2193ms)
+✔ returns the tax year, assumptions and disclaimer (2.152ms)
+✔ rejects a tax year with no table (2.1491ms)
+✔ finds the tax year that contains a date (2.1923ms)
+✔ switches tax year at midnight South African time, not UTC (0.4894ms)
+✔ builds the date range and label for a tax year (3.3507ms)
+✔ lists all 12 months from March to February (1.2546ms)
+✔ ends on 29 February in a leap year (1.164ms)
+✔ rejects a tax year that is not a whole year (2.33ms)
+ℹ tests 54
+ℹ suites 6
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 565.2219
