@@ -41,7 +41,7 @@ services:
   # reports healthy once this node is the writable primary.
   mongo:
     <<: *hardened
-    image: mongo:8.0.34-noble
+    image: mongo:8.3.13-noble
     command: ["--replSet", "rs0", "--bind_ip_all"]
     # Run as the image's mongodb user from the start, so no capabilities
     # are needed to switch users.
