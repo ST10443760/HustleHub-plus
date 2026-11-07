@@ -1,0 +1,9 @@
+# Semgrep Community Edition rule packs used by `node .semgrep/run.mjs` and
+# the pipeline. One pack per line; lines starting with # are ignored.
+p/javascript
+p/nodejs
+p/expressjs
+p/react
+p/owasp-top-ten
+p/jwt
+p/secrets
