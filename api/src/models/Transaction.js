@@ -61,7 +61,8 @@ const transactionSchema = new mongoose.Schema(
 
 // "My transactions", newest first, for each side.
 transactionSchema.index({ client: 1, createdAt: -1 });
-// Income: one freelancer's completed transactions, newest first.
+// Income: one freelancer's completed transactions, newest first. Also
+// serves the tax estimate (same two equality fields, then a createdAt range).
 transactionSchema.index({ freelancer: 1, status: 1, createdAt: -1 });
 // Admin list of all transactions, newest first.
 transactionSchema.index({ createdAt: -1 });
