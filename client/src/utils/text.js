@@ -8,20 +8,21 @@
  * as a text node - never as HTML - so decoded "<img ...>" shows up as the
  * literal characters, not an element.
  */
-const ENTITIES = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#x27;': "'",
-  '&#x2F;': '/',
-  '&#x5C;': '\\',
-  '&#96;': '`',
-};
+// A Map, so a lookup can never reach anything on Object.prototype.
+const ENTITIES = new Map([
+  ['&amp;', '&'],
+  ['&lt;', '<'],
+  ['&gt;', '>'],
+  ['&quot;', '"'],
+  ['&#x27;', "'"],
+  ['&#x2F;', '/'],
+  ['&#x5C;', '\\'],
+  ['&#96;', '`'],
+]);
 
 const ENTITY_PATTERN = /&(?:amp|lt|gt|quot|#x27|#x2F|#x5C|#96);/g;
 
 export function decodeEntities(value) {
   if (typeof value !== 'string') return '';
-  return value.replace(ENTITY_PATTERN, (entity) => ENTITIES[entity]);
+  return value.replace(ENTITY_PATTERN, (entity) => ENTITIES.get(entity));
 }
