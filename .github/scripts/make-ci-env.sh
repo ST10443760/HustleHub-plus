@@ -14,11 +14,12 @@ echo "::add-mask::${admin_password}"
 echo "::add-mask::${admin_email}"
 
 umask 077
+# Single-word values only: the file is also sourced by bash in the pipeline.
 cat > .env <<EOF
 JWT_SECRET=${jwt_secret}
 JWT_EXPIRES_IN=1h
 ADMIN_EMAIL=${admin_email}
-ADMIN_NAME=CI Admin
+ADMIN_NAME=CI-Admin
 ADMIN_PASSWORD=${admin_password}
 EOF
 
