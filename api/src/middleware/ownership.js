@@ -38,6 +38,7 @@ function requireOwnership(Model, { ownerField, resourceName = 'Resource', allowA
 
       const isAdminBypass = allowAdmin && req.user.role === 'admin';
       const isOwner = ownerFields.some(
+        // eslint-disable-next-line security/detect-object-injection -- owner field names are fixed in the route definitions ("freelancer", "client"), never request input
         (field) => doc[field] && doc[field].toString() === String(req.user.id)
       );
 
