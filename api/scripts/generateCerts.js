@@ -32,6 +32,7 @@ function findOpenssl() {
   const onPath = spawnSync('openssl', ['version'], { encoding: 'utf8' });
   if (onPath.status === 0) return 'openssl';
   if (process.platform === 'win32') {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- candidates are the fixed WINDOWS_FALLBACKS paths above, never user input
     return WINDOWS_FALLBACKS.find((candidate) => fs.existsSync(candidate)) || null;
   }
   return null;

@@ -25,6 +25,7 @@ if (process.env.NODE_ENV === 'production') {
 // Set before the server loads .env - dotenv never overwrites a variable
 // that's already set, so these win over anything in the file.
 for (const key of OVERRIDES) {
+  // eslint-disable-next-line security/detect-object-injection -- key is one of the fixed OVERRIDES names above
   process.env[key] = RELAXED_MAX;
 }
 logger.warn('Starting with RELAXED rate limits - for local testing only');
