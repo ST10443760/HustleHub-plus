@@ -1,26 +1,9 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { CSP, SECURITY_HEADERS } from './securityHeaders.js'
 
-// Content-Security-Policy for the BUILT client. No 'unsafe-inline' and no
-// 'unsafe-eval' anywhere: the app is one bundled script and one stylesheet,
-// both served from the same origin, and API calls go to the same origin
-// (/api, proxied in dev and preview).
-const CSP_DIRECTIVES = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self' data:",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-]
-
-const CSP = CSP_DIRECTIVES.join('; ')
-
-// frame-ancestors is ignored in a <meta> tag - browsers only honour it as a
-// real response header - so it's only added to the headers below.
-const CSP_HEADER = `${CSP}; frame-ancestors 'none'`
+// The CSP and security headers live in securityHeaders.js, the single
+// source of truth shared with the nginx config in the Docker image.
 
 // Adds the CSP as a <meta> tag to dist/index.html. Build only: the Vite dev
 // server injects inline scripts for hot reload, which this policy would
@@ -71,12 +54,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: apiProxy,
-    headers: {
-      'Content-Security-Policy': CSP_HEADER,
-      'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'no-referrer',
-      'X-Frame-Options': 'DENY',
-    },
+    headers: { ...SECURITY_HEADERS },
   },
   // Vitest: components render in jsdom; no test touches the real network.
   test: {
