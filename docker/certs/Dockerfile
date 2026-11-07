@@ -18,4 +18,6 @@ COPY generate-certs.sh /usr/local/bin/generate-certs
 RUN sed -i 's/\r$//' /usr/local/bin/generate-certs && chmod 0555 /usr/local/bin/generate-certs
 
 USER 1000:1000
+# A one-shot job that exits straight away, so there is nothing to health check.
+HEALTHCHECK NONE
 ENTRYPOINT ["/usr/local/bin/generate-certs"]
