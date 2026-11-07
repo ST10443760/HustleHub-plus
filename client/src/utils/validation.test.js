@@ -27,6 +27,13 @@ describe('validateGig', () => {
     expect(Object.keys(errors).sort()).toEqual(['category', 'deliveryDays', 'description', 'price', 'title']);
     expect(validateGig({ ...goodGig, price: '0' }, options).errors.price).toMatch(/between 1 and/);
     expect(validateGig({ ...goodGig, price: '1e3' }, options).errors.price).toBeDefined();
+    // Whole numbers and one or two decimals are fine; three or a bare dot are not.
+    for (const price of ['150', '149.9', '149.99']) {
+      expect(validateGig({ ...goodGig, price }, options).errors.price).toBeUndefined();
+    }
+    for (const price of ['149.999', '150.', '.5', '1.2.3']) {
+      expect(validateGig({ ...goodGig, price }, options).errors.price).toBeDefined();
+    }
     expect(validateGig({ ...goodGig, deliveryDays: '91' }, options).errors.deliveryDays).toBeDefined();
   });
 });
