@@ -2225,6 +2225,321 @@
           }
         },
         {
+          "name": "Tax Estimate - Gig Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json().data;",
+                  "const price = Number(pm.collectionVariables.get('bk_gig_price'));",
+                  "// Current tax year and month in SA time (UTC+2): the booking was made just now.",
+                  "const sa = new Date(Date.now() + 2 * 60 * 60 * 1000);",
+                  "const year = sa.getUTCFullYear();",
+                  "const startYear = sa.getUTCMonth() >= 2 ? year : year - 1;",
+                  "const thisMonth = year + '-' + String(sa.getUTCMonth() + 1).padStart(2, '0');",
+                  "pm.test('Has the full response shape', () => {",
+                  "  pm.expect(body).to.include.keys('taxYear', 'totals', 'rebate', 'taxFreeThreshold', 'breakdown', 'monthly', 'assumptions', 'disclaimer');",
+                  "  pm.expect(body.taxYear).to.include.keys('label', 'start', 'end');",
+                  "  pm.expect(body.totals).to.include.keys('gross', 'estimatedTax', 'takeHome', 'effectiveRatePercent');",
+                  "  pm.expect(body.assumptions).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(body.disclaimer).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('Defaults to the current tax year (1 March to end of February)', () => {",
+                  "  pm.expect(body.taxYear.start).to.eql(startYear + '-03-01');",
+                  "  pm.expect(body.taxYear.end).to.match(new RegExp('^' + (startYear + 1) + '-02-2[89]$'));",
+                  "});",
+                  "pm.test('Gross is the booked price, counted in this month', () => {",
+                  "  pm.expect(body.totals.gross).to.eql(price);",
+                  "  const month = body.monthly.find((m) => m.month === thisMonth);",
+                  "  pm.expect(month.income).to.eql(price);",
+                  "  pm.expect(month.bookings).to.eql(1);",
+                  "  const sum = body.monthly.reduce((total, m) => total + Math.round(m.income * 100), 0);",
+                  "  pm.expect(sum / 100).to.eql(body.totals.gross);",
+                  "});",
+                  "pm.test('Every month of the tax year is listed, March to February', () => {",
+                  "  pm.expect(body.monthly).to.have.lengthOf(12);",
+                  "  pm.expect(body.monthly[0].month).to.eql(startYear + '-03');",
+                  "  pm.expect(body.monthly[11].month).to.eql((startYear + 1) + '-02');",
+                  "});",
+                  "pm.test('Income below the threshold is taxed at 18% and fully rebated', () => {",
+                  "  pm.expect(body.totals.taxBeforeRebate).to.eql(Math.round(price * 18) / 100);",
+                  "  pm.expect(body.totals.estimatedTax).to.eql(0);",
+                  "  pm.expect(body.totals.takeHome).to.eql(price);",
+                  "  pm.expect(body.totals.effectiveRatePercent).to.eql(0);",
+                  "  pm.expect(Math.round(body.taxFreeThreshold * 18) / 100).to.eql(body.rebate);",
+                  "});",
+                  "pm.test('Breakdown lists the 7 SARS brackets', () => {",
+                  "  pm.expect(body.breakdown).to.have.lengthOf(7);",
+                  "  pm.expect(body.breakdown[0]).to.include({ from: 0, ratePercent: 18, amountInBracket: price });",
+                  "  pm.expect(body.breakdown[6].to).to.eql(null);",
+                  "  pm.expect(body.breakdown[6].ratePercent).to.eql(45);",
+                  "});",
+                  "pm.test('All amounts are numbers rounded to 2 decimals', () => {",
+                  "  const amounts = [body.rebate, body.taxFreeThreshold, ...Object.values(body.totals)];",
+                  "  body.breakdown.forEach((b) => amounts.push(b.amountInBracket, b.tax));",
+                  "  body.monthly.forEach((m) => amounts.push(m.income));",
+                  "  amounts.forEach((value) => {",
+                  "    pm.expect(value).to.be.a('number');",
+                  "    pm.expect(Math.round(value * 100) / 100).to.eql(value);",
+                  "  });",
+                  "});",
+                  "pm.test('No password hashes, emails or stack traces', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('.js:');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income/tax-estimate"
+          }
+        },
+        {
+          "name": "Tax Estimate - Previous Tax Year",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Uses the requested tax year, which has no income yet', () => {",
+                  "  const body = pm.response.json().data;",
+                  "  pm.expect(body.taxYear.start).to.eql('2025-03-01');",
+                  "  pm.expect(body.taxYear.end).to.eql('2026-02-28');",
+                  "  pm.expect(body.totals.gross).to.eql(0);",
+                  "  pm.expect(body.monthly.every((m) => m.income === 0 && m.bookings === 0)).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income/tax-estimate?taxYear=2025"
+          }
+        },
+        {
+          "name": "Tax Estimate - Other Freelancer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only counts their own transactions, so nothing earned', () => {",
+                  "  const body = pm.response.json().data;",
+                  "  pm.expect(body.totals.gross).to.eql(0);",
+                  "  pm.expect(body.totals.estimatedTax).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fb_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income/tax-estimate"
+          }
+        },
+        {
+          "name": "Tax Estimate - Client (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income/tax-estimate"
+          }
+        },
+        {
+          "name": "Tax Estimate - Admin (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income/tax-estimate"
+          }
+        },
+        {
+          "name": "Tax Estimate - No Token (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/income/tax-estimate"
+          }
+        },
+        {
+          "name": "Tax Estimate - Invalid taxYear (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.match(/taxYear/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income/tax-estimate?taxYear=20x6"
+          }
+        },
+        {
+          "name": "Tax Estimate - Unsupported taxYear (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.match(/taxYear must be one of/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income/tax-estimate?taxYear=1999"
+          }
+        },
+        {
+          "name": "Tax Estimate - Unknown Query Param (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(false);",
+                  "  pm.expect(body.error).to.match(/not allowed/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/income/tax-estimate?freelancerId={{bk_fb_id}}"
+          }
+        },
+        {
           "name": "Admin Transactions - Client (should fail)",
           "event": [
             {
