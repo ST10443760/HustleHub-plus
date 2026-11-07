@@ -441,6 +441,202 @@ npm run clean:test
 It prints how much it removed, never deletes an admin, and refuses to run
 when `NODE_ENV` is `production`.
 
+### Running with Docker
+
+The whole stack (MongoDB, the API and the React client) can also run in
+containers with one command. The normal `npm run dev` workflow above is
+**unchanged** and doesn't need Docker. The two don't share data: Docker
+uses its own MongoDB unless you point it at Atlas.
+
+**Prerequisites:** Docker Desktop (Windows/macOS) or Docker Engine with the
+Compose plugin (Linux), running. Nothing else: no local Node, MongoDB or
+OpenSSL needed. Port **5173** must be free (stop `npm run dev` first).
+
+```mermaid
+flowchart LR
+    B["Browser<br/>http://localhost:5173"] -->|"published 5173:8080"| C
+    subgraph net["Compose network (internal)"]
+        C["client<br/>nginx-unprivileged :8080<br/>static React build + security headers"]
+        A["api<br/>Node 22 :5000 (HTTPS)<br/>TRUST_PROXY=1"]
+        M[("mongo<br/>replica set rs0<br/>:27017")]
+        K["certs<br/>one-shot: self-signed cert<br/>SAN localhost, api"]
+        C -->|"/api over HTTPS<br/>cert verified"| A
+        A -->|"mongodb://mongo:27017/?replicaSet=rs0"| M
+        K -. "certs volume (read-only)" .-> C
+        K -. "certs volume (read-only)" .-> A
+    end
+    S["seed (on demand)<br/>creates the admin"] -.-> M
+```
+
+**1. Create the root `.env`** (next to `docker-compose.yml`; it's
+gitignored). Compose refuses to start without `JWT_SECRET`.
+
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+notepad .env   # paste the value after JWT_SECRET=, set ADMIN_PASSWORD (12+ characters)
+```
+
+bash:
+
+```bash
+cp .env.example .env
+sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 48)/" .env   # or paste one by hand
+nano .env   # set ADMIN_PASSWORD (12+ characters)
+```
+
+**2. Build and start** (same command in PowerShell and bash, from the repo
+root):
+
+```bash
+docker compose up -d --build --wait
+docker compose ps
+```
+
+`--wait` returns once everything is healthy. `docker compose ps` should
+show `mongo`, `api` and `client` as `Up ... (healthy)` and `certs` as
+`Exited (0)`, which is correct for a one-shot step. The first build takes a
+few minutes.
+
+**3. Create the admin account** (once; running it again changes nothing):
+
+```bash
+docker compose run --rm seed
+```
+
+**4. Open the app** at **http://localhost:5173**. Register, log in, create
+gigs and book them exactly as with `npm run dev`. The API and MongoDB are
+not reachable from the host on purpose. Everything goes through the
+client at port 5173.
+
+**5. Smoke test** (needs Node 22 on the host, no packages):
+
+```bash
+node docker/smoke-test.mjs
+```
+
+It checks that the page is served with a CSP header, that `/api/health`
+works through the proxy, and that register, login, a protected route (200
+with a token, 401 without) and an admin-only route (403 for a client) all
+behave. It exits non-zero on any failure. It creates one
+`test-smoke-...@example.com` user each run; registration is limited to 10
+per hour per IP, so don't run it more often than that against the normal
+stack.
+
+**Logs, stopping and resetting**
+
+```bash
+docker compose logs -f api      # follow the API log (login, booking, transaction events)
+docker compose down             # stop and remove the containers, keep the data
+docker compose down -v          # also delete the database and the certificate (full reset)
+```
+
+**What the containers do**
+
+| Service | Image | Notes |
+|---|---|---|
+| `certs` | `docker/certs` (Alpine 3.24.4 + OpenSSL) | Runs once and creates a self-signed cert (SAN `localhost`, `api`, `127.0.0.1`) in the `certs` volume. Keeps an existing cert unless it expires within a day |
+| `mongo` | `mongo:8.0.34-noble` | Single-member **replica set** `rs0`, because bookings and their transactions are saved in one MongoDB transaction, which a standalone server doesn't support. The healthcheck initiates the set the first time and only reports healthy once it is primary. Not published to the host; it has no authentication, so it must stay internal |
+| `api` | `api/Dockerfile` (Node 22.23.4 Alpine) | `NODE_ENV=production`, HTTPS with the shared cert, `CLIENT_ORIGIN=http://localhost:5173`, `TRUST_PROXY=1`. Not published to the host |
+| `client` | `client/Dockerfile` (Vite build, then `nginx-unprivileged` 1.31.7) | Serves the build on 8080 (published as 5173) with the same security headers as `npm run preview`, and proxies `/api` to the API |
+| `seed` | the API image | Only runs when you call `docker compose run --rm seed`. The `ADMIN_*` values exist only in this short-lived container |
+
+**Security measures in the Docker setup**
+
+- **Non-root everywhere.** The api runs as `node` (uid 1000), nginx as uid
+  101, mongo as uid 999 and the cert step as uid 1000. Every service also
+  has `cap_drop: [ALL]`, `no-new-privileges`, a **read-only root
+  filesystem** (with a small `tmpfs` at `/tmp` only), `init: true`, a
+  restart policy and a healthcheck. The API's own files are owned by root,
+  so the running process can't modify them.
+- **No secrets in images.** Both `.dockerignore` files are allowlists, so
+  `.env`, `certs/*.pem`, keys, tests, Postman files and the host's
+  `node_modules` never enter the build context. Secrets come from the root
+  `.env` at runtime, and the cert is mounted read-only. `docker history`
+  and a file listing of each image show no secret values and no key files.
+- **One CSP.** The client's CSP and security headers are defined once in
+  `client/securityHeaders.js`. Vite uses it for the `<meta>` tag and
+  `npm run preview`, and the Docker build generates nginx's `add_header`
+  lines from it. A Vitest test fails if nginx, preview and the shared file
+  ever disagree. nginx also sets `server_tokens off`, caches only hashed
+  `/assets/` files (one year, immutable), sends `index.html` with
+  `no-cache`, and falls back to `index.html` for React Router paths.
+- **TLS between nginx and the API is verified.** nginx proxies `/api` over
+  HTTPS with `proxy_ssl_verify on`, trusting only the shared self-signed
+  cert, whose SAN includes `api`. It passes `Host`, `X-Forwarded-For` and
+  `X-Forwarded-Proto`.
+- **Rate limiting behind the proxy.** Without help, every request would
+  appear to come from the nginx container, so the per-IP login and register
+  limits would become one global limit for all users. The API therefore
+  reads `TRUST_PROXY` (unset means off, so `npm run dev` behaves exactly as
+  before). Compose sets it to `1`: Express trusts exactly one proxy hop and
+  takes the client address that nginx added to `X-Forwarded-For`. This is
+  only safe because the API port is **not published**: if untrusted
+  clients could reach the API directly, they could send a fake
+  `X-Forwarded-For` and pick their own rate limit bucket. Values like
+  `true` are refused for the same reason. Unit tests
+  (`api/test/trustProxy.test.js`) show that with `TRUST_PROXY=1` two
+  different forwarded addresses get separate buckets, that without it they
+  share one, and that express-rate-limit logs no validation warnings with
+  the Compose setting.
+- **Fails fast.** The API exits at startup with a clear message if
+  `JWT_SECRET` or `MONGO_URI` is missing (or if `JWT_SECRET` is shorter
+  than 32 characters in production), instead of failing at the first
+  login.
+- **Health check outside the limits.** `GET /api/health` returns
+  `{ "success": true, "data": { "status": "ok" } }` and nothing else. It is
+  registered before the rate limiters, so healthchecks can't use up a
+  limit, and it isn't written to the request log.
+
+**Using MongoDB Atlas instead.** Set `MONGO_URI` in the root `.env` to your
+Atlas connection string. The local mongo container still starts but isn't
+used.
+
+**Running Newman against the containers (test only).**
+`docker-compose.test.yml` is a test-only override. It publishes the API on
+`127.0.0.1:5000` (loopback only) and applies the same relaxed rate limits
+as `npm run start:test`. The API ignores the `RATE_LIMIT_*_MAX` overrides
+when `NODE_ENV=production`, so the override sets `NODE_ENV=test`. Other
+effects of that: stack traces of unexpected errors go to the server log,
+the `JWT_SECRET` length check is skipped and `clean:test` may run. Never use
+it for a real deployment.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait
+docker compose run --rm seed     # once, for the admin tests
+cd api
+npx newman run postman/HustleHub_API.postman_collection.json --insecure \
+  --env-var base_url=https://localhost:5000 \
+  --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
+cd ..
+# remove the test users afterwards (allowed because NODE_ENV=test here)
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps api node scripts/cleanTestData.js
+# back to the normal stack (API no longer published)
+docker compose up -d --wait
+```
+
+In PowerShell, put the Newman command on one line (or end each line with a
+backtick instead of `\`). If port 5000 is already taken, for example by
+`npm run dev`, set `$env:API_TEST_PORT = "5001"` (PowerShell) or
+`export API_TEST_PORT=5001` (bash) before `up`, and use
+`base_url=https://localhost:5001`.
+
+**Docker troubleshooting**
+
+| Problem | Fix |
+|---|---|
+| `required variable JWT_SECRET is missing a value` | There's no root `.env`, or `JWT_SECRET=` is empty. See step 1. The root `.env` is separate from `api/.env` |
+| `Bind for 0.0.0.0:5173 failed: port is already allocated` | Something is already on 5173, usually `npm run dev`. Stop it (Ctrl+C) and run `up` again. On Windows, `Get-NetTCPConnection -LocalPort 5173` shows the process |
+| Port 5000 in use (test override only) | Stop `npm run dev` / `start:test`, or use `API_TEST_PORT` as described above |
+| `Cannot connect to the Docker daemon` / `open //./pipe/dockerDesktopLinuxEngine` | Docker Desktop isn't running. Start it and wait until it says "Engine running" |
+| `dependency failed to start: container hustlehub-mongo-1 is unhealthy`, or the API logs `MongoDB connection failed` | The replica set wasn't ready in time (slow first start). Run `docker compose up -d --wait` again: the healthcheck initiates the set on its own. Check with `docker compose logs mongo`. `docker compose down -v` resets it completely |
+| Booking fails with a server error | MongoDB isn't running as a replica set. Use this Compose file (it starts `--replSet rs0`) or Atlas, not a standalone mongo |
+| `exec /usr/local/bin/generate-certs: no such file or directory`, or `/bin/sh^M` | Windows line endings in a script. `.gitattributes` forces LF for shell scripts, Dockerfiles, `*.conf` and `*.yml`. If your clone predates it, run `git rm --cached -r . -q && git reset --hard` (this discards uncommitted changes) or re-clone. The cert image also strips CRs while it builds |
+| The browser shows an old version after a rebuild | Hard refresh (Ctrl+F5). `index.html` is never cached, but the browser may keep an old tab |
+| `429 Too many requests` from the smoke test | It registers a user each run (limit 10 per hour per IP). Wait, run `docker compose restart api` (limits are in memory), or use the test override |
+
 ## 7. Troubleshooting
 
 The problems below all came up while building and testing this project.
