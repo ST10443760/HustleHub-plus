@@ -1,0 +1,20 @@
+# Allowlist: ignore everything, then let in only what the build needs.
+*
+
+!package.json
+!package-lock.json
+!index.html
+!vite.config.js
+!securityHeaders.js
+!nginx.conf
+!public/
+!src/
+!scripts/
+
+# Never send these, even from inside an allowed folder.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/node_modules
+**/dist
