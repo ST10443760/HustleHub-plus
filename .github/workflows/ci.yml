@@ -1,0 +1,483 @@
+# HustleHub+ CI/CD pipeline.
+#
+# Every job must pass for "Pipeline OK" (the single required check) to go
+# green. There is no continue-on-error and no "|| true" anywhere: every run
+# step uses bash with -e and -o pipefail, so any failing command fails its
+# job and the whole run.
+#
+# Pipeline hardening: read-only token, no persisted git credentials, a
+# timeout on every job, no pull_request_target, nothing from branch names
+# or PR titles inside run scripts, every action pinned to a full commit SHA
+# and every tool container pinned to a tag AND a digest. The pipeline needs
+# no repository secrets: the stack's credentials are generated per job.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  NODE_VERSION: "22"
+  NEWMAN_VERSION: "6.2.3"
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  HADOLINT_IMAGE: hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
+  ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+  ZIZMOR_IMAGE: ghcr.io/zizmorcore/zizmor:1.32.0@sha256:3014cc8f68f663935f69b3c3e0e41f5ce102b268d97db13db0f62208747f860d
+  TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+  ZAP_IMAGE: zaproxy/zap-stable:2.17.0@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+
+jobs:
+  # ---------------------------------------------------------------------
+  # 1. Backend: unit tests and a dependency audit of what ships.
+  # ---------------------------------------------------------------------
+  backend:
+    name: Backend - unit tests and npm audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests (node --test)
+        run: npm test 2>&1 | tee unit-tests.txt
+
+      - name: Dependency audit (production, high and critical)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "### Backend"
+            if [ -f unit-tests.txt ]; then
+              echo '```'
+              grep -E '^(ℹ|#) (tests|pass|fail|cancelled|skipped) ' unit-tests.txt | sed -E 's/^(ℹ|#) //'
+              echo '```'
+            fi
+            if [ "$JOB_STATUS" = success ]; then echo "npm audit (production, high+): passed"; else echo "Something failed, see the log"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------
+  # 2. Frontend: component tests, lint, production build, audit.
+  # ---------------------------------------------------------------------
+  frontend:
+    name: Frontend - tests, build and npm audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Component tests (Vitest)
+        run: npm run test:run 2>&1 | tee vitest.txt
+
+      - name: Lint (oxlint)
+        run: npm run lint
+
+      - name: Production build (includes the CSP meta tag)
+        run: |
+          npm run build
+          grep -q 'http-equiv="Content-Security-Policy"' dist/index.html
+
+      - name: Dependency audit (production, high and critical)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "### Frontend"
+            if [ -f vitest.txt ]; then
+              echo '```'
+              grep -E '(Test Files|Tests) ' vitest.txt | sed -E 's/\x1b\[[0-9;]*m//g'
+              echo '```'
+            fi
+            if [ "$JOB_STATUS" = success ]; then echo "Lint, build and npm audit (production, high+): passed"; else echo "Something failed, see the log"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------
+  # 3. Secret scan over the FULL git history.
+  # ---------------------------------------------------------------------
+  secret-scan:
+    name: Secret scan - gitleaks (full history)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # No allowlist or .gitleaksignore: the full history scans clean.
+      # Runs as the runner's own user so git trusts the mounted repo.
+      - name: gitleaks
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "${GITHUB_WORKSPACE}:/repo" "$GITLEAKS_IMAGE" \
+            git --no-banner --redact --verbose --exit-code 1 /repo 2>&1 | tee gitleaks.txt
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### Secret scan (gitleaks, full history)"
+            if [ -f gitleaks.txt ]; then
+              echo '```'
+              grep -E 'commits scanned|no leaks found|leaks found' gitleaks.txt | sed -E 's/\x1b\[[0-9;]*m//g; s/^.*(INF|WRN|ERR) //'
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------
+  # 4. Lint the Dockerfiles, the Compose files and this workflow.
+  # ---------------------------------------------------------------------
+  lint-config:
+    name: Lint - Dockerfiles, Compose and workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: hadolint (all Dockerfiles)
+        run: |
+          for file in api/Dockerfile client/Dockerfile docker/certs/Dockerfile; do
+            echo "hadolint ${file}"
+            docker run --rm -i "$HADOLINT_IMAGE" hadolint - < "$file"
+          done
+
+      - name: docker compose config (both files)
+        run: |
+          # JWT_SECRET is only needed for interpolation here; nothing runs.
+          JWT_SECRET=config-check-only docker compose config --quiet
+          JWT_SECRET=config-check-only docker compose -f docker-compose.yml -f docker-compose.test.yml config --quiet
+          # Compose must refuse to start without JWT_SECRET.
+          if env -u JWT_SECRET docker compose config --quiet 2>/dev/null; then
+            echo "::error::docker compose accepted a missing JWT_SECRET"
+            exit 1
+          fi
+
+      - name: actionlint (workflow files)
+        run: docker run --rm -v "${GITHUB_WORKSPACE}:/repo" --workdir /repo "$ACTIONLINT_IMAGE" -color
+
+      - name: zizmor (workflow security audit)
+        run: docker run --rm -v "${GITHUB_WORKSPACE}:/repo:ro" "$ZIZMOR_IMAGE" --offline /repo/.github/workflows
+
+      - name: Job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ "$JOB_STATUS" = success ]; then result=passed; else result=FAILED; fi
+          echo "### Lint: hadolint (3 Dockerfiles), docker compose config (2 files + missing JWT_SECRET check), actionlint, zizmor: ${result}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------
+  # 5. Build and run the ENTIRE stack, then test it end to end.
+  # ---------------------------------------------------------------------
+  stack:
+    name: Stack - build, smoke test and Newman
+    needs: [backend, frontend, secret-scan, lint-config]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node (smoke test and Newman)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Generate job-local credentials
+        run: bash .github/scripts/make-ci-env.sh
+
+      - name: Build all images (certs, api, client)
+        run: docker compose build
+
+      - name: Start the stack with the strict default limits
+        run: docker compose up -d --wait --wait-timeout 180
+
+      - name: Smoke test
+        run: node docker/smoke-test.mjs 2>&1 | tee smoke-test.txt
+
+      # The strict collection runs FIRST, on fresh counters, through the
+      # client (nginx) exactly as a browser would. That way no API port is
+      # published, and it also proves the per-IP limits work behind the
+      # proxy (TRUST_PROXY=1).
+      - name: Newman - rate limit collection (strict limits, through nginx)
+        run: |
+          mkdir -p newman-raw newman-results
+          npx --yes "newman@${NEWMAN_VERSION}" run api/postman/HustleHub_RateLimits.postman_collection.json \
+            --env-var base_url=http://localhost:5173 \
+            --reporters cli,junit,json \
+            --reporter-junit-export newman-results/rate-limits.junit.xml \
+            --reporter-json-export newman-raw/rate-limits.json
+
+      - name: Seed the admin account
+        run: docker compose run --rm seed
+
+      # The test override publishes the API on 127.0.0.1:5000 and relaxes
+      # the limits (NODE_ENV=test). Recreating the api gives fresh counters.
+      - name: Switch to the test override (relaxed limits, API on 127.0.0.1:5000)
+        run: docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --wait --wait-timeout 180
+
+      - name: Newman - main collection (with the admin tests)
+        run: |
+          set -a
+          # shellcheck source=/dev/null
+          . ./.env
+          set +a
+          npx --yes "newman@${NEWMAN_VERSION}" run api/postman/HustleHub_API.postman_collection.json \
+            --insecure \
+            --env-var base_url=https://localhost:5000 \
+            --env-var "admin_email=${ADMIN_EMAIL}" \
+            --env-var "admin_password=${ADMIN_PASSWORD}" \
+            --reporters cli,junit,json \
+            --reporter-junit-export newman-results/main.junit.xml \
+            --reporter-json-export newman-raw/main.json
+
+      - name: Job summary and slim reports
+        if: always()
+        run: |
+          mkdir -p newman-results
+          {
+            echo "## Stack"
+            if [ -f smoke-test.txt ]; then
+              echo '```'
+              grep -E 'Smoke test (passed|failed)|FAIL' smoke-test.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          for name in rate-limits main; do
+            if [ -f "newman-raw/${name}.json" ]; then
+              node .github/scripts/newman-summary.mjs "newman-raw/${name}.json" "Newman: ${name} collection" \
+                "newman-results/${name}.slim.json" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      # Only the JUnit files and the slim JSON are uploaded. The raw Newman
+      # JSON holds request bodies and the generated admin password.
+      - name: Upload Newman results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: newman-results
+          path: |
+            newman-results/
+            smoke-test.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.test.yml logs --no-color --timestamps
+
+      - name: Tear down (containers and volumes)
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.test.yml down -v --remove-orphans
+
+  # ---------------------------------------------------------------------
+  # 6. Image and Dockerfile scanning with Trivy.
+  # ---------------------------------------------------------------------
+  image-scan:
+    name: Image scan - Trivy
+    needs: [lint-config]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the images
+        run: |
+          # Compose needs some JWT_SECRET to read the file; nothing runs here.
+          JWT_SECRET="$(openssl rand -hex 32)" docker compose build api client certs
+
+      # Fails on any HIGH or CRITICAL vulnerability that has a fix. There is
+      # no .trivyignore: all three images scan clean.
+      - name: Trivy - vulnerabilities in the images
+        run: |
+          mkdir -p trivy-results
+          for image in hustlehub-api:local hustlehub-client:local hustlehub-certs:local; do
+            echo "::group::${image}"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/ \
+              "$TRIVY_IMAGE" image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed \
+              --exit-code 1 --no-progress --format table "$image" 2>&1 | tee "trivy-results/${image%%:*}.txt"
+            echo "::endgroup::"
+          done
+
+      # Trivy has no Compose scanner; the Compose files are checked by
+      # docker compose config in the lint job.
+      - name: Trivy - misconfigurations in the Dockerfiles
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/repo:ro" -v trivy-cache:/root/.cache/ \
+            "$TRIVY_IMAGE" config --misconfig-scanners dockerfile --exit-code 1 /repo 2>&1 | tee trivy-results/dockerfiles.txt
+
+      - name: Upload Trivy results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: trivy-results
+          path: trivy-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ "$JOB_STATUS" = success ]; then result=clean; else result="FINDINGS, see the log"; fi
+          echo "### Trivy: images (HIGH/CRITICAL with a fix) and Dockerfile misconfigurations: ${result}" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------
+  # 7. Dynamic scan: OWASP ZAP baseline against the running stack.
+  # ---------------------------------------------------------------------
+  dast:
+    name: Dynamic scan - OWASP ZAP baseline
+    needs: [backend, frontend, secret-scan, lint-config]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Generate job-local credentials
+        run: bash .github/scripts/make-ci-env.sh
+
+      - name: Start the stack
+        run: docker compose up -d --build --wait --wait-timeout 180
+
+      # Rules in .zap/rules.tsv decide what FAILs (missing security headers,
+      # leaks, cross-domain problems). Everything else is reported as a
+      # warning; -I keeps warnings from failing the job.
+      - name: ZAP baseline scan
+        run: |
+          mkdir -p zap-report
+          cp .zap/rules.tsv zap-report/rules.tsv
+          chmod -R a+rwX zap-report
+          docker run --rm --network host -v "${GITHUB_WORKSPACE}/zap-report:/zap/wrk:rw" "$ZAP_IMAGE" \
+            zap-baseline.py -t http://localhost:5173 -c rules.tsv -I -m 2 \
+            -r zap-report.html -J zap-report.json -w zap-report.md 2>&1 | tee zap-output.txt
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zap-report
+          path: |
+            zap-report/zap-report.html
+            zap-report/zap-report.json
+            zap-report/zap-report.md
+            zap-output.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "### OWASP ZAP baseline"
+            if [ -f zap-output.txt ]; then
+              echo '```'
+              grep -E '^(FAIL-NEW|WARN-NEW|FAIL-INPROG)' zap-output.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs --no-color --timestamps
+
+      - name: Tear down (containers and volumes)
+        if: always()
+        run: docker compose down -v --remove-orphans
+
+  # ---------------------------------------------------------------------
+  # Static analysis (CodeQL or similar) is added here in the next batch,
+  # and added to the needs list of pipeline-ok below.
+  # ---------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------
+  # 8. Single required check: fails unless EVERY job above succeeded.
+  # ---------------------------------------------------------------------
+  pipeline-ok:
+    name: Pipeline OK
+    if: always()
+    needs: [backend, frontend, secret-scan, lint-config, stack, image-scan, dast]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check every job passed
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          {
+            echo "### Pipeline result"
+            echo "| Job | Result |"
+            echo "|---|---|"
+            echo "$NEEDS_JSON" | jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
+          failed="$(echo "$NEEDS_JSON" | jq -r '[to_entries[] | select(.value.result != "success") | .key] | join(", ")')"
+          if [ -n "$failed" ]; then
+            echo "::error::These jobs did not succeed: ${failed}"
+            exit 1
+          fi
+          echo "All jobs succeeded."
