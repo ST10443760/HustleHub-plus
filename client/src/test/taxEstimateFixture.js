@@ -19,7 +19,9 @@ function months(startYear) {
 }
 
 export function makeTaxEstimate({ startYear = 2026, monthlyIncome = {}, totals, breakdown } = {}) {
-  const income = { [`${startYear}-04`]: [100000.1, 3], [`${startYear + 1}-01`]: [199999.9, 5], ...monthlyIncome };
+  const income = new Map(
+    Object.entries({ [`${startYear}-04`]: [100000.1, 3], [`${startYear + 1}-01`]: [199999.9, 5], ...monthlyIncome })
+  );
   return {
     taxYear: {
       label: `1 March ${startYear} to 28 February ${startYear + 1} (SARS ${startYear + 1} tax year)`,
@@ -41,14 +43,13 @@ export function makeTaxEstimate({ startYear = 2026, monthlyIncome = {}, totals, 
         from,
         to,
         ratePercent,
-        amountInBracket: [245100, 54900][i] || 0,
-        tax: [44118, 14274][i] || 0,
+        amountInBracket: [245100, 54900].at(i) ?? 0,
+        tax: [44118, 14274].at(i) ?? 0,
       })),
-    monthly: months(startYear).map((month) => ({
-      month,
-      income: income[month] ? income[month][0] : 0,
-      bookings: income[month] ? income[month][1] : 0,
-    })),
+    monthly: months(startYear).map((month) => {
+      const [amount = 0, bookings = 0] = income.get(month) ?? [];
+      return { month, income: amount, bookings };
+    }),
     assumptions: ['Resident individual under 65, so only the primary rebate applies.', 'No deductions are taken into account.'],
     disclaimer: 'This is an estimate for planning only, not tax advice and not a SARS assessment.',
     source: {
