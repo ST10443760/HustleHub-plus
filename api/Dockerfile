@@ -10,17 +10,16 @@
 #   from the environment (docker-compose.yml) and the TLS cert is mounted
 #   at /app/certs at runtime. .dockerignore only lets the files below in.
 
-ARG NODE_IMAGE=node:22.23.4-alpine3.24
-
 # ---- Production dependencies ----
-FROM ${NODE_IMAGE} AS deps
+# Node 22 on Alpine, pinned to an exact version (both stages use the same one).
+FROM node:22.23.4-alpine3.24 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 # --ignore-scripts: none of the dependencies need an install script.
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # ---- Runtime ----
-FROM ${NODE_IMAGE} AS runtime
+FROM node:22.23.4-alpine3.24 AS runtime
 ENV NODE_ENV=production \
     PORT=5000 \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
