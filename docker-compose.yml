@@ -1,0 +1,139 @@
+# HustleHub+ full stack: MongoDB (replica set) + Express API + React/nginx.
+#
+#   cp .env.example .env      # then set JWT_SECRET (and the ADMIN_* values)
+#   docker compose up -d --build
+#   open http://localhost:5173
+#
+# Only the client is published to the host. MongoDB and the API are on the
+# internal network only:
+#   - the API trusts X-Forwarded-For from one proxy (TRUST_PROXY=1) so the
+#     per-IP rate limits see real clients behind nginx. That is only safe
+#     while nothing untrusted can reach the API directly, so its port is
+#     NOT published here (docker-compose.test.yml does that, for tests only).
+#   - MongoDB has no authentication, so it must never be published either.
+#
+# No secrets live in this file: they come from the root .env (gitignored).
+
+name: hustlehub
+
+# Hardening shared by every service.
+x-hardened: &hardened
+  init: true
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  # One-shot: creates the shared self-signed cert (SAN localhost, api) in
+  # the certs volume, or keeps the existing one. api and client wait for it.
+  certs:
+    <<: *hardened
+    build: ./docker/certs
+    image: hustlehub-certs:local
+    restart: "no"
+    volumes:
+      - certs:/certs
+
+  # Single-member replica set: bookings and their transactions are written
+  # in one MongoDB transaction, and transactions need a replica set. The
+  # healthcheck initiates the set the first time (idempotent) and only
+  # reports healthy once this node is the writable primary.
+  mongo:
+    <<: *hardened
+    image: mongo:8.0.34-noble
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    # Run as the image's mongodb user from the start, so no capabilities
+    # are needed to switch users.
+    user: "999:999"
+    tmpfs:
+      - /tmp:size=64m,uid=999,gid=999
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --norc
+        - --eval
+        - "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }) } quit(db.hello().isWritablePrimary ? 0 : 1)"
+      interval: 5s
+      timeout: 10s
+      start_period: 30s
+      start_interval: 2s
+      retries: 20
+
+  api:
+    <<: *hardened
+    build: ./api
+    image: hustlehub-api:local
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      # Defaults to the mongo service above. Set MONGO_URI in .env to use
+      # MongoDB Atlas instead.
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/hustlehub?replicaSet=rs0}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is not set. Copy .env.example to .env in the repo root and set JWT_SECRET to a long random value.}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      # Must match the browser origin exactly; the client is published on 5173.
+      CLIENT_ORIGIN: http://localhost:5173
+      # One trusted proxy hop: nginx in the client container.
+      TRUST_PROXY: "1"
+    volumes:
+      - certs:/app/certs:ro
+    tmpfs:
+      - /tmp:size=16m,uid=1000,gid=1000
+    expose:
+      - "5000"
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+
+  client:
+    <<: *hardened
+    build: ./client
+    image: hustlehub-client:local
+    ports:
+      # 5173 on the host, so the browser origin (and the API's CORS origin)
+      # stays http://localhost:5173, the same as `npm run dev`.
+      - "5173:8080"
+    volumes:
+      - certs:/etc/nginx/certs:ro
+    tmpfs:
+      - /tmp:size=16m,uid=101,gid=101
+    depends_on:
+      certs:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+
+  # Creates the admin account. Not started by `docker compose up`; run it with
+  #   docker compose run --rm seed
+  # The ADMIN_* values only exist in this short-lived container, never in
+  # the long-running api container.
+  seed:
+    <<: *hardened
+    image: hustlehub-api:local
+    profiles: ["tools"]
+    restart: "no"
+    command: ["node", "scripts/seedAdmin.js"]
+    environment:
+      NODE_ENV: production
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/hustlehub?replicaSet=rs0}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrator}
+    tmpfs:
+      - /tmp:size=16m,uid=1000,gid=1000
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  certs:
+  mongo-data:
+  mongo-config:
