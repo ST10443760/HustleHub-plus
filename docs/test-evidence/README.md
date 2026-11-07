@@ -1,21 +1,24 @@
 # Test evidence
 
-Raw, unedited output of the three test suites, saved as plain text from
-fresh runs on **12 October 2026** (Windows 11, Node 24.18.1, Newman 6.2.3,
-Vitest 5.0.3, MongoDB Atlas). All three runs passed with 0 failures.
+Raw, unedited output of the test suites, saved as plain text. The rate
+limit run is from **12 October 2026**; the main Newman, Vitest and api unit
+test runs were refreshed on **7 November 2026** after the tax estimate was
+added (Windows 11, Node 24.18.1, Newman 6.2.3, Vitest 5.0.3, MongoDB
+Atlas). Every run passed with 0 failures.
 
 | File | What it is | Command (run from the folder shown) | Result |
 |---|---|---|---|
-| [`newman-main-results.txt`](newman-main-results.txt) | Main Postman collection: Auth, RBAC, Gigs, Bookings, Income and Security folders, **including the admin tests** | `api/`: API started with `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure --reporters cli --color off --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>` | **85 requests, 145 assertions, 0 failed** |
+| [`newman-main-results.txt`](newman-main-results.txt) | Main Postman collection: Auth, RBAC, Gigs, Bookings, Income (including the tax estimate) and Security folders, **including the admin tests** | `api/`: API started with `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure --reporters cli --color off --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>` | **94 requests, 170 assertions, 0 failed** |
 | [`newman-rate-limits-results.txt`](newman-rate-limits-results.txt) | Rate limit collection against the **strict** limits: the 6th failed login and the 11th booking are refused with `429` + `Retry-After` | `api/`: API freshly started with `npm run dev`, then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure --reporters cli --color off` | **20 requests, 26 assertions, 0 failed** |
-| [`vitest-results.txt`](vitest-results.txt) | Frontend tests (Vitest + React Testing Library), one line per test | `client/`: `npm run test:run -- --reporter=verbose` | **16 test files, 67 tests passed** |
+| [`vitest-results.txt`](vitest-results.txt) | Frontend tests (Vitest + React Testing Library), one line per test | `client/`: `npm run test:run -- --reporter=verbose` | **17 test files, 80 tests passed** |
+| [`api-unit-results.txt`](api-unit-results.txt) | Backend unit tests (Node test runner): tax calculator, tax year dates, tax table consistency, tax estimate builder, money rounding, rate limit config. No database or secrets needed | `api/`: `npm test` | **54 tests passed** |
 
 Notes:
 
 - The admin credentials were read from `api/.env` and passed to Newman as
   arguments by a small script, so they never appear in a shell, a log or
   these files. Without them, the main collection skips the 5 admin-only
-  requests cleanly and runs 80 requests / 134 assertions.
+  requests cleanly and runs 88 requests / 157 assertions.
 - `--insecure` is needed because the local HTTPS certificate is
   self-signed. `--color off` keeps the files plain text.
 - Every file was checked before it was committed for JWTs (`eyJ...`),
