@@ -3,9 +3,19 @@ const fs = require('fs');
 const https = require('https');
 const http = require('http');
 const path = require('path');
+const logger = require('./utils/logger');
+const { validateEnv } = require('./config/env');
+
+// Fail fast, before loading the app or touching the database, if a
+// required setting is missing.
+const envProblems = validateEnv();
+if (envProblems.length > 0) {
+  envProblems.forEach((problem) => logger.error(`Startup aborted: ${problem}`));
+  process.exit(1);
+}
+
 const app = require('./app');
 const connectDB = require('./config/db');
-const logger = require('./utils/logger');
 
 const PORT = process.env.PORT || 5000;
 const KEY_PATH = path.join(__dirname, '..', 'certs', 'key.pem');
