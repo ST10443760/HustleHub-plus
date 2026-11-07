@@ -13,6 +13,8 @@ const SNIPPET = 'include /etc/nginx/snippets/security-headers.conf;';
 // "location /assets/ { ... }" blocks, keyed by their path.
 function locationBlocks(conf) {
   const blocks = {};
+  // Test-only: runs once over our own nginx.conf (a few KB), never on user input.
+  // eslint-disable-next-line security/detect-unsafe-regex -- fixed, trusted input; no backtracking risk in practice
   for (const match of conf.matchAll(/location\s+(=\s+)?(\S+)\s*\{([^}]*)\}/g)) {
     blocks[match[2]] = match[3];
   }
