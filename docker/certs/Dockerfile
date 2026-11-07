@@ -7,7 +7,7 @@
 FROM alpine:3.24.4
 
 # uid/gid 1000 matches the api image's "node" user, which must read the key.
-RUN apk add --no-cache openssl \
+RUN apk add --no-cache "openssl~=3.5" \
  && addgroup -g 1000 certs \
  && adduser -D -H -u 1000 -G certs certs \
  && mkdir /certs \
