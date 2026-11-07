@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCategory, formatDate, formatDays, formatMoney } from './format';
+import { formatCategory, formatDate, formatDays, formatMoney, formatMonth, formatPercent, formatWholeRand } from './format';
 
 // en-ZA uses a (non-breaking) space between groups and a decimal comma.
 const normalise = (text) => text.replace(/\s/g, ' ');
@@ -32,5 +32,26 @@ describe('small formatters', () => {
     expect(formatCategory('development')).toBe('Development');
     expect(formatDays(1)).toBe('1 day');
     expect(formatDays(7)).toBe('7 days');
+  });
+});
+
+describe('tax dashboard formatters', () => {
+  it('formats whole rand without cents', () => {
+    expect(normalise(formatWholeRand(245100))).toBe('R 245 100');
+    expect(normalise(formatWholeRand(0))).toBe('R 0');
+    expect(formatWholeRand('x')).toBe('-');
+  });
+
+  it('formats a percentage with two decimals', () => {
+    expect(formatPercent(13.52)).toBe('13,52%');
+    expect(formatPercent(0)).toBe('0,00%');
+    expect(formatPercent(undefined)).toBe('-');
+  });
+
+  it('turns a YYYY-MM key into a short month name', () => {
+    expect(formatMonth('2026-03')).toBe('Mar 2026');
+    expect(formatMonth('2027-02')).toBe('Feb 2027');
+    expect(formatMonth('2026-13')).toBe('-');
+    expect(formatMonth('March')).toBe('-');
   });
 });
