@@ -21,16 +21,19 @@ const STRICT_LIMITS = {
 
 function resolveRateLimits(env = process.env) {
   const isProduction = env.NODE_ENV === 'production';
-  const limits = {};
   const ignoredOverrides = [];
 
-  for (const [name, { windowMs, max, envKey }] of Object.entries(STRICT_LIMITS)) {
-    const override = Number.parseInt(env[envKey], 10);
-    const hasOverride = env[envKey] !== undefined && Number.isInteger(override) && override > 0;
+  const limits = Object.fromEntries(
+    Object.entries(STRICT_LIMITS).map(([name, { windowMs, max, envKey }]) => {
+      // eslint-disable-next-line security/detect-object-injection -- envKey is a fixed name from STRICT_LIMITS above, never from a request
+      const raw = env[envKey];
+      const override = Number.parseInt(raw, 10);
+      const hasOverride = raw !== undefined && Number.isInteger(override) && override > 0;
 
-    if (hasOverride && isProduction) ignoredOverrides.push(envKey);
-    limits[name] = { windowMs, max: hasOverride && !isProduction ? override : max };
-  }
+      if (hasOverride && isProduction) ignoredOverrides.push(envKey);
+      return [name, { windowMs, max: hasOverride && !isProduction ? override : max }];
+    })
+  );
 
   return { limits, ignoredOverrides };
 }
