@@ -25,3 +25,5 @@ zap-report/
 newman-results/
 newman-raw/
 trivy-results/
+semgrep-results/
+eslint-results/
