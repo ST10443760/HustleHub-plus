@@ -12,7 +12,8 @@
     "start:test": "node scripts/startTest.js",
     "certs": "node scripts/generateCerts.js",
     "seed:admin": "node scripts/seedAdmin.js",
-    "clean:test": "node scripts/cleanTestData.js"
+    "clean:test": "node scripts/cleanTestData.js",
+    "test": "node --test \"test/**/*.test.js\""
   },
   "keywords": [],
   "author": "Null Devs",
