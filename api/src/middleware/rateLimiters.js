@@ -74,4 +74,4 @@ const bookingLimiter = createLimiter('booking', limits.booking, {
 
 const generalLimiter = createLimiter('general', limits.general);
 
-module.exports = { loginLimiter, registerLimiter, bookingLimiter, generalLimiter };
+module.exports = { loginLimiter, registerLimiter, bookingLimiter, generalLimiter, createLimiter };
