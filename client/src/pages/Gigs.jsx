@@ -31,12 +31,13 @@ function readFilters(searchParams) {
   };
 }
 
+// Only non-empty filters go into the URL (and page only when it isn't 1).
 function toSearchParams(filters) {
-  const params = {};
-  for (const [key, value] of Object.entries(filters)) {
-    if (value !== '' && !(key === 'page' && value === 1)) params[key] = String(value);
-  }
-  return params;
+  return Object.fromEntries(
+    Object.entries(filters)
+      .filter(([key, value]) => value !== '' && !(key === 'page' && value === 1))
+      .map(([key, value]) => [key, String(value)])
+  );
 }
 
 export default function Gigs() {
