@@ -17,6 +17,7 @@ const DEFAULT_PAGE_SIZE = 10;
 function pick(source, fields) {
   const picked = {};
   for (const field of fields) {
+    // eslint-disable-next-line security/detect-object-injection -- `fields` is a fixed allow-list of gig field names from this controller, never request input
     if (source[field] !== undefined) picked[field] = source[field];
   }
   return picked;
@@ -38,6 +39,7 @@ async function listGigs(req, res, next) {
     }
     if (q) {
       // Escaped so the search is plain text, not a user-supplied pattern.
+      // eslint-disable-next-line security/detect-non-literal-regexp -- every regex character in q is escaped (and q is at most 50 characters), so it is a literal text match
       const pattern = new RegExp(escapeRegex(q), 'i');
       filter.$or = [{ title: pattern }, { description: pattern }];
     }
