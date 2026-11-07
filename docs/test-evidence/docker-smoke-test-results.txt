@@ -1,0 +1,17 @@
+$ node docker/smoke-test.mjs
+Smoke testing http://localhost:5173
+
+  PASS  stack is up
+  PASS  client page returns 200
+  PASS  client page sends a Content-Security-Policy header
+  PASS  the CSP header includes frame-ancestors
+  PASS  client page is the React app
+  PASS  GET /api/health through the client proxy says ok
+  PASS  register a new client
+  PASS  log in and get a token
+  PASS  protected route with the token returns 200
+  PASS  protected route without a token returns 401
+  PASS  admin-only route as a client returns 403
+  PASS  no password hashes or stack traces in the responses
+
+Smoke test passed: 12 checks.
