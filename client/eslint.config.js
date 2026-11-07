@@ -33,6 +33,14 @@ export default [
       globals: { ...globals.browser },
     },
     settings: { react: { version: 'detect' } },
+    rules: {
+      // React 19 removed propTypes checking: React ignores a component's
+      // propTypes entirely, so this rule (still in eslint-plugin-react's
+      // recommended set, which predates React 19) would only demand
+      // declarations that never run. It is a type-documentation rule, not a
+      // security rule. Every security, React and hooks rule stays on.
+      'react/prop-types': 'off',
+    },
   },
   {
     // Config files and build scripts run in Node.
