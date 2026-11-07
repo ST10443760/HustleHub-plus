@@ -74,6 +74,16 @@ const TAX_TABLES = deepFreeze({
   2026: TABLE_2027,
 });
 
+// Lookups go through a Map keyed by whole-number years, so a key like
+// "__proto__" or "constructor" can never resolve to something inherited
+// from Object.prototype.
+const TAX_TABLES_BY_YEAR = new Map(Object.entries(TAX_TABLES).map(([year, table]) => [Number(year), table]));
+
+// The table for a tax year (the year it starts in), or undefined.
+function getTaxTable(startYear) {
+  return TAX_TABLES_BY_YEAR.get(startYear);
+}
+
 // Newest first, e.g. [2026, 2025, 2024, 2023].
 const SUPPORTED_TAX_YEARS = Object.freeze(
   Object.keys(TAX_TABLES)
@@ -99,6 +109,7 @@ module.exports = {
   SOURCE_URL,
   CHECKED_ON,
   TAX_TABLES,
+  getTaxTable,
   SUPPORTED_TAX_YEARS,
   TAX_ASSUMPTIONS,
   TAX_DISCLAIMER,
