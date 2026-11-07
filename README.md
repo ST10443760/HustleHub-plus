@@ -1657,6 +1657,146 @@ that mount a folder. The rate limit collection runs through the client
 (`http://localhost:5173`), exactly like the pipeline. It needs freshly
 started counters, so run it before anything else after `up`.
 
+### Static code analysis
+
+Two static analysis tools read the source code (without running it) and
+look for insecure patterns. Both run in the pipeline's **Static analysis -
+ESLint and Semgrep** job and fail it on **any** finding. Both can be run
+locally with the exact same configuration.
+
+**The tools and why they were chosen**
+
+| Tool | What it checks | Configuration |
+|---|---|---|
+| **ESLint 9** with [eslint-plugin-security](https://github.com/eslint-community/eslint-plugin-security) | Runs on every `.js`/`.jsx` file in `api/` and `client/`, including tests and scripts. `@eslint/js` recommended rules catch bugs (undefined or unused variables, unreachable code). eslint-plugin-security catches Node security smells: `eval` with an expression, regular expressions that can backtrack catastrophically (ReDoS), `new RegExp` built from variables, file paths and `require` built from variables, timing-unsafe comparisons, `child_process` with variables, and dynamic object keys that could reach the prototype ("object injection"). In the client, eslint-plugin-react (including `react/no-danger` and `react/jsx-no-target-blank`) and eslint-plugin-react-hooks are also on | [`api/eslint.config.js`](api/eslint.config.js), [`client/eslint.config.js`](client/eslint.config.js) (flat config). `npm run lint` = `eslint . --max-warnings 0` |
+| **Semgrep Community Edition 1.184.0** | Pattern and data-flow rules across the whole repository: JavaScript, Express and React code, but also nginx config, Dockerfiles, YAML and Markdown | Rule packs in [`.semgrep/rulesets.txt`](.semgrep/rulesets.txt): `p/javascript`, `p/nodejs`, `p/expressjs`, `p/react`, `p/owasp-top-ten`, `p/jwt`, `p/secrets` (152 rules in total). Runs from the pinned image `semgrep/semgrep:1.184.0` (tag and digest) through [`.semgrep/run.mjs`](.semgrep/run.mjs), so Windows needs no Python. Metrics are off and only the open-source engine is used (`--oss-only`) |
+
+ESLint is the standard JavaScript linter and sits right in the editor, so
+problems show up while typing. Semgrep adds rules ESLint doesn't have
+(Express-specific injection and XSS sinks, hard-coded JWT secrets, leaked
+keys) and also checks the non-JavaScript files. That's how it found both
+of its real findings below. CodeQL was deliberately not used.
+
+**What is excluded:** only installed packages, build output and the tools'
+own result files ([`.semgrepignore`](.semgrepignore): `node_modules/`,
+`client/dist/`, `coverage/`, the result folders and
+`docs/static-analysis/`; ESLint ignores `node_modules/`, `dist/` and
+`coverage/`). No source, test or script folder is excluded.
+
+**Before and after**
+
+The baseline was saved before any fix, in its own commit (`ad1025c`), in
+[`docs/static-analysis/baseline/`](docs/static-analysis/baseline/). The
+final run is in [`docs/static-analysis/final/`](docs/static-analysis/final/).
+
+| Tool | Rule | Severity | Baseline | Final |
+|---|---|---|---|---|
+| ESLint (api) | `security/detect-object-injection` | warning | 12 | 0 |
+| ESLint (api) | `no-unused-vars` | error | 2 | 0 |
+| ESLint (api) | `security/detect-non-literal-fs-filename` | warning | 1 | 0 |
+| ESLint (api) | `security/detect-non-literal-regexp` | warning | 1 | 0 |
+| ESLint (api) | `security/detect-unsafe-regex` | warning | 1 | 0 |
+| ESLint (client) | `react/prop-types` | error | 92 | 0 (rule off, see below) |
+| ESLint (client) | `security/detect-object-injection` | warning | 9 | 0 |
+| ESLint (client) | `security/detect-unsafe-regex` | warning | 2 | 0 |
+| Semgrep | `dependabot-missing-cooldown` | MEDIUM | 5 | 0 |
+| Semgrep | `nginx.security.request-host-used` | WARNING | 1 | 0 |
+| **Total** | | | **126** (ESLint api 17, client 103, Semgrep 6) | **0** |
+
+**What the findings meant, in plain language**
+
+None of the 126 findings was an exploitable vulnerability in the running
+app. Two were real configuration weaknesses, and a handful pointed at code
+that was safe only because of a check somewhere else. Those were all
+fixed. The rest were false positives: patterns that look dangerous in
+general but are safe here because the key, path or pattern is fixed in our
+own code. Each of those has a narrow suppression on that line with the
+reason. The 92 `react/prop-types` errors were about a React feature that
+no longer exists.
+
+**Fixes**
+
+| Finding | What was wrong | Fix | Commits |
+|---|---|---|---|
+| Semgrep `request-host-used` (`client/nginx.conf`) | nginx passed the browser's own `Host` header on to the API (`proxy_set_header Host $host`). The API doesn't build links from it today, but forwarding an attacker-chosen Host is the root of host header injection (poisoned password reset links, cache poisoning) | nginx now always sends `Host: api`, the API's own name in its certificate. A test fails if `$host` or `$http_host` ever comes back | `0434d24`, `8794a69` |
+| Semgrep `dependabot-missing-cooldown` (×5, `.github/dependabot.yml`) | Dependabot would propose a version minutes after it was published. Hijacked or malicious package releases are usually caught and pulled within days, so that is the riskiest moment to upgrade | A 7-day cooldown on every ecosystem. Security updates are not delayed | `78639db` |
+| `security/detect-unsafe-regex` (`api/src/middleware/gigValidators.js`, `client/src/utils/validation.js`) | The two-decimal price check `/^\d+(\.\d{1,2})?$/` has a quantifier inside an optional group, the shape that ReDoS attacks exploit. This one is actually linear, but the code relied on that being true | Rewritten as `/^(?:\d+\|\d+\.\d\d?)$/` (two plain alternatives, nothing nested), with new tests: the same prices are accepted and rejected, and a 300-digit input finishes at once | `bfd63c2`, `1f97b7e`, `5556e2e`, `9cc5abe` |
+| `security/detect-object-injection` (`api/src/utils/taxEstimate.js`, `api/test/taxConfig.test.js`) | Tax tables were looked up with `TAX_TABLES[year]` on a plain object, so `buildTaxEstimate('constructor')` found `Object.prototype.constructor` (truthy) and only failed later. The query validator stopped this from being reachable, but the lookup itself wasn't safe | New `getTaxTable(year)` backed by a `Map`, so nothing inherited from `Object.prototype` can ever match. Tests try `__proto__`, `constructor`, `toString` and string or decimal years | `cd159c2`, `a288283`, `ae65b02` |
+| `security/detect-object-injection` (`client/src/utils/text.js`) | The HTML entity decoder used `ENTITIES[entity]` on a plain object | A `Map` (`ENTITIES.get(entity)`); the existing decoder tests still pass | `e622071` |
+| `security/detect-object-injection` (`client/src/pages/Gigs.jsx`, `client/src/test/taxEstimateFixture.js`) | Objects were filled with `obj[key] = value` in a loop (keys were fixed, so not exploitable) | Rewritten with `Object.fromEntries`, a `Map` and `Array.prototype.at`, so there is nothing to suppress | `ba78dcc`, `c158278` |
+| `security/detect-object-injection` (`api/src/config/rateLimits.js`, 3 hits) | The env override was looked up twice and the result object filled by key | Each override is read once and the limits are built with `Object.fromEntries`. One lookup remains, suppressed (see below) | `e86ef1a` |
+| `no-unused-vars` (`api/src/middleware/authMiddleware.js`) | An unused `err` in a `catch` | `catch {` | `6d60c90` |
+| `react/prop-types` (×92, client) | The rule wants a `propTypes` declaration on every component. **React 19 removed propTypes checking**: React now ignores `propTypes` completely, so the declarations would never run. The rule is on only because eslint-plugin-react's recommended set predates React 19 | Turned off in `client/eslint.config.js` with the reason next to it. This is the **only** rule that is turned off, and it isn't a security rule. Every security, React and hooks rule stays on | `315b82d` |
+
+**Remaining suppressions** (each one is `eslint-disable-next-line` for one
+rule on one line, with the reason written after `--`):
+
+| File | Rule | Why it is safe |
+|---|---|---|
+| `api/src/middleware/errorHandler.js` | `no-unused-vars` | Express only treats a middleware as an error handler when it has exactly four arguments, so the unused `next` must stay |
+| `api/src/controllers/gigController.js` (`pick`) | `security/detect-object-injection` | The field names come from a fixed allow-list in the controller, never from the request |
+| `api/src/controllers/gigController.js` (search) | `security/detect-non-literal-regexp` | Every regex character in `q` is escaped first (and `q` is at most 50 characters), so it is a literal text search |
+| `api/src/middleware/ownership.js` | `security/detect-object-injection` | The owner field names (`freelancer`, `client`) are fixed in the route definitions |
+| `api/src/config/rateLimits.js` | `security/detect-object-injection` | The env variable name comes from the fixed `STRICT_LIMITS` table |
+| `api/scripts/startTest.js` | `security/detect-object-injection` | The key is one of the fixed `OVERRIDES` names (local test script) |
+| `api/scripts/generateCerts.js` | `security/detect-non-literal-fs-filename` | The paths are the fixed OpenSSL locations listed in the script |
+| `client/src/api/gigs.js` | `security/detect-object-injection` | The key is one of the fixed `LIST_PARAMS` names |
+| `client/src/test/securityHeaders.test.js` | `security/detect-unsafe-regex` | Test-only: the regex runs once over our own `nginx.conf`, never on user input |
+
+There are no Semgrep suppressions (`nosemgrep`), no `.eslintignore`, and
+no rule set to `warn` or `off` apart from `react/prop-types`.
+`security/detect-object-injection` keeps the plugin's default level.
+
+Every one of the 21 `detect-object-injection` hits was reviewed:
+
+| Hits | Location | Outcome |
+|---|---|---|
+| 3 | `api/src/config/rateLimits.js` | Restructured; 1 suppression left |
+| 3 | `api/src/controllers/gigController.js` (one line) | Suppressed (fixed allow-list) |
+| 2 | `api/src/middleware/ownership.js` (one line) | Suppressed (fixed field names) |
+| 2 | `api/src/utils/taxEstimate.js` | Fixed (prototype-safe `getTaxTable`) |
+| 1 | `api/test/taxConfig.test.js` | Fixed (`getTaxTable`) |
+| 1 | `api/scripts/startTest.js` | Suppressed (fixed names) |
+| 1 | `client/src/api/gigs.js` | Suppressed (fixed names) |
+| 1 | `client/src/pages/Gigs.jsx` | Rewritten with `Object.fromEntries` |
+| 6 | `client/src/test/taxEstimateFixture.js` | Rewritten with a `Map` and `.at()` |
+| 1 | `client/src/utils/text.js` | Fixed (`Map`) |
+
+**Proof that the job fails closed:** an `eval` of `req.query` plus a
+hard-coded JWT secret was added to `api/src/app.js` for a moment (never
+committed).
+- `npm run lint` exited 1: `security/detect-eval-with-expression`.
+- `node .semgrep/run.mjs` exited 1 with 3 findings: `hardcoded-jwt-secret`,
+  `direct-response-write` (XSS) and `code-string-concat` (code injection).
+
+After every class of fix, the api unit tests (74), Vitest (88 tests),
+both Newman collections against the Docker stack (main: 94 requests and
+173 assertions; rate limits: 20 and 26) and `docker/smoke-test.mjs` (12
+checks) were re-run and passed.
+
+**Running both tools locally** (PowerShell, from the repo root, Docker
+Desktop running):
+
+```powershell
+# ESLint (fails on any warning or error)
+cd api;    npm ci; npm run lint; cd ..
+cd client; npm ci; npm run lint; cd ..
+
+# Semgrep (pinned container; results in semgrep-results\semgrep.json and .sarif)
+node .semgrep/run.mjs
+
+# Counts by tool, rule and severity, after saving ESLint JSON next to Semgrep's
+cd api;    npx eslint . -f json -o ..\semgrep-results\eslint-api.json; cd ..
+cd client; npx eslint . -f json -o ..\semgrep-results\eslint-client.json; cd ..
+node .github/scripts/static-analysis-summary.mjs semgrep-results
+```
+
+Clean output: `npm run lint` prints only the `> eslint . --max-warnings 0`
+line and returns to the prompt. Semgrep ends with
+`Ran 152 rules on ... files: 0 findings.` The first Semgrep run downloads
+the image, and on Windows a full scan takes a few minutes because Docker
+reads the files through the Windows file system.
+
 ## 12. Requirements Traceability
 
 The 11 Part 2 requirements, what was built for each, where, and how it is tested.
