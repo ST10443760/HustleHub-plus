@@ -19,3 +19,9 @@ coverage/
 npm-debug.log*
 *.log
 .DS_Store
+
+# pipeline and scan output when the CI steps are run locally
+zap-report/
+newman-results/
+newman-raw/
+trivy-results/
