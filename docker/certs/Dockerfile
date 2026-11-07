@@ -17,5 +17,5 @@ COPY generate-certs.sh /usr/local/bin/generate-certs
 # Strip any CR in case the script was checked out with Windows line endings.
 RUN sed -i 's/\r$//' /usr/local/bin/generate-certs && chmod 0555 /usr/local/bin/generate-certs
 
-USER certs
+USER 1000:1000
 ENTRYPOINT ["/usr/local/bin/generate-certs"]
