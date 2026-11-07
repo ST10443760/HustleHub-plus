@@ -1,0 +1,19 @@
+# Allowlist: ignore everything, then let in only what the image needs.
+# Keeps .env, certs/*.pem, keys, tests, Postman files and the host's
+# node_modules out of the build context entirely.
+*
+
+!package.json
+!package-lock.json
+!src/
+!scripts/healthcheck.js
+!scripts/seedAdmin.js
+!scripts/cleanTestData.js
+
+# Belt and braces, in case anything secret ends up under an allowed path.
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.crt
+**/node_modules
