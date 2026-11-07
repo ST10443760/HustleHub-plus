@@ -8,11 +8,8 @@
 # 2. runtime: nginx-unprivileged (runs as a non-root user on port 8080)
 #    serving only the built files. No Node, no source, no node_modules.
 
-ARG NODE_IMAGE=node:22.23.4-alpine3.24
-ARG NGINX_IMAGE=nginxinc/nginx-unprivileged:1.31.7-alpine3.24
-
 # ---- Build ----
-FROM ${NODE_IMAGE} AS build
+FROM node:22.23.4-alpine3.24 AS build
 WORKDIR /app
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false NPM_CONFIG_FUND=false
 COPY package.json package-lock.json ./
@@ -27,7 +24,7 @@ RUN npm run build \
  && node scripts/nginx-security-headers.mjs > /app/security-headers.conf
 
 # ---- Runtime ----
-FROM ${NGINX_IMAGE} AS runtime
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine3.24 AS runtime
 # Drop the stock pages (they name the server) before adding our own files.
 USER root
 RUN rm -rf /usr/share/nginx/html/*
