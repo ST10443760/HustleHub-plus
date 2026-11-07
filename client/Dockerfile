@@ -9,7 +9,7 @@
 #    serving only the built files. No Node, no source, no node_modules.
 
 # ---- Build ----
-FROM node:22.23.4-alpine3.24 AS build
+FROM node:26.12.1-alpine3.24 AS build
 WORKDIR /app
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false NPM_CONFIG_FUND=false
 COPY package.json package-lock.json ./
