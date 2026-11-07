@@ -611,6 +611,128 @@ main {
   color: var(--color-muted);
 }
 
+/* ---------- Income dashboard ---------- */
+.tax-year-field {
+  min-width: 14rem;
+}
+
+.stat-row-4 {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.stat-hint {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.dashboard-section {
+  margin-bottom: var(--space-6);
+}
+
+.section-note {
+  color: var(--color-muted);
+}
+
+.notice {
+  border-left: 4px solid var(--color-primary);
+  margin-bottom: var(--space-6);
+}
+
+.notice h3 {
+  font-size: 1rem;
+  margin-top: var(--space-4);
+}
+
+.notice ul {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-5);
+}
+
+.notice li {
+  margin-bottom: var(--space-1);
+}
+
+.disclaimer {
+  background: var(--color-primary-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.source {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.data-table .row-muted td {
+  color: var(--color-muted);
+}
+
+.data-table tfoot th {
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1rem;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.data-table .row-total th,
+.data-table .row-total td {
+  font-weight: 700;
+  border-bottom: 0;
+}
+
+/* Hand-drawn SVG chart: geometry comes from attributes, colours from here. */
+.chart {
+  margin: 0;
+}
+
+.chart-scroll {
+  overflow-x: auto;
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  min-width: 560px;
+  height: auto;
+}
+
+.chart-grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.chart-baseline {
+  stroke: var(--color-muted);
+  stroke-width: 1;
+}
+
+.chart-axis-label {
+  fill: var(--color-muted);
+  font-size: 12px;
+}
+
+.chart-value-label {
+  fill: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chart-bar {
+  fill: var(--color-primary);
+}
+
+.chart-bar.active {
+  fill: var(--color-primary-hover);
+}
+
+.chart-hit {
+  fill: transparent;
+}
+
 /* ---------- Small screens ---------- */
 @media (max-width: 760px) {
   .filters {
@@ -658,6 +780,15 @@ main {
 
   .data-table td.amount {
     text-align: left;
+  }
+
+  /* Footer totals: the label moves into each cell (data-label). */
+  .data-table tfoot {
+    display: block;
+  }
+
+  .data-table tfoot th {
+    display: none;
   }
 }
 
