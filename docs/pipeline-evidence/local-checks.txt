@@ -1,0 +1,25 @@
+Local run of the pipeline's lint, config and scan commands
+Date: 2026-11-07T15:26Z, commit 6e64fbf, Windows 11 + Docker Desktop
+
+$ actionlint
+actionlint: no problems (exit 0)
+
+$ zizmor --offline --persona auditor .github/workflows
+No findings to report. Good job!
+
+$ hadolint api/Dockerfile
+clean (exit 0)
+$ hadolint client/Dockerfile
+clean (exit 0)
+$ hadolint docker/certs/Dockerfile
+clean (exit 0)
+
+$ docker compose config (both files, then without JWT_SECRET)
+docker-compose.yml: valid
+with docker-compose.test.yml: valid
+error while interpolating services.api.environment.JWT_SECRET: required variable JWT_SECRET is missing a value: JWT_SECRET is not set. Copy .env.example to .env in the repo root and set JWT_SECRET to a long random value.
+(exit 1: Compose refuses to run without JWT_SECRET)
+
+$ npm audit --omit=dev --audit-level=high (api, client)
+found 0 vulnerabilities
+found 0 vulnerabilities
