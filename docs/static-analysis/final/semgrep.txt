@@ -1,0 +1,38 @@
+Semgrep semgrep/semgrep:1.184.0 with p/javascript, p/nodejs, p/expressjs, p/react, p/owasp-top-ten, p/jwt, p/secrets
+               
+               
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 179 files tracked by git with 600 Code rules:
+                                                                                                                        
+  Language      Rules   Files          Origin      Rules                                                                
+ ─────────────────────────────        ───────────────────                                                               
+  <multilang>      48     179          Community     600                                                                
+  js               70     134                                                                                           
+  json              3       6                                                                                           
+  yaml             25       4                                                                                           
+  dockerfile        4       3                                                                                           
+  bash              1       2                                                                                           
+  html              1       1                                                                                           
+                                                                                                                        
+                
+                
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 0 (0 blocking)
+ • Rules run: 152
+ • Targets scanned: 179
+ • Parsed lines: ~100.0%
+ • Scan skipped: 
+   ◦ Files larger than  files 1.0 MB: 1
+   ◦ Files matching .semgrepignore patterns: 14
+ • Scan was limited to files tracked by git
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 152 rules on 179 files: 0 findings.
+(need more rules? `semgrep login` for additional free Semgrep Registry rules)
+
+
+Results: docs/static-analysis/final/semgrep.json and semgrep.sarif
