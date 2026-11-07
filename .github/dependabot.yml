@@ -16,6 +16,11 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
+    # Wait a week before proposing a newly published version: most hijacked
+    # or malicious releases are caught and pulled within days. Security
+    # updates are not delayed by this.
+    cooldown:
+      default-days: 7
     groups:
       api-minor-and-patch:
         update-types: [minor, patch]
@@ -30,6 +35,11 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
+    # Wait a week before proposing a newly published version: most hijacked
+    # or malicious releases are caught and pulled within days. Security
+    # updates are not delayed by this.
+    cooldown:
+      default-days: 7
     groups:
       client-minor-and-patch:
         update-types: [minor, patch]
@@ -41,6 +51,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    # Wait a week before proposing a newly published version: most hijacked
+    # or malicious releases are caught and pulled within days. Security
+    # updates are not delayed by this.
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ["*"]
@@ -59,6 +74,11 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
+    # Wait a week before proposing a newly published version: most hijacked
+    # or malicious releases are caught and pulled within days. Security
+    # updates are not delayed by this.
+    cooldown:
+      default-days: 7
 
   # The mongo image in docker-compose.yml.
   - package-ecosystem: docker-compose
@@ -71,3 +91,8 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 3
+    # Wait a week before proposing a newly published version: most hijacked
+    # or malicious releases are caught and pulled within days. Security
+    # updates are not delayed by this.
+    cooldown:
+      default-days: 7
