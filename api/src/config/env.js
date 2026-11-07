@@ -6,6 +6,8 @@
  * Returns a list of problems. The messages name the setting but never
  * include its value.
  */
+const { resolveTrustProxy } = require('./proxy');
+
 const MIN_PRODUCTION_SECRET_LENGTH = 32;
 
 function validateEnv(env = process.env) {
@@ -20,6 +22,12 @@ function validateEnv(env = process.env) {
 
   if (!env.MONGO_URI || !env.MONGO_URI.trim()) {
     problems.push('MONGO_URI is not set. Point it at MongoDB (see .env.example).');
+  }
+
+  try {
+    resolveTrustProxy(env);
+  } catch (err) {
+    problems.push(err.message);
   }
 
   return problems;
