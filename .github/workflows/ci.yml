@@ -117,7 +117,7 @@ jobs:
       - name: Component tests (Vitest)
         run: npm run test:run 2>&1 | tee vitest.txt
 
-      - name: Lint (oxlint)
+      - name: Lint (ESLint)
         run: npm run lint
 
       - name: Production build (includes the CSP meta tag)
