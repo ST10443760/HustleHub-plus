@@ -74,7 +74,9 @@ describe('client security headers', () => {
     const api = locationBlocks(nginxConf)['/api/'];
     expect(api).toMatch(/proxy_ssl_verify on;/);
     expect(api).toMatch(/proxy_ssl_name api;/);
-    expect(api).toMatch(/proxy_set_header Host \$host;/);
+    // A fixed Host, never the client's Host header (host header injection).
+    expect(api).toMatch(/proxy_set_header Host api;/);
+    expect(api).not.toMatch(/\$host\b|\$http_host\b/);
     expect(api).toMatch(/proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;/);
     expect(api).toMatch(/proxy_set_header X-Forwarded-Proto \$scheme;/);
   });
