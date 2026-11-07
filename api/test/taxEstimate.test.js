@@ -59,3 +59,9 @@ test('returns the tax year, assumptions and disclaimer', () => {
 test('rejects a tax year with no table', () => {
   assert.throws(() => buildTaxEstimate(2019), RangeError);
 });
+
+test('rejects keys that exist on Object.prototype', () => {
+  for (const key of ['constructor', '__proto__', 'toString']) {
+    assert.throws(() => buildTaxEstimate(key), RangeError, `key ${key}`);
+  }
+});
