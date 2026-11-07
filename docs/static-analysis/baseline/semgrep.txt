@@ -1,0 +1,114 @@
+Semgrep semgrep/semgrep:1.184.0 with p/javascript, p/nodejs, p/expressjs, p/react, p/owasp-top-ten, p/jwt, p/secrets
+               
+               
+┌─────────────┐
+│ Scan Status │
+└─────────────┘
+  Scanning 177 files tracked by git with 600 Code rules:
+                                                                                                                        
+  Language      Rules   Files          Origin      Rules                                                                
+ ─────────────────────────────        ───────────────────                                                               
+  <multilang>      48     177          Community     600                                                                
+  js               70     132                                                                                           
+  json              3       6                                                                                           
+  yaml             25       4                                                                                           
+  dockerfile        4       3                                                                                           
+  bash              1       2                                                                                           
+  html              1       1                                                                                           
+                                                                                                                        
+                   
+                   
+┌─────────────────┐
+│ 6 Code Findings │
+└─────────────────┘
+                          
+    .github/dependabot.yml
+    ❯❱ package_managers.dependabot.dependabot-missing-cooldown.dependabot-missing-cooldown
+          ❰❰ Blocking ❱❱
+          This Dependabot configuration does not set a cooldown period. Newly published packages can be     
+          malicious or unstable. Add a `cooldown` block with `default-days: 7` to each `package-ecosystem`  
+          entry under `updates` to wait 7 days before proposing updates to newly published package versions.
+          Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-                
+          updates/configuration-options-for-the-dependabot.yml-file#cooldown                                
+          Details: https://sg.run/5WvGK                                                                     
+                                                                                                            
+            9┆ - package-ecosystem: npm
+           10┆   directory: /api
+           11┆   schedule:
+           12┆     interval: weekly
+           13┆   # The stack is pinned on purpose (Node 22, Express 4, MongoDB 8 ...), so
+           14┆   # major versions are not proposed. Minor, patch and security updates are.
+           15┆   ignore:
+           16┆     - dependency-name: "*"
+           17┆       update-types: ["version-update:semver-major"]
+           18┆   open-pull-requests-limit: 3
+             [hid 3 additional lines, adjust with --max-lines-per-finding] 
+           23┆ - package-ecosystem: npm
+           24┆   directory: /client
+           25┆   schedule:
+           26┆     interval: weekly
+           27┆   # The stack is pinned on purpose (Node 22, Express 4, MongoDB 8 ...), so
+           28┆   # major versions are not proposed. Minor, patch and security updates are.
+           29┆   ignore:
+           30┆     - dependency-name: "*"
+           31┆       update-types: ["version-update:semver-major"]
+           32┆   open-pull-requests-limit: 3
+             [hid 3 additional lines, adjust with --max-lines-per-finding] 
+           39┆ - package-ecosystem: github-actions
+           40┆   directory: /
+           41┆   schedule:
+           42┆     interval: weekly
+           43┆   open-pull-requests-limit: 3
+           44┆   groups:
+           45┆     actions:
+           46┆       patterns: ["*"]
+            ⋮┆----------------------------------------
+           49┆ - package-ecosystem: docker
+           50┆   directories:
+           51┆     - /api
+           52┆     - /client
+           53┆     - /docker/certs
+           54┆   schedule:
+           55┆     interval: weekly
+           56┆   # The stack is pinned on purpose (Node 22, Express 4, MongoDB 8 ...), so
+           57┆   # major versions are not proposed. Minor, patch and security updates are.
+           58┆   ignore:
+             [hid 3 additional lines, adjust with --max-lines-per-finding] 
+           64┆ - package-ecosystem: docker-compose
+           65┆   directory: /
+           66┆   schedule:
+           67┆     interval: weekly
+           68┆   # The stack is pinned on purpose (Node 22, Express 4, MongoDB 8 ...), so
+           69┆   # major versions are not proposed. Minor, patch and security updates are.
+           70┆   ignore:
+           71┆     - dependency-name: "*"
+           72┆       update-types: ["version-update:semver-major"]
+           73┆   open-pull-requests-limit: 3
+                     
+    client/nginx.conf
+    ❯❱ generic.nginx.security.request-host-used.request-host-used
+          ❰❰ Blocking ❱❱
+          '$http_host' and '$host' variables may contain a malicious value from attacker controlled 'Host'
+          request header. Use an explicitly configured host value or a allow list for validation.         
+          Details: https://sg.run/4x3Z                                                                    
+                                                                                                          
+           43┆ proxy_set_header Host $host;
+
+                
+                
+┌──────────────┐
+│ Scan Summary │
+└──────────────┘
+✅ Scan completed successfully.
+ • Findings: 6 (6 blocking)
+ • Rules run: 152
+ • Targets scanned: 177
+ • Parsed lines: ~100.0%
+ • Scan skipped: 
+   ◦ Files larger than  files 1.0 MB: 1
+   ◦ Files matching .semgrepignore patterns: 3
+ • Scan was limited to files tracked by git
+ • For a detailed list of skipped files and lines, run semgrep with the --verbose flag
+Ran 152 rules on 177 files: 6 findings.
+
+Results: docs/static-analysis/baseline/semgrep.json and semgrep.sarif

@@ -1,0 +1,13 @@
+ESLint (api): 17 finding(s)
+    12  warning  security/detect-object-injection
+     2  error    no-unused-vars
+     1  warning  security/detect-non-literal-fs-filename
+     1  warning  security/detect-non-literal-regexp
+     1  warning  security/detect-unsafe-regex
+ESLint (client): 103 finding(s)
+    92  error    react/prop-types
+     9  warning  security/detect-object-injection
+     2  warning  security/detect-unsafe-regex
+Semgrep: 6 finding(s)
+     5  MEDIUM   package_managers.dependabot.dependabot-missing-cooldown.dependabot-missing-cooldown
+     1  WARNING  generic.nginx.security.request-host-used.request-host-used

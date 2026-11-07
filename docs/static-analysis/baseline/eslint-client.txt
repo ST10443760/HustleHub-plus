@@ -1,0 +1,146 @@
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\api\gigs.js
+  9:19  warning  Variable Assigned to Object Injection Sink  security/detect-object-injection
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\AdminDeleteGig.jsx
+  9:42  error  'gigId' is missing in props validation  react/prop-types
+  9:49  error  'title' is missing in props validation  react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\BookingPanel.jsx
+  13:40  error  'gigId' is missing in props validation          react/prop-types
+  13:47  error  'title' is missing in props validation          react/prop-types
+  13:54  error  'price' is missing in props validation          react/prop-types
+  13:61  error  'onUnavailable' is missing in props validation  react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\ConfirmAction.jsx
+  6:41   error  'title' is missing in props validation         react/prop-types
+  6:48   error  'children' is missing in props validation      react/prop-types
+  6:58   error  'confirmLabel' is missing in props validation  react/prop-types
+  6:72   error  'busyLabel' is missing in props validation     react/prop-types
+  6:83   error  'busy' is missing in props validation          react/prop-types
+  6:89   error  'error' is missing in props validation         react/prop-types
+  6:96   error  'onConfirm' is missing in props validation     react/prop-types
+  6:107  error  'onCancel' is missing in props validation      react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\FormField.jsx
+  8:37  error  'id' is missing in props validation         react/prop-types
+  8:41  error  'label' is missing in props validation      react/prop-types
+  8:48  error  'error' is missing in props validation      react/prop-types
+  8:55  error  'hint' is missing in props validation       react/prop-types
+  8:61  error  'className' is missing in props validation  react/prop-types
+  8:77  error  'as' is missing in props validation         react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\GigCard.jsx
+   7:35  error  'gig' is missing in props validation                  react/prop-types
+   8:36  error  'gig.title' is missing in props validation            react/prop-types
+   9:30  error  'gig.freelancer' is missing in props validation       react/prop-types
+   9:62  error  'gig.freelancer' is missing in props validation       react/prop-types
+   9:73  error  'gig.freelancer.name' is missing in props validation  react/prop-types
+  14:32  error  'gig.id' is missing in props validation               react/prop-types
+  17:48  error  'gig.category' is missing in props validation         react/prop-types
+  18:41  error  'gig.deliveryDays' is missing in props validation     react/prop-types
+  21:45  error  'gig.price' is missing in props validation            react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\GigForm.jsx
+  23:35  error  'initialValues' is missing in props validation  react/prop-types
+  23:62  error  'submitLabel' is missing in props validation    react/prop-types
+  23:75  error  'busyLabel' is missing in props validation      react/prop-types
+  23:86  error  'onSubmit' is missing in props validation       react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\MonthlyIncomeChart.jsx
+   50:46  error  'monthly' is missing in props validation         react/prop-types
+   52:42  error  'monthly.length' is missing in props validation  react/prop-types
+   54:35  error  'monthly.map' is missing in props validation     react/prop-types
+   60:33  error  'monthly.length' is missing in props validation  react/prop-types
+   91:22  error  'monthly.map' is missing in props validation     react/prop-types
+  140:20  error  'monthly.map' is missing in props validation     react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\Pagination.jsx
+  1:38  error  'page' is missing in props validation        react/prop-types
+  1:44  error  'totalPages' is missing in props validation  react/prop-types
+  1:56  error  'onChange' is missing in props validation    react/prop-types
+  1:66  error  'disabled' is missing in props validation    react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\ProtectedRoute.jsx
+  13:42  error  'roles' is missing in props validation           react/prop-types
+  13:49  error  'children' is missing in props validation        react/prop-types
+  25:23  error  'roles.includes' is missing in props validation  react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\StatusMessage.jsx
+   3:32  error  'label' is missing in props validation     react/prop-types
+  11:30  error  'message' is missing in props validation   react/prop-types
+  11:39  error  'onRetry' is missing in props validation   react/prop-types
+  24:30  error  'title' is missing in props validation     react/prop-types
+  24:37  error  'children' is missing in props validation  react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\components\TaxBreakdownTable.jsx
+  14:45  error  'breakdown' is missing in props validation               react/prop-types
+  14:56  error  'totals' is missing in props validation                  react/prop-types
+  14:64  error  'rebate' is missing in props validation                  react/prop-types
+  34:22  error  'breakdown.map' is missing in props validation           react/prop-types
+  55:35  error  'totals.taxBeforeRebate' is missing in props validation  react/prop-types
+  71:35  error  'totals.estimatedTax' is missing in props validation     react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\context\AuthProvider.jsx
+  14:40  error  'children' is missing in props validation  react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\pages\GigEditor.jsx
+  22:20  error  'message' is missing in props validation  react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\pages\Gigs.jsx
+  37:59  warning  Generic Object Injection Sink  security/detect-object-injection
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\pages\Income.jsx
+   23:21   error  'label' is missing in props validation                                 react/prop-types
+   23:28   error  'value' is missing in props validation                                 react/prop-types
+   23:35   error  'hint' is missing in props validation                                  react/prop-types
+   33:29   error  'estimate' is missing in props validation                              react/prop-types
+   35:27   error  'estimate.source' is missing in props validation                       react/prop-types
+   36:45   error  'estimate.source.url' is missing in props validation                   react/prop-types
+   36:72   error  'estimate.source.url' is missing in props validation                   react/prop-types
+   36:76   error  'estimate.source.url.startsWith' is missing in props validation        react/prop-types
+   36:109  error  'estimate.source.url' is missing in props validation                   react/prop-types
+   43:71   error  'estimate.rebate' is missing in props validation                       react/prop-types
+   44:31   error  'estimate.taxFreeThreshold' is missing in props validation             react/prop-types
+   48:19   error  'estimate.assumptions' is missing in props validation                  react/prop-types
+   48:31   error  'estimate.assumptions.map' is missing in props validation              react/prop-types
+   53:48   error  'estimate.disclaimer' is missing in props validation                   react/prop-types
+   59:21   error  'estimate.source.name' is missing in props validation                  react/prop-types
+   61:19   error  'estimate.source.checkedOn' is missing in props validation             react/prop-types
+   61:51   error  'estimate.source.checkedOn' is missing in props validation             react/prop-types
+   68:25   error  'estimate' is missing in props validation                              react/prop-types
+   69:11   error  'estimate.totals' is missing in props validation                       react/prop-types
+   70:29   error  'estimate.monthly' is missing in props validation                      react/prop-types
+   70:37   error  'estimate.monthly.reduce' is missing in props validation               react/prop-types
+   77:37   error  'estimate.totals.gross' is missing in props validation                 react/prop-types
+   80:67   error  'estimate.totals.estimatedTax' is missing in props validation          react/prop-types
+   81:63   error  'estimate.totals.takeHome' is missing in props validation              react/prop-types
+   82:74   error  'estimate.totals.effectiveRatePercent' is missing in props validation  react/prop-types
+   87:17   error  'estimate.totals.gross' is missing in props validation                 react/prop-types
+   89:53   error  'estimate.taxYear' is missing in props validation                      react/prop-types
+   89:61   error  'estimate.taxYear.start' is missing in props validation                react/prop-types
+   89:82   error  'estimate.taxYear' is missing in props validation                      react/prop-types
+   89:90   error  'estimate.taxYear.end' is missing in props validation                  react/prop-types
+   93:51   error  'estimate.monthly' is missing in props validation                      react/prop-types
+  100:48   error  'estimate.breakdown' is missing in props validation                    react/prop-types
+  100:92   error  'estimate.rebate' is missing in props validation                       react/prop-types
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\test\securityHeaders.test.js
+  16:37  warning  Unsafe Regular Expression  security/detect-unsafe-regex
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\test\taxEstimateFixture.js
+  44:26  warning  Generic Object Injection Sink  security/detect-object-injection
+  45:14  warning  Generic Object Injection Sink  security/detect-object-injection
+  49:15  warning  Generic Object Injection Sink  security/detect-object-injection
+  49:31  warning  Generic Object Injection Sink  security/detect-object-injection
+  50:17  warning  Generic Object Injection Sink  security/detect-object-injection
+  50:33  warning  Generic Object Injection Sink  security/detect-object-injection
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\utils\text.js
+  26:52  warning  Generic Object Injection Sink  security/detect-object-injection
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\client\src\utils\validation.js
+  83:13  warning  Unsafe Regular Expression  security/detect-unsafe-regex
+
+✖ 103 problems (92 errors, 11 warnings)
+

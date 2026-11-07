@@ -1,0 +1,40 @@
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\scripts\generateCerts.js
+  35:50  warning  Found existsSync from package "fs" with non literal argument at index 0  security/detect-non-literal-fs-filename
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\scripts\startTest.js
+  28:3  warning  Generic Object Injection Sink  security/detect-object-injection
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\src\config\rateLimits.js
+  28:38  warning  Function Call Object Injection Sink  security/detect-object-injection
+  29:25  warning  Generic Object Injection Sink        security/detect-object-injection
+  32:5   warning  Generic Object Injection Sink        security/detect-object-injection
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\src\controllers\gigController.js
+  20:9   warning  Generic Object Injection Sink                     security/detect-object-injection
+  20:38  warning  Generic Object Injection Sink                     security/detect-object-injection
+  20:54  warning  Generic Object Injection Sink                     security/detect-object-injection
+  41:23  warning  Found non-literal argument to RegExp Constructor  security/detect-non-literal-regexp
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\src\middleware\authMiddleware.js
+  26:12  error  'err' is defined but never used  no-unused-vars
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\src\middleware\errorHandler.js
+  50:38  error  'next' is defined but never used  no-unused-vars
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\src\middleware\gigValidators.js
+  22:41  warning  Unsafe Regular Expression  security/detect-unsafe-regex
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\src\middleware\ownership.js
+  41:20  warning  Generic Object Injection Sink  security/detect-object-injection
+  41:34  warning  Generic Object Injection Sink  security/detect-object-injection
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\src\utils\taxEstimate.js
+  22:10  warning  Generic Object Injection Sink               security/detect-object-injection
+  31:17  warning  Variable Assigned to Object Injection Sink  security/detect-object-injection
+
+C:\Users\LENOVO P14s\Downloads\hustlehub-backend-full\hustlehub-backend\HustleHub-plus\api\test\taxConfig.test.js
+  9:19  warning  Variable Assigned to Object Injection Sink  security/detect-object-injection
+
+✖ 17 problems (2 errors, 15 warnings)
+
