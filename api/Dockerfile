@@ -12,14 +12,14 @@
 
 # ---- Production dependencies ----
 # Node 22 on Alpine, pinned to an exact version (both stages use the same one).
-FROM node:22.23.4-alpine3.24 AS deps
+FROM node:26.12.1-alpine3.24 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 # --ignore-scripts: none of the dependencies need an install script.
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # ---- Runtime ----
-FROM node:22.23.4-alpine3.24 AS runtime
+FROM node:26.12.1-alpine3.24 AS runtime
 ENV NODE_ENV=production \
     PORT=5000
 WORKDIR /app
