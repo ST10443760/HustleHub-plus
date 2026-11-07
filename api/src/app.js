@@ -5,6 +5,7 @@ const cors = require('cors');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const sanitize = require('./middleware/sanitize');
 const { helmetOptions, corsOptions } = require('./config/security');
+const { resolveTrustProxy } = require('./config/proxy');
 const { generalLimiter } = require('./middleware/rateLimiters');
 const logger = require('./utils/logger');
 
@@ -13,6 +14,10 @@ const HEALTH_PATH = '/api/health';
 
 // Don't advertise the framework (Helmet removes the header too).
 app.disable('x-powered-by');
+
+// Off unless TRUST_PROXY is set (Docker sets it to 1 for nginx). Must be
+// set before the rate limiters, which key on req.ip. See config/proxy.js.
+app.set('trust proxy', resolveTrustProxy());
 
 // Lightweight request logger - not a replacement for the event-specific
 // logging in each controller, just a trace of what hit the API. First, so
