@@ -547,6 +547,7 @@ database.
 | GET | `/api/bookings/:id` | The booking's client or freelancer | Anyone else gets `403` |
 | GET | `/api/transactions/mine` | Client, Freelancer | Clients: what they paid. Freelancers: what they were paid |
 | GET | `/api/income` | Freelancer | `{ totalEarned, bookingCount, items }` from completed transactions |
+| GET | `/api/income/tax-estimate` | Freelancer | Estimated SA income tax for one tax year, with a monthly breakdown. Query: `taxYear` (optional, the year the tax year starts in). See [Tax estimation](#tax-estimation) |
 
 **Gig rules**
 
