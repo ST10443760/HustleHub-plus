@@ -80,7 +80,8 @@ export function validateGig(form, { categories, maxPrice }) {
   // API: a number from 1 to 100000 with at most 2 decimal places
   const price = Number(priceText);
   if (priceText === '') errors.price = 'Price is required';
-  else if (!/^\d+(\.\d{1,2})?$/.test(priceText) || !Number.isFinite(price)) {
+  // Two plain alternatives (no quantifier nested in another): always linear time.
+  else if (!/^(?:\d+|\d+\.\d\d?)$/.test(priceText) || !Number.isFinite(price)) {
     errors.price = 'Enter a price like 150 or 149.99';
   } else if (price < 1 || price > maxPrice) errors.price = `Price must be between 1 and ${maxPrice}`;
 
