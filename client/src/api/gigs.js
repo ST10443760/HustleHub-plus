@@ -6,6 +6,7 @@ const LIST_PARAMS = ['page', 'limit', 'category', 'q', 'minPrice', 'maxPrice'];
 export function listGigs(filters, signal) {
   const params = new URLSearchParams();
   for (const key of LIST_PARAMS) {
+    // eslint-disable-next-line security/detect-object-injection -- key is one of the fixed LIST_PARAMS names above
     const value = filters[key];
     if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
   }
