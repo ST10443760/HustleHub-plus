@@ -23,7 +23,7 @@ async function protect(req, res, next) {
   let decoded;
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
-  } catch (err) {
+  } catch {
     // Covers both expired and tampered/invalid tokens - same generic
     // message either way, no need to tell an attacker which case it was.
     return next(new AppError('Not authenticated - invalid or expired token', 401));
