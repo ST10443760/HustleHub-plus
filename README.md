@@ -1,5 +1,7 @@
 # HustleHub+
 
+[![CI](https://github.com/ST10443760/HustleHub-plus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ST10443760/HustleHub-plus/actions/workflows/ci.yml)
+
 HustleHub+ is a secure freelance marketplace platform. Freelancers advertise
 services, clients browse and book them, and the platform records the
 resulting transactions and tracks freelancer income. (Tax estimation and
@@ -1475,6 +1477,176 @@ There are 67 tests across 16 files, covering both rendering and user interaction
   server's message telling "deleted" apart from "deactivated".
 - **Income** (totals, items, empty state with R 0,00) and **admin Users** (rows
   rendered, no password field anywhere).
+
+### CI/CD pipeline
+
+Every push to `main`, every pull request and every manual run
+(**Run workflow**) goes through the GitHub Actions pipeline in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). It tests the code,
+runs several kinds of security checks, builds and starts the **whole
+stack** in Docker, tests it end to end, and turns red if anything fails.
+
+```mermaid
+flowchart LR
+    B["Backend<br/>unit tests + npm audit"]
+    F["Frontend<br/>Vitest, lint, build + npm audit"]
+    G["Secret scan<br/>gitleaks, full history"]
+    L["Lint<br/>hadolint, compose config,<br/>actionlint, zizmor"]
+    S["Stack<br/>build all images, compose up,<br/>smoke test, Newman x2"]
+    I["Image scan<br/>Trivy images + Dockerfiles"]
+    D["Dynamic scan<br/>OWASP ZAP baseline"]
+    OK{{"Pipeline OK"}}
+    B --> S
+    F --> S
+    G --> S
+    L --> S
+    B --> D
+    F --> D
+    G --> D
+    L --> D
+    L --> I
+    B --> OK
+    F --> OK
+    G --> OK
+    L --> OK
+    S --> OK
+    I --> OK
+    D --> OK
+```
+
+The four fast jobs run in parallel. The stack and the ZAP scan only start
+when they all pass, so nothing is deployed or scanned on top of broken
+code. The image scan starts as soon as the Dockerfiles have passed lint.
+
+**What each job checks, and why it matters for security**
+
+| Job | What it does | Why |
+|---|---|---|
+| **Backend - unit tests and npm audit** | `npm ci`, `npm test` (68 unit tests: tax calculator, startup settings check, trust proxy and rate limit buckets, health check), `npm audit --omit=dev --audit-level=high` | Proves the money and security logic behaves, and that no known high or critical vulnerability ships in a production dependency |
+| **Frontend - tests, build and npm audit** | `npm ci`, `npm run test:run` (88 Vitest tests, including the CSP and security header consistency test), `npm run lint`, `npm run build` (and checks the CSP meta tag is in the build), `npm audit --omit=dev --audit-level=high` | Same for the React app; a build without its CSP fails |
+| **Secret scan - gitleaks (full history)** | gitleaks over **every commit** (`fetch-depth: 0`), not just the latest | A secret committed and later deleted is still in history; this catches it. No allowlist: the history scans clean |
+| **Lint - Dockerfiles, Compose and workflows** | hadolint on all three Dockerfiles; `docker compose config` on both Compose files, plus a check that Compose **refuses** to run without `JWT_SECRET`; actionlint and zizmor on this workflow | Catches insecure or broken container and pipeline configuration before anything runs. zizmor is a security audit of the workflow itself (injection, credential persistence, unpinned actions) |
+| **Stack - build, smoke test and Newman** | Generates random credentials, builds the certs, api and client images, `docker compose up -d --build --wait`, runs `docker/smoke-test.mjs`, the **rate limit** collection against the strict limits, seeds the admin, switches to the test override and runs the **main** collection (with the admin tests) | Proves the **entire stack** builds, starts healthy and enforces auth, RBAC, ownership, validation, rate limits, CORS and headers end to end |
+| **Image scan - Trivy** | Trivy on the api, client and certs images (fails on HIGH/CRITICAL vulnerabilities that have a fix, `--ignore-unfixed`), and Trivy's Dockerfile misconfiguration scan | Known-vulnerable OS packages or libraries in the images, or risky Dockerfile patterns (root user, no healthcheck, ...), fail the build. There is no `.trivyignore` |
+| **Dynamic scan - OWASP ZAP baseline** | Starts the stack and runs the ZAP baseline scan (spider plus passive scan) against `http://localhost:5173` | Tests the running app from the outside like an attacker would: missing or broken security headers, information leaks, cross-domain problems |
+| **Pipeline OK** | Runs last, always, and fails unless **every** job above succeeded | One check to require in branch protection |
+
+The ZAP rules live in [`.zap/rules.tsv`](.zap/rules.tsv). Missing or
+broken security headers (CSP, anti-clickjacking, nosniff,
+Permissions-Policy, site isolation), information leaks (server version,
+`X-Powered-By`, debug errors, source code), cross-domain problems and
+vulnerable JavaScript libraries are set to **FAIL**. Everything else is
+reported as a warning in the report but doesn't fail the job. One rule is
+ignored: *ZAP is Out of Date* (10116), because the image is pinned on
+purpose and updated by Dependabot. The first scan found two real problems,
+both fixed rather than suppressed: no `Permissions-Policy` header and
+missing cross-origin isolation headers. All of them are now sent from
+`client/securityHeaders.js`, and nginx's `/healthz` sends them too. The
+scan takes about a minute.
+
+**How the pipeline itself is secured**
+
+- The workflow token is read-only (`permissions: contents: read`), and
+  `actions/checkout` runs with `persist-credentials: false`, so no step can
+  push or reuse the token.
+- Every action is pinned to a full commit SHA, with the version in a
+  comment, and every tool image (gitleaks, hadolint, actionlint, zizmor,
+  Trivy, ZAP) to a tag **and** a digest, so a moved tag can't change what
+  runs.
+- It triggers on `push`, `pull_request` and `workflow_dispatch` only (never
+  `pull_request_target`). Branch names and PR titles are never put into a
+  script. A newer run on the same branch cancels the older one.
+- It needs **no repository secrets**.
+  [`.github/scripts/make-ci-env.sh`](.github/scripts/make-ci-env.sh)
+  generates a random `JWT_SECRET` (96 characters), admin email and admin
+  password (35 characters) in each job, masks them with `::add-mask::`, and
+  writes them to a job-local `.env` that disappears with the runner.
+- Newman's full JSON report contains request bodies and the generated
+  admin password, so it is never uploaded. Only the JUnit files and a slim
+  JSON (request names, status codes, assertion results) are.
+
+**How a failure is enforced**
+
+- Every `run:` step uses bash with `-e -o pipefail`, so a failing command
+  fails the step even when its output is piped through `tee`.
+- There is no `continue-on-error` and no `|| true` anywhere.
+- Unit tests, Vitest, Newman and smoke-test failures exit non-zero.
+  `npm audit --audit-level=high`, gitleaks, Trivy (`--exit-code 1`),
+  hadolint, actionlint, zizmor and ZAP FAIL rules all do the same.
+- `Pipeline OK` needs every job and checks each one's result explicitly,
+  so a failed, cancelled or skipped job turns it red.
+- This was tested locally: a broken unit test assertion, the old lockfile
+  with the body-parser advisory, and a broken health check response each
+  made their step exit 1.
+
+**Where to find the results**
+
+- **Actions** tab → the run → **Summary**. Each job writes its key results
+  there: unit test and Vitest counts, Newman requests and assertions for
+  both collections, the gitleaks result, the Trivy result and the ZAP
+  FAIL/WARN counts. `Pipeline OK` adds a table of every job's result.
+- **Artifacts** at the bottom of the run summary: `newman-results` (JUnit
+  and slim JSON for both collections, plus the smoke test output),
+  `trivy-results` (one table per image plus the Dockerfile scan) and
+  `zap-report` (HTML, JSON and Markdown report). They're kept for 14 days.
+- If the stack job fails, it prints every container's log before it tears
+  the stack down. Teardown (`docker compose down -v`) always runs.
+- Saved evidence from a green run: [`docs/pipeline-evidence/`](docs/pipeline-evidence/README.md).
+
+**Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) opens
+weekly update pull requests for the npm packages in `api/` and `client/`,
+the pinned actions, the three Dockerfiles' base images and the mongo image
+in Compose. Every one of them goes through this pipeline before it can be
+merged.
+
+**Running every step locally** (from the repo root, with Docker running):
+
+```bash
+# Backend
+cd api && npm ci && npm test && npm audit --omit=dev --audit-level=high && cd ..
+
+# Frontend
+cd client && npm ci && npm run test:run && npm run lint && npm run build && npm audit --omit=dev --audit-level=high && cd ..
+
+# Secret scan (full history)
+docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git --no-banner --redact --verbose --exit-code 1 /repo
+
+# Lint
+for f in api/Dockerfile client/Dockerfile docker/certs/Dockerfile; do docker run --rm -i hadolint/hadolint:v2.15.1 hadolint - < "$f"; done
+JWT_SECRET=x docker compose config --quiet
+JWT_SECRET=x docker compose -f docker-compose.yml -f docker-compose.test.yml config --quiet
+docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
+docker run --rm -v "$PWD:/repo:ro" ghcr.io/zizmorcore/zizmor:1.32.0 --offline /repo/.github/workflows
+
+# Image scan (after docker compose build)
+for i in hustlehub-api:local hustlehub-client:local hustlehub-certs:local; do
+  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2 image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$i"
+done
+docker run --rm -v "$PWD:/repo:ro" aquasec/trivy:0.76.2 config --misconfig-scanners dockerfile --exit-code 1 /repo
+
+# Stack (uses your root .env; see "Running with Docker")
+docker compose up -d --build --wait
+node docker/smoke-test.mjs
+npx newman run api/postman/HustleHub_RateLimits.postman_collection.json --env-var base_url=http://localhost:5173
+docker compose run --rm seed
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --wait
+npx newman run api/postman/HustleHub_API.postman_collection.json --insecure --env-var base_url=https://localhost:5000 \
+  --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
+
+# Dynamic scan (stack running; joins the Compose network, so it works the same on Windows)
+mkdir -p zap-report && cp .zap/rules.tsv zap-report/
+docker run --rm --network hustlehub_default -v "$PWD/zap-report:/zap/wrk:rw" zaproxy/zap-stable:2.17.0 \
+  zap-baseline.py -t http://client:8080 -c rules.tsv -I -r zap-report.html
+
+docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
+```
+
+In PowerShell, use `${PWD}` instead of `$PWD`, run the `for` loops one
+image or file at a time, and put each command on one line. Git Bash on
+Windows needs `MSYS_NO_PATHCONV=1` in front of the `docker run` commands
+that mount a folder. The rate limit collection runs through the client
+(`http://localhost:5173`), exactly like the pipeline. It needs freshly
+started counters, so run it before anything else after `up`.
 
 ## 12. Requirements Traceability
 
