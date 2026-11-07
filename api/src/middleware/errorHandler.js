@@ -47,6 +47,9 @@ function notFoundHandler(req, res, next) {
  * express-validator) plugs in here too - Lihle extends this file with
  * that logic rather than creating a second error handler.
  */
+// Express only treats a middleware as an error handler when it takes exactly
+// four arguments, so `next` must stay even though it is never called.
+// eslint-disable-next-line no-unused-vars -- required 4-argument signature
 function errorHandler(err, req, res, next) {
   // Mongoose rejected the data (schema validation, bad cast, unknown field
   // under strict: 'throw'). That's bad input, not a server fault, but the
