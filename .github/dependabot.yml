@@ -1,0 +1,53 @@
+# Weekly dependency updates. Every Dependabot pull request runs the full CI
+# pipeline, so an update only lands if tests, audits and scans still pass.
+# Minor and patch updates are grouped per folder to keep the number of open
+# pull requests small; major updates come one at a time.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /api
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      api-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /client
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      client-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Keeps the SHA-pinned actions in .github/workflows up to date (Dependabot
+  # updates the SHA and the version comment together).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Base images in the three Dockerfiles.
+  - package-ecosystem: docker
+    directories:
+      - /api
+      - /client
+      - /docker/certs
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # The mongo image in docker-compose.yml.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
