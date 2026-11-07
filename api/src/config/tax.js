@@ -81,4 +81,25 @@ const SUPPORTED_TAX_YEARS = Object.freeze(
     .sort((a, b) => b - a)
 );
 
-module.exports = { SOURCE_URL, CHECKED_ON, TAX_TABLES, SUPPORTED_TAX_YEARS };
+// Returned with every estimate and shown on the income dashboard.
+const TAX_ASSUMPTIONS = Object.freeze([
+  'Resident individual under 65, so only the primary rebate applies.',
+  'All completed HustleHub+ income in the tax year is treated as taxable income.',
+  'No deductions, expenses, medical tax credits or retirement contributions are taken into account.',
+  'No UIF, provisional tax payments or other income outside HustleHub+ are included.',
+  'Income to date is treated as the full year\'s taxable income; it is not projected forward.',
+  'The South African tax year runs from 1 March to the last day of February (dates in SA time).',
+]);
+
+const TAX_DISCLAIMER =
+  'This is an estimate for planning only, not tax advice and not a SARS assessment. ' +
+  'Your actual tax depends on your full financial situation. Check with SARS or a registered tax practitioner.';
+
+module.exports = {
+  SOURCE_URL,
+  CHECKED_ON,
+  TAX_TABLES,
+  SUPPORTED_TAX_YEARS,
+  TAX_ASSUMPTIONS,
+  TAX_DISCLAIMER,
+};
