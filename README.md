@@ -1495,6 +1495,7 @@ flowchart LR
     S["Stack<br/>build all images, compose up,<br/>smoke test, Newman x2"]
     I["Image scan<br/>Trivy images + Dockerfiles"]
     D["Dynamic scan<br/>OWASP ZAP baseline"]
+    A["Static analysis<br/>ESLint + Semgrep"]
     OK{{"Pipeline OK"}}
     B --> S
     F --> S
@@ -1512,23 +1513,26 @@ flowchart LR
     S --> OK
     I --> OK
     D --> OK
+    A --> OK
 ```
 
-The four fast jobs run in parallel. The stack and the ZAP scan only start
-when they all pass, so nothing is deployed or scanned on top of broken
-code. The image scan starts as soon as the Dockerfiles have passed lint.
+The four fast jobs and the static analysis job run in parallel. The stack
+and the ZAP scan only start when the four fast jobs pass, so nothing is
+deployed or scanned on top of broken code. The image scan starts as soon as
+the Dockerfiles have passed lint.
 
 **What each job checks, and why it matters for security**
 
 | Job | What it does | Why |
 |---|---|---|
-| **Backend - unit tests and npm audit** | `npm ci`, `npm test` (68 unit tests: tax calculator, startup settings check, trust proxy and rate limit buckets, health check), `npm audit --omit=dev --audit-level=high` | Proves the money and security logic behaves, and that no known high or critical vulnerability ships in a production dependency |
+| **Backend - unit tests and npm audit** | `npm ci`, `npm test` (74 unit tests: tax calculator, startup settings check, trust proxy and rate limit buckets, health check, gig price validation), `npm audit --omit=dev --audit-level=high` | Proves the money and security logic behaves, and that no known high or critical vulnerability ships in a production dependency |
 | **Frontend - tests, build and npm audit** | `npm ci`, `npm run test:run` (88 Vitest tests, including the CSP and security header consistency test), `npm run lint`, `npm run build` (and checks the CSP meta tag is in the build), `npm audit --omit=dev --audit-level=high` | Same for the React app; a build without its CSP fails |
 | **Secret scan - gitleaks (full history)** | gitleaks over **every commit** (`fetch-depth: 0`), not just the latest | A secret committed and later deleted is still in history; this catches it. No allowlist: the history scans clean |
 | **Lint - Dockerfiles, Compose and workflows** | hadolint on all three Dockerfiles; `docker compose config` on both Compose files, plus a check that Compose **refuses** to run without `JWT_SECRET`; actionlint and zizmor on this workflow | Catches insecure or broken container and pipeline configuration before anything runs. zizmor is a security audit of the workflow itself (injection, credential persistence, unpinned actions) |
 | **Stack - build, smoke test and Newman** | Generates random credentials, builds the certs, api and client images, `docker compose up -d --build --wait`, runs `docker/smoke-test.mjs`, the **rate limit** collection against the strict limits, seeds the admin, switches to the test override and runs the **main** collection (with the admin tests) | Proves the **entire stack** builds, starts healthy and enforces auth, RBAC, ownership, validation, rate limits, CORS and headers end to end |
 | **Image scan - Trivy** | Trivy on the api, client and certs images (fails on HIGH/CRITICAL vulnerabilities that have a fix, `--ignore-unfixed`), and Trivy's Dockerfile misconfiguration scan | Known-vulnerable OS packages or libraries in the images, or risky Dockerfile patterns (root user, no healthcheck, ...), fail the build. There is no `.trivyignore` |
 | **Dynamic scan - OWASP ZAP baseline** | Starts the stack and runs the ZAP baseline scan (spider plus passive scan) against `http://localhost:5173` | Tests the running app from the outside like an attacker would: missing or broken security headers, information leaks, cross-domain problems |
+| **Static analysis - ESLint and Semgrep** | ESLint with eslint-plugin-security on `api/` and `client/` (`--max-warnings 0`), Semgrep with seven rule packs (`--error`). Uploads JSON and SARIF | Finds insecure code patterns in the source before it runs. See [Static code analysis](#static-code-analysis) |
 | **Pipeline OK** | Runs last, always, and fails unless **every** job above succeeded | One check to require in branch protection |
 
 The ZAP rules live in [`.zap/rules.tsv`](.zap/rules.tsv). Missing or
@@ -1632,6 +1636,11 @@ docker compose run --rm seed
 docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --wait
 npx newman run api/postman/HustleHub_API.postman_collection.json --insecure --env-var base_url=https://localhost:5000 \
   --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
+
+# Static analysis (see "Static code analysis" below)
+cd api && npm run lint && cd ..
+cd client && npm run lint && cd ..
+node .semgrep/run.mjs
 
 # Dynamic scan (stack running; joins the Compose network, so it works the same on Windows)
 mkdir -p zap-report && cp .zap/rules.tsv zap-report/
