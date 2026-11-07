@@ -35,6 +35,16 @@ export const SECURITY_HEADERS = Object.freeze({
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'X-Frame-Options': 'DENY',
+  // The app uses none of these browser features, so no page (or injected
+  // script) can ask for them.
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  // Site isolation (Spectre): our files can only be loaded by our own
+  // origin, the page gets its own browsing context group, and it may only
+  // embed resources that opt in. Everything the app loads is same-origin,
+  // so nothing breaks.
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
 });
 
 /**
