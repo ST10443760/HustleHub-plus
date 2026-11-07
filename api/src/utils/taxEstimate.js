@@ -1,5 +1,5 @@
 const {
-  TAX_TABLES,
+  getTaxTable,
   SUPPORTED_TAX_YEARS,
   TAX_ASSUMPTIONS,
   TAX_DISCLAIMER,
@@ -19,7 +19,7 @@ const { getTaxYearRange, taxYearForDate } = require('./taxYear');
 // configured year rather than guessing new rates.
 function defaultTaxYear(now = new Date()) {
   const current = taxYearForDate(now);
-  return TAX_TABLES[current] ? current : SUPPORTED_TAX_YEARS[0];
+  return getTaxTable(current) ? current : SUPPORTED_TAX_YEARS[0];
 }
 
 /**
@@ -28,7 +28,7 @@ function defaultTaxYear(now = new Date()) {
  *   one row per month that had income ("YYYY-MM"), amounts in whole cents
  */
 function buildTaxEstimate(startYear, monthlyRows = []) {
-  const table = TAX_TABLES[startYear];
+  const table = getTaxTable(startYear);
   if (!table) throw new RangeError(`No tax table configured for ${startYear}`);
 
   const range = getTaxYearRange(startYear);
