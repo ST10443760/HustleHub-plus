@@ -1,7 +1,7 @@
 # Weekly dependency updates. Every Dependabot pull request runs the full CI
 # pipeline, so an update only lands if tests, audits and scans still pass.
 # Minor and patch updates are grouped per folder to keep the number of open
-# pull requests small; major updates come one at a time.
+# pull requests small. Major versions are ignored for npm and Docker images.
 
 version: 2
 
@@ -10,7 +10,12 @@ updates:
     directory: /api
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # The stack is pinned on purpose (Node 22, Express 4, MongoDB 8 ...), so
+    # major versions are not proposed. Minor, patch and security updates are.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 3
     groups:
       api-minor-and-patch:
         update-types: [minor, patch]
@@ -19,7 +24,12 @@ updates:
     directory: /client
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # The stack is pinned on purpose (Node 22, Express 4, MongoDB 8 ...), so
+    # major versions are not proposed. Minor, patch and security updates are.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 3
     groups:
       client-minor-and-patch:
         update-types: [minor, patch]
@@ -30,7 +40,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     groups:
       actions:
         patterns: ["*"]
@@ -43,11 +53,21 @@ updates:
       - /docker/certs
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # The stack is pinned on purpose (Node 22, Express 4, MongoDB 8 ...), so
+    # major versions are not proposed. Minor, patch and security updates are.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 3
 
   # The mongo image in docker-compose.yml.
   - package-ecosystem: docker-compose
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 2
+    # The stack is pinned on purpose (Node 22, Express 4, MongoDB 8 ...), so
+    # major versions are not proposed. Minor, patch and security updates are.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 3
