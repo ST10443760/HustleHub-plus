@@ -35,6 +35,21 @@ const userSchema = new mongoose.Schema(
       enum: ROLES,
       default: 'client',
     },
+
+    // ---- Account lockout (see utils/lockout.js) ----
+    // Internal only: select: false, stripped by toJSON, never in a token.
+    // Accounts created before these existed simply don't have them, which
+    // the lockout logic treats as "no failures".
+    failedLoginAttempts: { type: Number, default: 0, min: 0, select: false },
+    firstFailedLoginAt: { type: Date, default: null, select: false },
+    lastFailedLoginAt: { type: Date, default: null, select: false },
+    lockUntil: { type: Date, default: null, select: false },
+
+    // ---- Session revocation ----
+    // Copied into every JWT as "tv". Changing the password or "sign out of
+    // all devices" increments it, so every older token stops working.
+    // Missing (older accounts) counts as 0.
+    tokenVersion: { type: Number, default: 0, min: 0, select: false },
   },
   {
     timestamps: true,
@@ -42,14 +57,18 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Safe public shape for API responses: string id, no hash, no __v.
+// Never part of an API response, even if a query selected them.
+const PRIVATE_FIELDS = ['passwordHash', 'failedLoginAttempts', 'firstFailedLoginAt', 'lastFailedLoginAt', 'lockUntil', 'tokenVersion'];
+
+// Safe public shape for API responses: string id, no hash, no lockout or
+// session fields, no __v.
 userSchema.set('toJSON', {
   transform(doc, ret) {
-    ret.id = ret._id.toString();
-    delete ret._id;
-    delete ret.__v;
-    delete ret.passwordHash;
-    return ret;
+    const safe = { ...ret, id: ret._id.toString() };
+    delete safe._id;
+    delete safe.__v;
+    for (const field of PRIVATE_FIELDS) Reflect.deleteProperty(safe, field);
+    return safe;
   },
 });
 
