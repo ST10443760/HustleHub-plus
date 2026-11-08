@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const Gig = require('../models/Gig');
+const AuditLog = require('../models/AuditLog');
+const { recordAudit } = require('../utils/audit');
 const { AppError } = require('../middleware/errorHandler');
 const { removeOrDeactivateGig } = require('../utils/gigRemoval');
 const logger = require('../utils/logger');
@@ -67,6 +69,15 @@ async function deleteAnyGig(req, res, next) {
       gigId: result.id,
       freelancerId: gig.freelancer.toString(),
     });
+    // The gig removal doesn't use a database transaction, so the audit entry
+    // is written right after it succeeds. A failed audit write is logged and
+    // never undoes or fails the removal (see utils/audit.js).
+    await recordAudit(req, {
+      action: result.deleted ? 'admin_gig_deleted' : 'admin_gig_deactivated',
+      targetType: 'gig',
+      targetId: gig._id,
+      meta: { hadBookings: !result.deleted },
+    });
 
     res.status(200).json({ success: true, data: result });
   } catch (err) {
@@ -74,4 +85,37 @@ async function deleteAnyGig(req, res, next) {
   }
 }
 
-module.exports = { listUsers, listTransactions, deleteAnyGig };
+// GET /api/admin/audit-logs - the audit log, newest first, paginated like
+// the transactions list, optionally for one action. Actors are shown by
+// name and role only. There is deliberately no route to change or delete
+// an entry.
+async function listAuditLogs(req, res, next) {
+  try {
+    const page = req.query.page || 1;
+    const limit = req.query.limit || 20;
+    const filter = req.query.action ? { action: req.query.action } : {};
+
+    const [entries, total] = await Promise.all([
+      AuditLog.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate('actorId', 'name'),
+      AuditLog.countDocuments(filter),
+    ]);
+
+    logger.event('ADMIN', 'Viewed the audit log', { adminId: req.user.id, page, limit, action: req.query.action });
+
+    const logs = entries.map((entry) => {
+      const { actorId, ...rest } = entry.toJSON();
+      const actor = actorId && actorId.name !== undefined ? { id: actorId._id.toString(), name: actorId.name } : null;
+      return { ...rest, actor };
+    });
+
+    res.status(200).json({ success: true, data: { logs, page, limit, total } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { listUsers, listTransactions, deleteAnyGig, listAuditLogs };
