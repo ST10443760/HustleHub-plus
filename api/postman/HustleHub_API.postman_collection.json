@@ -501,7 +501,7 @@
           }
         },
         {
-          "name": "Admin Login (skipped without admin credentials)",
+          "name": "Admin Login (requires admin credentials)",
           "event": [
             {
               "listen": "prerequest",
@@ -546,7 +546,7 @@
           }
         },
         {
-          "name": "Admin Users - Admin Token (skipped without admin credentials)",
+          "name": "Admin Users - Admin Token (requires admin credentials)",
           "event": [
             {
               "listen": "prerequest",
@@ -2409,7 +2409,7 @@
           }
         },
         {
-          "name": "Tax Estimate - Admin (skipped without admin credentials)",
+          "name": "Tax Estimate - Admin (requires admin credentials)",
           "event": [
             {
               "listen": "prerequest",
@@ -2579,7 +2579,7 @@
           }
         },
         {
-          "name": "Admin Transactions - Admin (skipped without admin credentials)",
+          "name": "Admin Transactions - Admin (requires admin credentials)",
           "event": [
             {
               "listen": "prerequest",
@@ -3022,7 +3022,7 @@
           }
         },
         {
-          "name": "Admin Delete Gig - Admin (skipped without admin credentials)",
+          "name": "Admin Delete Gig - Admin (requires admin credentials)",
           "event": [
             {
               "listen": "prerequest",
@@ -3062,7 +3062,7 @@
           }
         },
         {
-          "name": "Get Gig After Admin Delete (skipped without admin credentials)",
+          "name": "Get Gig After Admin Delete (requires admin credentials)",
           "event": [
             {
               "listen": "prerequest",
