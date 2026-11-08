@@ -48,7 +48,15 @@
     { "key": "sec_client_token", "value": "" },
     { "key": "sec_fl_token", "value": "" },
     { "key": "sec_gig_id", "value": "" },
-    { "key": "big_text", "value": "" }
+    { "key": "big_text", "value": "" },
+    { "key": "lk_email", "value": "" },
+    { "key": "lk_user_id", "value": "" },
+    { "key": "lk_generic_body", "value": "" },
+    { "key": "as_email", "value": "" },
+    { "key": "as_token", "value": "" },
+    { "key": "as_token2", "value": "" },
+    { "key": "as_token3", "value": "" },
+    { "key": "as_user_id", "value": "" }
   ],
   "item": [
     {
@@ -2630,6 +2638,1196 @@
       ]
     },
     {
+      "name": "Account security",
+      "item": [
+        {
+          "name": "Lockout - Register Throwaway User (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('lk_email', `test-lock-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('lk_user_id', pm.response.json().data.user.id);",
+                  "pm.test('No password hash, lockout or session fields in the response', () => {",
+                  "  const text = pm.response.text();",
+                  "  ['passwordHash', 'failedLoginAttempts', 'firstFailedLoginAt', 'lastFailedLoginAt', 'lockUntil', 'tokenVersion'].forEach((field) => {",
+                  "    pm.expect(text).to.not.include(field);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lockout Test\",\n  \"email\": \"{{lk_email}}\",\n  \"password\": \"LockoutPassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Lockout - Unknown Email (baseline)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Generic message', () => pm.expect(pm.response.json().error).to.eql('Invalid email or password'));",
+                  "pm.collectionVariables.set('lk_generic_body', pm.response.text());"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test-nobody-{{$timestamp}}@example.com\",\n  \"password\": \"LockoutPassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Lockout - Wrong Password 1 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Exactly the same response as an unknown email', () => {",
+                  "  pm.expect(pm.response.text()).to.eql(pm.collectionVariables.get('lk_generic_body'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lk_email}}\",\n  \"password\": \"WrongPassword9\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Lockout - Wrong Password 2 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Exactly the same response as an unknown email', () => {",
+                  "  pm.expect(pm.response.text()).to.eql(pm.collectionVariables.get('lk_generic_body'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lk_email}}\",\n  \"password\": \"WrongPassword9\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Lockout - Wrong Password 3 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Exactly the same response as an unknown email', () => {",
+                  "  pm.expect(pm.response.text()).to.eql(pm.collectionVariables.get('lk_generic_body'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lk_email}}\",\n  \"password\": \"WrongPassword9\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Lockout - Wrong Password 4 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Exactly the same response as an unknown email', () => {",
+                  "  pm.expect(pm.response.text()).to.eql(pm.collectionVariables.get('lk_generic_body'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lk_email}}\",\n  \"password\": \"WrongPassword9\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Lockout - Wrong Password 5 of 5",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Exactly the same response as an unknown email', () => {",
+                  "  pm.expect(pm.response.text()).to.eql(pm.collectionVariables.get('lk_generic_body'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lk_email}}\",\n  \"password\": \"WrongPassword9\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Lockout - Correct Password Is Still Rejected (account locked)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Exactly the same response as an unknown email', () => {",
+                  "  pm.expect(pm.response.text()).to.eql(pm.collectionVariables.get('lk_generic_body'));",
+                  "});",
+                  "pm.test('No token handed out', () => pm.expect(pm.response.text()).to.not.include('token'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lk_email}}\",\n  \"password\": \"LockoutPassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Change Password - Register User (setup)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('as_email', `test-account-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const result = pm.response.json().data;",
+                  "pm.collectionVariables.set('as_token', result.token);",
+                  "pm.collectionVariables.set('as_user_id', result.user.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Account Test\",\n  \"email\": \"{{as_email}}\",\n  \"password\": \"AccountPassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Change Password - No Token (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"AccountPassword1\",\n  \"newPassword\": \"AccountPassword2\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Missing Fields (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/Current password is required/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Unknown Field (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/not allowed/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"AccountPassword1\",\n  \"newPassword\": \"AccountPassword2\",\n  \"userId\": \"{{bk_client_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Not Text (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/must be text/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": [\n    \"AccountPassword1\"\n  ],\n  \"newPassword\": \"AccountPassword2\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Same As Current (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/must be different/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"AccountPassword1\",\n  \"newPassword\": \"AccountPassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Weak New Password (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/at least 8 characters/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"AccountPassword1\",\n  \"newPassword\": \"short\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Over 72 Bytes (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/at most 72 bytes/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"AccountPassword1\",\n  \"newPassword\": \"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Wrong Current Password (400, not 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/Current password is incorrect/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"NotMyPassword9\",\n  \"newPassword\": \"AccountPassword2\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Session Still Valid After A Wrong Attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Change Password - Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json().data;",
+                  "pm.test('Returns a fresh token for this session', () => {",
+                  "  pm.expect(result.token).to.be.a('string');",
+                  "  pm.expect(result.token).to.not.eql(pm.collectionVariables.get('as_token'));",
+                  "  pm.expect(result.user.id).to.eql(pm.collectionVariables.get('as_user_id'));",
+                  "});",
+                  "pm.collectionVariables.set('as_token2', result.token);",
+                  "pm.test('No password hash, lockout or session fields in the response', () => {",
+                  "  const text = pm.response.text();",
+                  "  ['passwordHash', 'failedLoginAttempts', 'firstFailedLoginAt', 'lastFailedLoginAt', 'lockUntil', 'tokenVersion'].forEach((field) => {",
+                  "    pm.expect(text).to.not.include(field);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"AccountPassword1\",\n  \"newPassword\": \"AccountPassword2\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "Change Password - Old Token Rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Change Password - New Token Works",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No password hash, lockout or session fields in the response', () => {",
+                  "  const text = pm.response.text();",
+                  "  ['passwordHash', 'failedLoginAttempts', 'firstFailedLoginAt', 'lastFailedLoginAt', 'lockUntil', 'tokenVersion'].forEach((field) => {",
+                  "    pm.expect(text).to.not.include(field);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token2}}"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Change Password - Old Password No Longer Logs In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/^Invalid email or password$/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{as_email}}\",\n  \"password\": \"AccountPassword1\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Change Password - New Password Logs In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('as_token3', pm.response.json().data.token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{as_email}}\",\n  \"password\": \"AccountPassword2\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Logout All - No Token (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/auth/logout-all"
+          }
+        },
+        {
+          "name": "Logout All - Unknown Field (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/not allowed/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token3}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{bk_client_id}}\"\n}"
+            },
+            "url": "{{base_url}}/api/auth/logout-all"
+          }
+        },
+        {
+          "name": "Logout All - Success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Says so', () => pm.expect(pm.response.json().data.message).to.match(/signed out of all devices/));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token3}}"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/logout-all"
+          }
+        },
+        {
+          "name": "Logout All - Current Token No Longer Works",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token3}}"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Logout All - Other Session Token No Longer Works",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{as_token2}}"
+              }
+            ],
+            "url": "{{base_url}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Audit Log - Client (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_client_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/audit-logs"
+          }
+        },
+        {
+          "name": "Audit Log - Freelancer (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bk_fa_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/audit-logs"
+          }
+        },
+        {
+          "name": "Audit Log - No Token (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/admin/audit-logs"
+          }
+        },
+        {
+          "name": "Audit Log - Bad Action Filter (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/action must be one of/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/audit-logs?action=drop_database"
+          }
+        },
+        {
+          "name": "Audit Log - Unknown Query Param (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Standard error shape', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(false);",
+                  "  pm.expect(json.error).to.match(/not allowed/);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/audit-logs?actorId={{bk_client_id}}"
+          }
+        },
+        {
+          "name": "Audit Log - Admin Sees The Password Change (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json().data;",
+                  "const entry = result.logs.find((log) => log.targetId === pm.collectionVariables.get('as_user_id'));",
+                  "pm.test('The password change is recorded, by that user, about that user', () => {",
+                  "  pm.expect(entry, 'audit entry').to.be.an('object');",
+                  "  pm.expect(entry.action).to.eql('password_changed');",
+                  "  pm.expect(entry.outcome).to.eql('success');",
+                  "  pm.expect(entry.actor.id).to.eql(pm.collectionVariables.get('as_user_id'));",
+                  "  pm.expect(entry.actorRole).to.eql('client');",
+                  "  pm.expect(entry.targetType).to.eql('user');",
+                  "});",
+                  "pm.test('Newest first, paginated, filtered to one action', () => {",
+                  "  pm.expect(result).to.include.keys('logs', 'page', 'limit', 'total');",
+                  "  pm.expect(result.logs.every((log) => log.action === 'password_changed')).to.be.true;",
+                  "  for (let i = 1; i < result.logs.length; i++) {",
+                  "    pm.expect(new Date(result.logs[i - 1].createdAt) >= new Date(result.logs[i].createdAt)).to.be.true;",
+                  "  }",
+                  "});",
+                  "pm.test('No emails, passwords or tokens in the audit log', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('eyJ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/audit-logs?action=password_changed&limit=50"
+          }
+        },
+        {
+          "name": "Audit Log - Admin Sees The Logout All (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json().data;",
+                  "const entry = result.logs.find((log) => log.targetId === pm.collectionVariables.get('as_user_id'));",
+                  "pm.test('The sign out everywhere is recorded', () => {",
+                  "  pm.expect(entry, 'audit entry').to.be.an('object');",
+                  "  pm.expect(entry.action).to.eql('logout_all');",
+                  "  pm.expect(entry.outcome).to.eql('success');",
+                  "});",
+                  "pm.test('Newest first, paginated, filtered to one action', () => {",
+                  "  pm.expect(result).to.include.keys('logs', 'page', 'limit', 'total');",
+                  "  pm.expect(result.logs.every((log) => log.action === 'logout_all')).to.be.true;",
+                  "  for (let i = 1; i < result.logs.length; i++) {",
+                  "    pm.expect(new Date(result.logs[i - 1].createdAt) >= new Date(result.logs[i].createdAt)).to.be.true;",
+                  "  }",
+                  "});",
+                  "pm.test('No emails, passwords or tokens in the audit log', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('eyJ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/audit-logs?action=logout_all&limit=50"
+          }
+        },
+        {
+          "name": "Audit Log - Admin Sees The Lockout (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json().data;",
+                  "const entry = result.logs.find((log) => log.targetId === pm.collectionVariables.get('lk_user_id'));",
+                  "pm.test('The lockout is recorded with its attempt count', () => {",
+                  "  pm.expect(entry, 'audit entry').to.be.an('object');",
+                  "  pm.expect(entry.action).to.eql('account_locked');",
+                  "  pm.expect(entry.outcome).to.eql('success');",
+                  "  pm.expect(entry.meta).to.eql({ failedAttempts: 5, lockMinutes: 15 });",
+                  "});",
+                  "pm.test('Newest first, paginated, filtered to one action', () => {",
+                  "  pm.expect(result).to.include.keys('logs', 'page', 'limit', 'total');",
+                  "  pm.expect(result.logs.every((log) => log.action === 'account_locked')).to.be.true;",
+                  "  for (let i = 1; i < result.logs.length; i++) {",
+                  "    pm.expect(new Date(result.logs[i - 1].createdAt) >= new Date(result.logs[i].createdAt)).to.be.true;",
+                  "  }",
+                  "});",
+                  "pm.test('No emails, passwords or tokens in the audit log', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('eyJ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/audit-logs?action=account_locked&limit=50"
+          }
+        }
+      ]
+    },
+    {
       "name": "Security",
       "description": "Security headers, injection attempts, locked CORS, body errors and admin-only gig removal.",
       "item": [
@@ -3094,6 +4292,64 @@
               }
             ],
             "url": "{{base_url}}/api/gigs/{{sec_gig_id}}"
+          }
+        },
+        {
+          "name": "Audit Log - Admin Sees The Gig Deletion (skipped without admin credentials)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Only runs when admin credentials are supplied (see the RBAC folder).",
+                  "if (!pm.variables.get('admin_email') || !pm.variables.get('admin_password') || !pm.collectionVariables.get('admin_token')) {",
+                  "  console.log('Skipping: admin credentials not set');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const result = pm.response.json().data;",
+                  "const entry = result.logs.find((log) => log.targetId === pm.collectionVariables.get('sec_gig_id'));",
+                  "pm.test('The admin gig deletion is recorded, by an admin', () => {",
+                  "  pm.expect(entry, 'audit entry').to.be.an('object');",
+                  "  pm.expect(entry.action).to.eql('admin_gig_deleted');",
+                  "  pm.expect(entry.outcome).to.eql('success');",
+                  "  pm.expect(entry.actorRole).to.eql('admin');",
+                  "  pm.expect(entry.targetType).to.eql('gig');",
+                  "  pm.expect(entry.actor).to.have.keys('id', 'name');",
+                  "});",
+                  "pm.test('Newest first, paginated, filtered to one action', () => {",
+                  "  pm.expect(result).to.include.keys('logs', 'page', 'limit', 'total');",
+                  "  pm.expect(result.logs.every((log) => log.action === 'admin_gig_deleted')).to.be.true;",
+                  "  for (let i = 1; i < result.logs.length; i++) {",
+                  "    pm.expect(new Date(result.logs[i - 1].createdAt) >= new Date(result.logs[i].createdAt)).to.be.true;",
+                  "  }",
+                  "});",
+                  "pm.test('No emails, passwords or tokens in the audit log', () => {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.not.include('@example.com');",
+                  "  pm.expect(text).to.not.include('passwordHash');",
+                  "  pm.expect(text).to.not.include('eyJ');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": "{{base_url}}/api/admin/audit-logs?action=admin_gig_deleted&limit=50"
           }
         }
       ]
