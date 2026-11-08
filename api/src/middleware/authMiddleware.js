@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const { AppError } = require('./errorHandler');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const { tokenVersionOf } = require('../utils/generateToken');
 
 /**
  * Protects a route - requires a valid JWT in the Authorization header
@@ -36,10 +37,16 @@ async function protect(req, res, next) {
   try {
     // Role comes from the database, not the token, so a role change takes
     // effect straight away.
-    const user = await User.findById(decoded.id).select('role');
+    const user = await User.findById(decoded.id).select('role +tokenVersion');
 
     if (!user) {
       return next(new AppError('Not authenticated - user no longer exists', 401));
+    }
+
+    // A password change or "sign out of all devices" bumps tokenVersion,
+    // which ends every token issued before it.
+    if (tokenVersionOf(decoded) !== tokenVersionOf(user)) {
+      return next(new AppError('Not authenticated - invalid or expired token', 401));
     }
 
     req.user = { id: user.id, role: user.role };
