@@ -733,6 +733,18 @@ main {
   fill: transparent;
 }
 
+/* ---------- Account page and audit log ---------- */
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.audit-detail {
+  display: block;
+}
+
 /* ---------- Small screens ---------- */
 @media (max-width: 760px) {
   .filters {
