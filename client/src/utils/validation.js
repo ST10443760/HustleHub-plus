@@ -7,6 +7,35 @@
 // A pragmatic email shape check; the API's isEmail() has the final say.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// bcrypt only uses the first 72 bytes of a password (an emoji is 4 bytes).
+export const MAX_PASSWORD_BYTES = 72;
+
+// API: at least 8 characters, at least one number, at most 72 bytes.
+// The same rules for registration and for a new password.
+export function passwordProblem(password, label) {
+  if (!password) return `${label} is required`;
+  if (password.length < 8) return `${label} must be at least 8 characters`;
+  if (!/\d/.test(password)) return `${label} must contain at least one number`;
+  if (new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES) {
+    return `${label} must be at most ${MAX_PASSWORD_BYTES} bytes (about ${MAX_PASSWORD_BYTES} plain characters)`;
+  }
+  return '';
+}
+
+// Account page: current password, new password and its confirmation.
+export function validateChangePassword({ currentPassword, newPassword, confirmPassword }) {
+  const errors = {};
+  if (!currentPassword) errors.currentPassword = 'Current password is required';
+
+  const newError = passwordProblem(newPassword, 'New password');
+  if (newError) errors.newPassword = newError;
+  else if (newPassword === currentPassword) errors.newPassword = 'New password must be different from the current password';
+
+  if (!confirmPassword) errors.confirmPassword = 'Type the new password again';
+  else if (confirmPassword !== newPassword) errors.confirmPassword = 'The passwords do not match';
+  return errors;
+}
+
 export function validateRegister({ name, email, password, role }) {
   const errors = {};
 
@@ -18,10 +47,8 @@ export function validateRegister({ name, email, password, role }) {
   if (!email) errors.email = 'Email is required';
   else if (!EMAIL_PATTERN.test(email)) errors.email = 'Must be a valid email address';
 
-  // API: at least 8 characters with at least one number
-  if (!password) errors.password = 'Password is required';
-  else if (password.length < 8) errors.password = 'Password must be at least 8 characters';
-  else if (!/\d/.test(password)) errors.password = 'Password must contain at least one number';
+  const passwordError = passwordProblem(password, 'Password');
+  if (passwordError) errors.password = passwordError;
 
   // API: optional, client or freelancer only
   if (role !== 'client' && role !== 'freelancer') errors.role = 'Choose client or freelancer';
