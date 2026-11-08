@@ -1,4 +1,4 @@
-# HustleHub+
+﻿# HustleHub+
 
 HustleHub+ is a secure freelance marketplace platform. Freelancers advertise
 services, clients browse and book them, and the platform records the
@@ -101,7 +101,7 @@ only for convenience).
 | Input handling | express-validator on register and login | Validators on every route with unknown fields rejected, HTML escaping, NoSQL operator stripping, strict id checks, regex-safe search |
 | Abuse protection | None | Rate limits on login, register and booking, plus a general limit |
 | Headers | Helmet defaults | Explicit Helmet config with a strict CSP on the API, a separate CSP on the built client, CORS locked to the client origin |
-| Tests | One Postman collection (auth) | Main Postman collection (Auth, RBAC, Gigs, Bookings, Income, Security), a rate limit collection, and 67 Vitest + React Testing Library tests |
+| Tests | One Postman collection (auth) | Main Postman collection (Auth, RBAC, Gigs, Bookings, Income, Security), a rate limit collection, and 87 Vitest + React Testing Library tests |
 
 ## 4. Architecture
 
@@ -348,12 +348,12 @@ the Vite proxy forwards them to the API.
 
 1. Create a free account at <https://www.mongodb.com/cloud/atlas> and create a
    free (M0) cluster.
-2. **Database Access** → Add New Database User. Give it a username and a
+2. **Database Access** â†’ Add New Database User. Give it a username and a
    password made of **plain letters and numbers only** (symbols such as
    `@`, `:` or `/` would have to be URL-encoded in the connection string),
    with the "Read and write to any database" role.
-3. **Network Access** → Add IP Address → **Add Current IP Address**.
-4. **Connect** → Drivers, and copy the connection string. Put your database
+3. **Network Access** â†’ Add IP Address â†’ **Add Current IP Address**.
+4. **Connect** â†’ Drivers, and copy the connection string. Put your database
    user's password in place of `<password>`, and add the database name
    `hustlehub` after the host, before the `?`:
    `mongodb+srv://<user>:<password>@<your-cluster-host>/hustlehub?retryWrites=true&w=majority`
@@ -391,7 +391,7 @@ npm run dev               # https://localhost:5000 (nodemon)
   safe message (never the URI) if it can't.
 - Check it: `curl -k https://localhost:5000/api/health`. Browsers and Postman
   warn about the self-signed certificate - that's expected locally (in
-  Postman, turn off "SSL certificate verification" under Settings → General).
+  Postman, turn off "SSL certificate verification" under Settings â†’ General).
 - Other API scripts: `npm start` (no nodemon), `npm run start:test` (relaxed
   rate limits for the main Newman run - see **Testing**), `npm run clean:test`
   (see below).
@@ -643,7 +643,7 @@ The problems below all came up while building and testing this project.
 
 | Problem | Cause | Fix |
 |---|---|---|
-| The API exits with `MongoDB connection failed {"errorName":"Error","code":"ECONNREFUSED"}`, and the SRV lookup (`querySrv ECONNREFUSED`) fails, although Atlas is reachable | On some Windows networks Node can't resolve the DNS SRV record that a `mongodb+srv://` string needs | Use the **standard, non-SRV** connection string: in Atlas, Connect → Drivers, choose the older driver version / "Legacy URI String" option, which gives `mongodb://host1:27017,host2:27017,host3:27017/hustlehub?replicaSet=...&ssl=true&authSource=admin`. Add `/hustlehub` as the database name and put it in `MONGO_URI` |
+| The API exits with `MongoDB connection failed {"errorName":"Error","code":"ECONNREFUSED"}`, and the SRV lookup (`querySrv ECONNREFUSED`) fails, although Atlas is reachable | On some Windows networks Node can't resolve the DNS SRV record that a `mongodb+srv://` string needs | Use the **standard, non-SRV** connection string: in Atlas, Connect â†’ Drivers, choose the older driver version / "Legacy URI String" option, which gives `mongodb://host1:27017,host2:27017,host3:27017/hustlehub?replicaSet=...&ssl=true&authSource=admin`. Add `/hustlehub` as the database name and put it in `MONGO_URI` |
 | The API exits with `MongoDB connection failed` (other codes) | Wrong user or password, or your IP isn't allowed | Check the database user and password, and add your current IP under Atlas **Network Access** |
 | The API logs `No SSL certificate found in api/certs - falling back to plain HTTP`; the client shows errors and Vite logs `EPROTO ... wrong version number` (`502`); Newman fails | `api/certs/key.pem` and `cert.pem` don't exist, so the API runs on HTTP while the proxy and Postman expect HTTPS | Run `npm run certs` in `api/` and restart the API |
 | Every save, login or booking in the browser fails with **"Origin not allowed"** (`403`) | The client isn't on `http://localhost:5173`, the only origin `CLIENT_ORIGIN` allows (for example, preview or dev ended up on another port) | Run the client on port 5173 (both `npm run dev` and `npm run preview` use it), keep `CLIENT_ORIGIN=http://localhost:5173` with no trailing slash, and use `http://localhost:5173`, not `127.0.0.1` |
@@ -684,8 +684,8 @@ and text never double-escapes (no `&amp;amp;`). Nothing is ever rendered as HTML
 API later answers `401`, the token is cleared and the user is sent to the
 login page. The client never logs tokens or request data.
 
-The client's Content-Security-Policy is described under **Security → Client
-Content-Security-Policy**, and its tests under **Testing → Frontend tests**.
+The client's Content-Security-Policy is described under **Security â†’ Client
+Content-Security-Policy**, and its tests under **Testing â†’ Frontend tests**.
 
 ## 9. API
 
@@ -835,8 +835,8 @@ next to the figures.
 3. **Primary rebate.** The primary rebate (R17 820 for the 2027 tax year)
    is subtracted. The result is never allowed to go below zero, so anyone
    earning the tax-free threshold (R99 000) or less pays R0.
-4. **Summary figures.** Take-home = gross − estimated tax. Effective rate =
-   estimated tax ÷ gross × 100 (0% when gross is 0).
+4. **Summary figures.** Take-home = gross âˆ’ estimated tax. Effective rate =
+   estimated tax Ã· gross Ã— 100 (0% when gross is 0).
 
 **Tax tables used**
 
@@ -878,12 +878,12 @@ a freelancer earns **R300 000** in the 2027 tax year.
 
 | Step | Calculation | Amount |
 |---|---|---|
-| First bracket | 18% × R245 100 | R44 118.00 |
-| Second bracket | 26% × (R300 000 − R245 100) = 26% × R54 900 | R14 274.00 |
+| First bracket | 18% Ã— R245 100 | R44 118.00 |
+| Second bracket | 26% Ã— (R300 000 âˆ’ R245 100) = 26% Ã— R54 900 | R14 274.00 |
 | Tax before rebate | R44 118 + R14 274 | R58 392.00 |
-| Less primary rebate | R58 392 − R17 820 | **R40 572.00 estimated tax** |
-| Take-home | R300 000 − R40 572 | **R259 428.00** |
-| Effective rate | R40 572 ÷ R300 000 × 100 = 13.524% | **13.52%** |
+| Less primary rebate | R58 392 âˆ’ R17 820 | **R40 572.00 estimated tax** |
+| Take-home | R300 000 âˆ’ R40 572 | **R259 428.00** |
+| Effective rate | R40 572 Ã· R300 000 Ã— 100 = 13.524% | **13.52%** |
 
 **Money and dates**
 
@@ -915,8 +915,8 @@ a freelancer earns **R300 000** in the 2027 tax year.
 
 **The endpoint**
 
-`GET /api/income/tax-estimate?taxYear=2026` runs protect →
-requireRole(freelancer) → query validation. The freelancer is always taken
+`GET /api/income/tax-estimate?taxYear=2026` runs protect â†’
+requireRole(freelancer) â†’ query validation. The freelancer is always taken
 from the verified token, never from the request. Clients and admins get
 `403`, no token gets `401`. `taxYear` must be a single 4-digit year that is
 in the table, and any other query parameter (for example `freelancerId`)
@@ -980,24 +980,24 @@ rate limit, body parsing with a 10kb cap, the NoSQL sanitiser).
 | Method | Route | Middleware, in order | Who |
 |---|---|---|---|
 | GET | `/api/health` | - | Anyone |
-| POST | `/api/auth/register` | registerLimiter → validators (role only client/freelancer) | Anyone |
-| POST | `/api/auth/login` | loginLimiter → validators | Anyone |
+| POST | `/api/auth/register` | registerLimiter â†’ validators (role only client/freelancer) | Anyone |
+| POST | `/api/auth/login` | loginLimiter â†’ validators | Anyone |
 | GET | `/api/auth/me` | protect | Logged in |
-| GET | `/api/admin/users` | protect → requireRole(admin) | Admin |
-| GET | `/api/admin/transactions` | protect → requireRole(admin) → pagination validators | Admin |
-| DELETE | `/api/admin/gigs/:id` | protect → requireRole(admin) → validateObjectId | Admin |
-| GET | `/api/gigs` | protect → query validators (exact params) | Logged in |
-| GET | `/api/gigs/mine` | protect → requireRole(freelancer) | Freelancer (own gigs only, by query) |
-| GET | `/api/gigs/:id` | protect → validateObjectId (+ inactive gigs only for the owner, in the controller) | Logged in |
-| POST | `/api/gigs` | protect → requireRole(freelancer) → body validators (exact fields) | Freelancer (owner = token user) |
-| PUT | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** → body validators | Owner only |
-| DELETE | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** | Owner only |
-| POST | `/api/bookings` | protect → requireRole(client) → bookingLimiter (per user) → validators (gigId only) | Client |
-| GET | `/api/bookings/mine` | protect → requireRole(client, freelancer) | Own bookings only, by query |
-| GET | `/api/bookings/:id` | protect → validateObjectId → **requireOwnership** (client or freelancer) | The booking's two parties |
-| GET | `/api/transactions/mine` | protect → requireRole(client, freelancer) | Own transactions only, by query |
-| GET | `/api/income` | protect → requireRole(freelancer) | Own income only, by query |
-| GET | `/api/income/tax-estimate` | protect → requireRole(freelancer) → validators (`taxYear` only, checkExact) | Own income only, by query |
+| GET | `/api/admin/users` | protect â†’ requireRole(admin) | Admin |
+| GET | `/api/admin/transactions` | protect â†’ requireRole(admin) â†’ pagination validators | Admin |
+| DELETE | `/api/admin/gigs/:id` | protect â†’ requireRole(admin) â†’ validateObjectId | Admin |
+| GET | `/api/gigs` | protect â†’ query validators (exact params) | Logged in |
+| GET | `/api/gigs/mine` | protect â†’ requireRole(freelancer) | Freelancer (own gigs only, by query) |
+| GET | `/api/gigs/:id` | protect â†’ validateObjectId (+ inactive gigs only for the owner, in the controller) | Logged in |
+| POST | `/api/gigs` | protect â†’ requireRole(freelancer) â†’ body validators (exact fields) | Freelancer (owner = token user) |
+| PUT | `/api/gigs/:id` | protect â†’ requireRole(freelancer) â†’ validateObjectId â†’ **requireOwnership** â†’ body validators | Owner only |
+| DELETE | `/api/gigs/:id` | protect â†’ requireRole(freelancer) â†’ validateObjectId â†’ **requireOwnership** | Owner only |
+| POST | `/api/bookings` | protect â†’ requireRole(client) â†’ bookingLimiter (per user) â†’ validators (gigId only) | Client |
+| GET | `/api/bookings/mine` | protect â†’ requireRole(client, freelancer) | Own bookings only, by query |
+| GET | `/api/bookings/:id` | protect â†’ validateObjectId â†’ **requireOwnership** (client or freelancer) | The booking's two parties |
+| GET | `/api/transactions/mine` | protect â†’ requireRole(client, freelancer) | Own transactions only, by query |
+| GET | `/api/income` | protect â†’ requireRole(freelancer) | Own income only, by query |
+| GET | `/api/income/tax-estimate` | protect â†’ requireRole(freelancer) â†’ validators (`taxYear` only, checkExact) | Own income only, by query |
 
 Every route except health, register and login requires a valid JWT; every
 role-restricted route uses `requireRole`; every route that reads or changes
@@ -1245,7 +1245,7 @@ Results of `npm audit` at submission time:
 | `client/` | **0 vulnerabilities** | **0 vulnerabilities** |
 
 **Known and accepted:** the three `api/` findings are one issue in `braces`,
-reached only through `nodemon` → `chokidar` → `braces`. nodemon is a
+reached only through `nodemon` â†’ `chokidar` â†’ `braces`. nodemon is a
 development tool that watches files and restarts the server; it never runs
 in a deployed API and never handles requests. The only available fix
 (`npm audit fix --force`) downgrades nodemon to 1.x, which is a breaking
@@ -1414,19 +1414,19 @@ in memory, so restart the API before running it again to start with a clean
 window.
 
 Both collections can also be imported into Postman (disable SSL certificate
-verification under Settings → General).
+verification under Settings â†’ General).
 
 ### Test evidence
 
-Real output from fresh runs on 12 October 2026 is committed in
+Real output from fresh runs on 7–8 November 2026 is committed in
 [`docs/test-evidence/`](docs/test-evidence/README.md) as plain text, alongside
 screenshots of the same runs:
 
 | Suite | How to run it | Result | Evidence |
 |---|---|---|---|
-| Main Postman collection (Newman) | API on `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure` with the admin credentials | **85 requests, 145 assertions, 0 failed** (80 / 134 without admin credentials, when the 5 admin requests are skipped) | [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt), [screenshot 11](docs/screenshots/11-newman-pass.png) |
+| Main Postman collection (Newman) | API on `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure` with the admin credentials | **94 requests, 173 assertions, 0 failed** | [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt), [screenshot 11](docs/screenshots/11-newman-pass.png) |
 | Rate limit collection (Newman) | API freshly started with `npm run dev` (strict limits), then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure` | **20 requests, 26 assertions, 0 failed** | [`newman-rate-limits-results.txt`](docs/test-evidence/newman-rate-limits-results.txt), [screenshot 11b](docs/screenshots/11b-newman-rate-limits.png), [screenshot 14](docs/screenshots/14-rate-limit-429.png) |
-| Frontend (Vitest + React Testing Library) | `npm run test:run` in `client/` | **16 files, 67 tests passed** | [`vitest-results.txt`](docs/test-evidence/vitest-results.txt), [screenshot 12](docs/screenshots/12-vitest-pass.png) |
+| Frontend (Vitest + React Testing Library) | `npm run test:run` in `client/` | **18 files, 87 tests passed** | [`vitest-results.txt`](docs/test-evidence/vitest-results.txt), [screenshot 12](docs/screenshots/12-vitest-pass.png) |
 
 ### Frontend tests
 
@@ -1441,7 +1441,7 @@ npm run test:run   # run everything once
 npm test           # watch mode while developing
 ```
 
-There are 67 tests across 16 files, covering both rendering and user interaction:
+There are 87 tests across 18 files, covering both rendering and user interaction:
 
 - **Utilities:** `decodeEntities` (every entity the API produces, single-pass
   decoding), rand and date formatting, and the register and gig validation
@@ -1490,7 +1490,7 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
 | 6 | Security: JWT on protected routes, RBAC, input sanitised | `protect` (JWT + DB user), `requireRole`, `requireOwnership`, validators, HTML escaping, `express-mongo-sanitize` | `api/src/middleware/` (authMiddleware, ownership, validators, sanitize, validateObjectId) | Newman **Auth**, **RBAC** and **Security** folders; route audit table above; `ProtectedRoute.test.jsx`, `client.test.js` | Newman Auth, RBAC and Security folders in [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt); [`vitest-results.txt`](docs/test-evidence/vitest-results.txt) |
 | 7 | Rate limiting on sensitive endpoints with a meaningful response | Login (failed only), register, booking (per user), general; `429` + `Retry-After` + message; strict in production | `api/src/middleware/rateLimiters.js`, `config/rateLimits.js` | Newman **rate limit collection** (6th failed login and 11th booking get `429`); `BookingPanel.test.jsx` and `Login.test.jsx` show the retry message | [`newman-rate-limits-results.txt`](docs/test-evidence/newman-rate-limits-results.txt); screenshots [11b](docs/screenshots/11b-newman-rate-limits.png), [14](docs/screenshots/14-rate-limit-429.png) |
 | 8 | Helmet security headers with a restrictive CSP | Explicit Helmet config, CSP without `unsafe-inline`/`unsafe-eval` on the API; client CSP meta tag at build time and as headers in preview | `api/src/config/security.js`, `client/vite.config.js` | Newman **Security** folder (headers); headless-browser check of the built client: 0 CSP violations | Newman Security folder in [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt); screenshots [13](docs/screenshots/13-security-headers.png), [13b](docs/screenshots/13b-security-headers-continued.png) |
-| 9 | Testing: Postman + Newman for key endpoints; frontend tests for rendering and interaction | Main collection (Auth, RBAC, Gigs, Bookings, Income, Security), rate limit collection, 67 Vitest tests | `api/postman/`, `client/src/**/*.test.js(x)` | `npx newman run ...` and `npm run test:run` (see **Testing**) | All three files in [`docs/test-evidence/`](docs/test-evidence/README.md); screenshots [11](docs/screenshots/11-newman-pass.png), [11b](docs/screenshots/11b-newman-rate-limits.png), [12](docs/screenshots/12-vitest-pass.png) |
+| 9 | Testing: Postman + Newman for key endpoints; frontend tests for rendering and interaction | Main collection (Auth, RBAC, Gigs, Bookings, Income, Security), rate limit collection, 87 Vitest tests | `api/postman/`, `client/src/**/*.test.js(x)` | `npx newman run ...` and `npm run test:run` (see **Testing**) | All three files in [`docs/test-evidence/`](docs/test-evidence/README.md); screenshots [11](docs/screenshots/11-newman-pass.png), [11b](docs/screenshots/11b-newman-rate-limits.png), [12](docs/screenshots/12-vitest-pass.png) |
 | 10 | README: features, security, how to run backend and frontend, testing | This document | `README.md`, `api/certs/README.md` | Every command run on a fresh clone | This README; every command run on a fresh clone |
 | 11 | Demonstration video: auth, gig creation, booking, transaction recording | Recorded walkthrough | See **Demonstration Video** | Watching the video | [Demo video](https://youtu.be/H5GcOdMPQNw) |
 
@@ -1600,7 +1600,7 @@ _Against the strict limits, the 6th failed login and the 11th booking are refuse
 
 **12-vitest-pass**
 
-![Terminal summary of Vitest showing 16 test files and 67 tests passed (editor pane redacted)](docs/screenshots/12-vitest-pass.png)
+![Historical Vitest screenshot showing 16 files and 67 tests; superseded by the current 18-file, 87-test results](docs/screenshots/12-vitest-pass.png)
 
 _All frontend tests pass. The editor pane was blacked out because it showed the local .env._
 
@@ -1658,3 +1658,5 @@ From the Part 1 submission (Postman, API only), kept for reference in
 ![Login Wrong Password](./docs/screenshots/part1/06-login-wrong-password.png)
 ![Protected No Token](./docs/screenshots/part1/07-protected-no-token.png)
 ![Protected Valid Token](./docs/screenshots/part1/08-protected-valid-token.png)
+
+
