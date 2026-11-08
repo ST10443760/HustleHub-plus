@@ -9,17 +9,21 @@ const NAV_LINKS = {
     { to: '/gigs', label: 'Browse gigs' },
     { to: '/bookings', label: 'My bookings' },
     { to: '/transactions', label: 'My transactions' },
+    { to: '/account', label: 'Account' },
   ],
   freelancer: [
     { to: '/gigs', label: 'Browse gigs' },
     { to: '/freelancer/gigs', label: 'My gigs' },
     { to: '/freelancer/bookings', label: 'Bookings' },
     { to: '/income', label: 'Income' },
+    { to: '/account', label: 'Account' },
   ],
   admin: [
     { to: '/gigs', label: 'Browse gigs' },
     { to: '/admin/users', label: 'Users' },
     { to: '/admin/transactions', label: 'Transactions' },
+    { to: '/admin/audit-log', label: 'Audit log' },
+    { to: '/account', label: 'Account' },
   ],
 };
 

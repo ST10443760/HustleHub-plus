@@ -1,6 +1,8 @@
 import { Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import Account from './pages/Account';
+import AdminAuditLog from './pages/AdminAuditLog';
 import AdminTransactions from './pages/AdminTransactions';
 import AdminUsers from './pages/AdminUsers';
 import FreelancerBookings from './pages/FreelancerBookings';
@@ -28,6 +30,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="gigs" element={<Gigs />} />
           <Route path="gigs/:id" element={<GigDetail />} />
+          <Route path="account" element={<Account />} />
         </Route>
 
         {/* Clients */}
@@ -49,6 +52,7 @@ export default function App() {
         <Route element={<ProtectedRoute roles={['admin']} />}>
           <Route path="admin/users" element={<AdminUsers />} />
           <Route path="admin/transactions" element={<AdminTransactions />} />
+          <Route path="admin/audit-log" element={<AdminAuditLog />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />
