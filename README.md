@@ -661,9 +661,13 @@ The problems below all came up while building and testing this project.
 | Role | Screens |
 |---|---|
 | Anyone | Home, Register (client or freelancer only), Log in |
-| Client | Browse gigs (search, category, price range, pages), Gig detail with **Book this gig** and a simulated payment confirmation, My bookings, My transactions |
-| Freelancer | Browse gigs, My gigs (New, Edit, Activate/Deactivate, Delete with confirmation), New/Edit gig form, Bookings on my gigs, Income (total, booking count, per-booking table), an **Edit** link on their own gig pages |
-| Admin | Browse gigs, Users (name, email, role, joined), All transactions (paginated), **Delete as admin** on any gig page |
+| Client | Browse gigs (search, category, price range, pages), Gig detail with **Book this gig** and a simulated payment confirmation, My bookings, My transactions, Account |
+| Freelancer | Browse gigs, My gigs (New, Edit, Activate/Deactivate, Delete with confirmation), New/Edit gig form, Bookings on my gigs, Income (total, booking count, per-booking table), an **Edit** link on their own gig pages, Account |
+| Admin | Browse gigs, Users (name, email, role, joined), All transactions (paginated), **Audit log** (paginated, filter by action), **Delete as admin** on any gig page, Account |
+
+Every role has an **Account** page: change password (current, new and
+confirm, with inline validation) and **Sign out of all devices** (with a
+confirmation step). See [Extra security features](#extra-security-features).
 
 A logged-out visitor who opens a protected page is sent to Log in; a
 logged-in user with the wrong role sees a "Not allowed" page. These are
@@ -684,7 +688,9 @@ and text never double-escapes (no `&amp;amp;`). Nothing is ever rendered as HTML
 **Session.** Only the JWT is stored, in `localStorage` (see the trade-off under
 **Security**). On start-up the client checks it with `GET /api/auth/me`; if the
 API later answers `401`, the token is cleared and the user is sent to the
-login page. The client never logs tokens or request data.
+login page. The client never logs tokens or request data. Every token carries
+a version number; changing the password or signing out of all devices ends
+every older token (see **Extra security features**).
 
 The client's Content-Security-Policy is described under **Security → Client
 Content-Security-Policy**, and its tests under **Testing → Frontend tests**.
@@ -703,7 +709,11 @@ trusting the token, so a role change takes effect immediately.
 |---|---|---|
 | `client` | Default at registration | Browse gigs, book gigs, view their own bookings and transactions |
 | `freelancer` | Choose it at registration | Create, edit and delete their **own** gigs, view bookings on their gigs, view their income |
-| `admin` | Only via `npm run seed:admin` | List all users, view all transactions, remove any gig |
+| `admin` | Only via `npm run seed:admin` | List all users, view all transactions, remove any gig, read the audit log |
+
+Every role can change its own password and sign out of all its devices
+(`/api/auth/change-password`, `/api/auth/logout-all`). Nobody can change
+another user's password.
 
 Registration only accepts `client` or `freelancer`. Sending
 `"role": "admin"` is rejected with a `400`, so nobody can make themselves an
@@ -729,11 +739,14 @@ database.
 |---|---|---|---|
 | GET | `/api/health` | Anyone | Health check |
 | POST | `/api/auth/register` | Anyone | `role` may be `client` (default) or `freelancer`, never `admin`. Rate limited |
-| POST | `/api/auth/login` | Anyone | Same generic error for wrong password and unknown email. Rate limited |
+| POST | `/api/auth/login` | Anyone | Same generic `401` for a wrong password, an unknown email and a locked account. Rate limited per IP, plus the per-account lockout |
 | GET | `/api/auth/me` | Logged in | The current user |
+| POST | `/api/auth/change-password` | Logged in | Body `{ currentPassword, newPassword }` only. Wrong current password: `400`. Success: new token, every other session ends. Rate limited per user |
+| POST | `/api/auth/logout-all` | Logged in | No body. Ends every session of the account, this one included |
 | GET | `/api/admin/users` | Admin | All users, newest first, no password hashes |
 | GET | `/api/admin/transactions` | Admin | All transactions, newest first. Query: `page`, `limit` (max 50) |
-| DELETE | `/api/admin/gigs/:id` | Admin | Removes any gig: deleted if it has no bookings, otherwise deactivated |
+| DELETE | `/api/admin/gigs/:id` | Admin | Removes any gig: deleted if it has no bookings, otherwise deactivated. Recorded in the audit log |
+| GET | `/api/admin/audit-logs` | Admin | The audit log, newest first. Query: `page`, `limit` (max 50), `action` (one of the audit actions). Read only |
 | GET | `/api/gigs` | Logged in | Active gigs, newest first. Query: `page`, `limit` (max 50), `category`, `q`, `minPrice`, `maxPrice` |
 | GET | `/api/gigs/mine` | Freelancer | Your own gigs, including inactive ones |
 | GET | `/api/gigs/:id` | Logged in | One gig. Inactive gigs are only visible to their owner (404 for everyone else) |
@@ -985,9 +998,12 @@ rate limit, body parsing with a 10kb cap, the NoSQL sanitiser).
 | POST | `/api/auth/register` | registerLimiter → validators (role only client/freelancer) | Anyone |
 | POST | `/api/auth/login` | loginLimiter → validators | Anyone |
 | GET | `/api/auth/me` | protect | Logged in |
+| POST | `/api/auth/change-password` | protect → passwordChangeLimiter (per user) → validators (exact fields) | Logged in (own account only) |
+| POST | `/api/auth/logout-all` | protect → validators (empty body) | Logged in (own account only) |
 | GET | `/api/admin/users` | protect → requireRole(admin) | Admin |
 | GET | `/api/admin/transactions` | protect → requireRole(admin) → pagination validators | Admin |
 | DELETE | `/api/admin/gigs/:id` | protect → requireRole(admin) → validateObjectId | Admin |
+| GET | `/api/admin/audit-logs` | protect → requireRole(admin) → query validators (exact params) | Admin |
 | GET | `/api/gigs` | protect → query validators (exact params) | Logged in |
 | GET | `/api/gigs/mine` | protect → requireRole(freelancer) | Freelancer (own gigs only, by query) |
 | GET | `/api/gigs/:id` | protect → validateObjectId (+ inactive gigs only for the owner, in the controller) | Logged in |
