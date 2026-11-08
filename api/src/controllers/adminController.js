@@ -108,7 +108,9 @@ async function listAuditLogs(req, res, next) {
 
     const logs = entries.map((entry) => {
       const { actorId, ...rest } = entry.toJSON();
-      const actor = actorId && actorId.name !== undefined ? { id: actorId._id.toString(), name: actorId.name } : null;
+      // The populated user has already been through the User model's toJSON
+      // (id, no _id). A deleted user leaves actorId null.
+      const actor = actorId && typeof actorId === 'object' && actorId.name !== undefined ? { id: actorId.id, name: actorId.name } : null;
       return { ...rest, actor };
     });
 
