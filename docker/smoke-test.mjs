@@ -12,7 +12,8 @@
  *
  * Exits 0 when every check passes, 1 on the first failure.
  *
- * It registers one throwaway client (test-smoke-...@example.com), which
+ * It registers one throwaway client (test-smoke-...@example.com), changes
+ * its password (checking the old token stops working), which
  * `npm run clean:test` removes. Registration is rate limited to 10 per hour
  * per IP, so running this more than 10 times an hour against the normal
  * stack gets a 429 (the test override relaxes the limit).
@@ -124,8 +125,20 @@ async function main() {
   const admin = await request('/api/admin/users', { token });
   check(admin.status === 403, 'admin-only route as a client returns 403', `got ${admin.status}`);
 
+  // 6. Change the password: the old session ends, the new token works.
+  const newPassword = `Smoke${randomBytes(6).toString('hex')}2`;
+  const changed = await request('/api/auth/change-password', {
+    method: 'POST',
+    token,
+    body: { currentPassword: password, newPassword },
+  });
+  const newToken = changed.json?.data?.token;
+  check(changed.status === 200 && typeof newToken === 'string', 'change the password and get a fresh token', `got ${changed.status}`);
+  check((await request('/api/auth/me', { token })).status === 401, 'the token from before the change no longer works');
+  check((await request('/api/auth/me', { token: newToken })).status === 200, 'the new token works');
+
   // Nothing secret in any of the answers.
-  const everything = [registered, login, me, anonymous, admin].map((r) => r.text).join('\n');
+  const everything = [registered, login, me, anonymous, admin, changed].map((r) => r.text).join('\n');
   check(!/passwordHash|\.js:\d+/.test(everything), 'no password hashes or stack traces in the responses');
 
   console.log(`\nSmoke test passed: ${passed} checks.`);
