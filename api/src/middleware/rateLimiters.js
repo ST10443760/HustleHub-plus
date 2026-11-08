@@ -21,6 +21,7 @@ logger.info('Rate limits active', {
   login: `${limits.login.max} failed / 15 min per IP`,
   register: `${limits.register.max} / hour per IP`,
   booking: `${limits.booking.max} / 10 min per user`,
+  passwordChange: `${limits.passwordChange.max} / 15 min per user`,
   general: `${limits.general.max} / 15 min per IP`,
 });
 
@@ -72,6 +73,11 @@ const bookingLimiter = createLimiter('booking', limits.booking, {
   keyGenerator: (req) => (req.user ? `user:${req.user.id}` : `ip:${ipKeyGenerator(req.ip)}`),
 });
 
+// Same per-user keying as bookings. Must be mounted after `protect`.
+const passwordChangeLimiter = createLimiter('passwordChange', limits.passwordChange, {
+  keyGenerator: (req) => (req.user ? `user:${req.user.id}` : `ip:${ipKeyGenerator(req.ip)}`),
+});
+
 const generalLimiter = createLimiter('general', limits.general);
 
-module.exports = { loginLimiter, registerLimiter, bookingLimiter, generalLimiter, createLimiter };
+module.exports = { loginLimiter, registerLimiter, bookingLimiter, passwordChangeLimiter, generalLimiter, createLimiter };

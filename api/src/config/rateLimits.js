@@ -15,6 +15,9 @@ const STRICT_LIMITS = {
   register: { windowMs: 60 * MINUTE, max: 10, envKey: 'RATE_LIMIT_REGISTER_MAX' },
   // Per authenticated user, not per IP.
   booking: { windowMs: 10 * MINUTE, max: 10, envKey: 'RATE_LIMIT_BOOKING_MAX' },
+  // Per authenticated user. Each attempt costs a bcrypt check and can lock
+  // the account (a wrong current password counts as a failed login).
+  passwordChange: { windowMs: 15 * MINUTE, max: 5, envKey: 'RATE_LIMIT_PASSWORD_CHANGE_MAX' },
   // Safety net across the whole API.
   general: { windowMs: 15 * MINUTE, max: 100, envKey: 'RATE_LIMIT_GENERAL_MAX' },
 };
