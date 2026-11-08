@@ -1,9 +1,8 @@
-﻿# HustleHub+
+# HustleHub+
 
 HustleHub+ is a secure freelance marketplace platform. Freelancers advertise
 services, clients browse and book them, and the platform records the
-resulting transactions and tracks freelancer income. (Tax estimation and
-income charts are planned for Part 3 and are not built yet.) Because the
+resulting transactions and tracks freelancer income. Because the
 system handles credentials, transaction records and income data, security
 was treated as a core requirement from the first line of code, not something
 added afterward.
@@ -86,9 +85,7 @@ only for convenience).
 - Bookings and their transactions written atomically in one MongoDB
   transaction; money stored as numbers rounded to 2 decimals
 - Security event logging without secrets; no stack traces in responses
-- 171 automated API assertions in Newman (145 in the main collection, 26 in
-  the rate limit collection) and 67 frontend tests (Vitest + React Testing
-  Library), all passing
+- 199 automated Newman assertions (173 in the main collection and 26 in the rate limit collection), 87 API unit tests and 87 frontend tests (Vitest + React Testing Library), all passing
 
 ## 3. What Changed Since Part 1
 
@@ -101,7 +98,7 @@ only for convenience).
 | Input handling | express-validator on register and login | Validators on every route with unknown fields rejected, HTML escaping, NoSQL operator stripping, strict id checks, regex-safe search |
 | Abuse protection | None | Rate limits on login, register and booking, plus a general limit |
 | Headers | Helmet defaults | Explicit Helmet config with a strict CSP on the API, a separate CSP on the built client, CORS locked to the client origin |
-| Tests | One Postman collection (auth) | Main Postman collection (Auth, RBAC, Gigs, Bookings, Income, Security), a rate limit collection, and 87 Vitest + React Testing Library tests |
+| Tests | One Postman collection (auth) | Main Postman collection (Auth, RBAC, Gigs, Bookings, Income, Security), a rate limit collection, 87 API unit tests, and 87 Vitest + React Testing Library frontend tests |
 
 ## 4. Architecture
 
@@ -1513,10 +1510,7 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
   audit**). Production dependencies have 0 known vulnerabilities.
 - **Payments are simulated.** A transaction is created as `completed` with a
   reference; no payment provider is involved and no money moves.
-- **Not built yet (Part 3):** tax estimation, income dashboard charts,
-  GitHub Actions CI/CD, Docker images, static analysis and cloud logging. The
-  data model is ready for them: amounts are numbers, every record has
-  timestamps, and income is already aggregated per freelancer.
+- **Not built yet (Part 3):** GitHub Actions CI/CD, static analysis and cloud logging. Docker deployment, tax estimation and monthly income charts have been implemented.
 - **Local HTTPS only.** The self-signed certificate is for development; a
   deployment needs a real certificate, and the production host should send
   the client's security headers (including `frame-ancestors 'none'`).
@@ -1658,5 +1652,3 @@ From the Part 1 submission (Postman, API only), kept for reference in
 ![Login Wrong Password](./docs/screenshots/part1/06-login-wrong-password.png)
 ![Protected No Token](./docs/screenshots/part1/07-protected-no-token.png)
 ![Protected Valid Token](./docs/screenshots/part1/08-protected-valid-token.png)
-
-
