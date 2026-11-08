@@ -5,6 +5,29 @@ const { AppError } = require('./errorHandler');
  * Validation rule sets for auth routes. Kept separate from the controller
  * so the "what's allowed in" rules are easy to find and audit in one place.
  */
+
+// bcrypt only uses the first 72 bytes of a password and silently ignores the
+// rest, so a longer password would be weaker than it looks. Measured in
+// bytes, not characters: an emoji is 4 bytes.
+const MAX_PASSWORD_BYTES = 72;
+const isText = (value) => typeof value === 'string';
+
+/**
+ * The one set of password strength rules, used by registration and by
+ * change-password so the two can't drift apart. `label` starts each message.
+ */
+function strongPassword(field, label) {
+  return body(field)
+    .exists().withMessage(`${label} is required`).bail()
+    // typeof, not isString(): isString() would pass an array of strings.
+    .custom(isText).withMessage(`${label} must be text`).bail()
+    .notEmpty().withMessage(`${label} is required`).bail()
+    .isLength({ min: 8 }).withMessage(`${label} must be at least 8 characters`)
+    .matches(/\d/).withMessage(`${label} must contain at least one number`)
+    .custom((value) => Buffer.byteLength(value, 'utf8') <= MAX_PASSWORD_BYTES)
+    .withMessage(`${label} must be at most ${MAX_PASSWORD_BYTES} bytes (about ${MAX_PASSWORD_BYTES} plain characters)`);
+}
+
 const registerValidationRules = [
   body('name')
     .exists().withMessage('Name is required').bail()
@@ -19,10 +42,7 @@ const registerValidationRules = [
     .notEmpty().withMessage('Email is required')
     .isEmail().withMessage('Must be a valid email address')
     .normalizeEmail(),
-  body('password')
-    .notEmpty().withMessage('Password is required')
-    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-    .matches(/\d/).withMessage('Password must contain at least one number'),
+  strongPassword('password', 'Password'),
   // Optional - defaults to client. Admin is never allowed through public
   // registration; admin accounts are seeded separately.
   body('role')
@@ -37,8 +57,36 @@ const loginValidationRules = [
     .isEmail().withMessage('Must be a valid email address')
     .normalizeEmail(),
   body('password')
-    .notEmpty().withMessage('Password is required'),
+    .notEmpty().withMessage('Password is required').bail()
+    // An array or object would otherwise reach bcrypt and fail with a 500.
+    .custom(isText).withMessage('Password must be text'),
 ];
+
+/**
+ * POST /api/auth/change-password: { currentPassword, newPassword } and
+ * nothing else. The new password follows the registration rules and must
+ * differ from the current one. The current password is only checked for
+ * being text of a sane length; whether it is RIGHT is the controller's job.
+ */
+const changePasswordRules = [
+  checkExact(
+    [
+      body('currentPassword')
+        .exists().withMessage('Current password is required').bail()
+        .custom(isText).withMessage('Current password must be text').bail()
+        .notEmpty().withMessage('Current password is required').bail()
+        .isLength({ max: 1024 }).withMessage('Current password is too long'),
+      strongPassword('newPassword', 'New password')
+        .bail()
+        .custom((value, { req }) => value !== req.body.currentPassword)
+        .withMessage('New password must be different from the current password'),
+    ],
+    { locations: ['body'], message: 'Request contains fields that are not allowed' }
+  ),
+];
+
+// POST /api/auth/logout-all takes no body fields at all.
+const emptyBodyRules = [checkExact([], { locations: ['body'], message: 'Request contains fields that are not allowed' })];
 
 /**
  * ?page and ?limit for paginated lists. Anything else in the query string is
@@ -73,8 +121,11 @@ function handleValidationErrors(req, res, next) {
 }
 
 module.exports = {
+  MAX_PASSWORD_BYTES,
   registerValidationRules,
   loginValidationRules,
+  changePasswordRules,
+  emptyBodyRules,
   paginationQueryRules,
   handleValidationErrors,
 };
