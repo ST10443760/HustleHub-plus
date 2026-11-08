@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchCurrentUser, loginRequest, registerRequest } from '../api/auth';
+import { changePasswordRequest, fetchCurrentUser, loginRequest, logoutAllRequest, registerRequest } from '../api/auth';
 import { setUnauthorizedHandler } from '../api/client';
 import { clearToken, readToken, saveToken } from '../utils/storage';
 import { AuthContext } from './authContext';
@@ -68,9 +68,26 @@ export default function AuthProvider({ children }) {
     navigate('/login', { replace: true });
   }, [navigate]);
 
+  // Every other session ends; this one continues with the fresh token the
+  // API returns (the old one is no longer valid).
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    const data = await changePasswordRequest(currentPassword, newPassword);
+    saveToken(data.token);
+    setUser(toSessionUser(data.user));
+    return data.message;
+  }, []);
+
+  // Ends every session, this one included, then back to the login page.
+  const logoutAll = useCallback(async () => {
+    await logoutAllRequest();
+    clearToken();
+    setUser(null);
+    navigate('/login', { replace: true, state: { signedOutEverywhere: true } });
+  }, [navigate]);
+
   const value = useMemo(
-    () => ({ user, loading, login, register, logout }),
-    [user, loading, login, register, logout]
+    () => ({ user, loading, login, register, logout, changePassword, logoutAll }),
+    [user, loading, login, register, logout, changePassword, logoutAll]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
