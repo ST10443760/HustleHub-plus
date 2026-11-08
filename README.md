@@ -1299,9 +1299,11 @@ The risk is reduced by:
 | Concern | How it's addressed |
 |---|---|
 | Plain-text password storage | Never stored: hashed with bcryptjs before persisting |
-| Credential stuffing / enumeration | Identical generic error and timing for wrong password vs unknown email; failed logins rate limited (5 per 15 min per IP) |
+| Credential stuffing / enumeration | Identical generic error and timing for wrong password, unknown email and locked account; failed logins rate limited (5 per 15 min per IP) and accounts locked after 5 failures in 15 min (see **Extra security features**) |
 | Unauthorised access to protected routes | JWT required and verified on every protected request |
 | Token tampering | Signature verification via `JWT_SECRET`; invalid signatures rejected |
+| Stolen or leaked session token | Token versions: changing the password or signing out of all devices ends every older token |
+| Unreviewable admin and security actions | Append-only audit log of admin gig removals, password changes, sign-outs and lockouts, visible to admins |
 | Injection / malformed input | express-validator rejects invalid input and unknown fields; global middleware strips `$` and `.` keys |
 | Cross-site scripting | Text fields HTML-escaped before saving; strict CSP with no `unsafe-inline` |
 | Privilege escalation / IDOR | Role read from the database on every request; RBAC on every route; ownership checks on gigs and bookings |
@@ -1310,6 +1312,226 @@ The risk is reduced by:
 | Clickjacking and MIME sniffing | `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` |
 | Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
 | Data interception in transit | API served over HTTPS, even in local development |
+
+### Extra security features
+
+Three features added on top of the core security controls above. Each one
+can be seen in the app and is covered by unit, Newman and (where there is a
+UI) Vitest tests.
+
+#### A. Account lockout
+
+**Threat.** Slow password guessing against **one** account from **many** IP
+addresses (a botnet, or credential stuffing spread out over time). The
+per-IP login limiter can't see this, because every IP only tries a few
+times.
+
+**How it works.**
+- **Policy:** 5 failed attempts within 15 minutes lock the account for 15
+  minutes. Failures older than the window don't count, and a successful
+  login resets everything. The policy lives in
+  [`api/src/config/lockout.js`](api/src/config/lockout.js).
+  `LOCKOUT_MAX_ATTEMPTS`, `LOCKOUT_WINDOW_MINUTES` and
+  `LOCKOUT_DURATION_MINUTES` can change it for local testing only; they are
+  ignored when `NODE_ENV=production`, like the rate limit overrides.
+- **State:** `failedLoginAttempts`, `firstFailedLoginAt` (the start of the
+  window), `lastFailedLoginAt` and `lockUntil` on the user. They are
+  `select: false`, removed by `toJSON` from every response, and never put
+  in the JWT. Accounts created before this feature simply don't have them,
+  which counts as "no failures", so no migration is needed.
+- **Atomic counting:** every attempt on an existing account first *claims*
+  an attempt with one `findOneAndUpdate`. It only matches an unlocked
+  account and uses an update pipeline to count the attempt (or start a new
+  window) and set `lockUntil` on the attempt that reaches the limit, all
+  inside the database. The password is only checked after a successful
+  claim. With 10 wrong passwords sent in parallel against a fresh account,
+  exactly 5 were checked, 5 were refused unchecked, and the account locked
+  once.
+- **No enumeration, by message or by timing:** a locked account never has
+  its real password checked. A bcrypt compare against a dummy hash runs
+  instead, exactly as it does for an unknown email. A wrong password, an
+  unknown email and a locked account all return the **same** `401`
+  `{"success":false,"error":"Invalid email or password"}`, byte for byte,
+  and take about the same time.
+- **Logging:** the lockout is logged as an `AUTH` event with the user id
+  only (never the email or password) and written to the audit log.
+
+**Two layers, two different threats.**
+
+| Layer | Protects against | Limit |
+|---|---|---|
+| Per-IP login rate limiter | One IP bursting through passwords (one account or many) | 5 failed logins per 15 min per IP, then `429` |
+| Account lockout | Many IPs slowly guessing one account | 5 failed attempts per 15 min per account, then locked 15 min |
+
+Both are kept. They trip at the same count, so from a single IP with the
+strict limits the 6th attempt gets the limiter's `429` before the lock
+would show. To demonstrate the lock, run the API with
+`npm run start:test`, which relaxes the per-IP limiter but keeps the
+lockout strict. The Newman lockout requests run that way.
+
+**The trade-off.** Anyone who knows an email address can lock that account
+on purpose for 15 minutes by typing wrong passwords (a small denial of
+service). That is why the lock is short and lifts by itself, with no admin
+needed: it makes online guessing roughly 5 tries per 15 minutes per account
+(about 480 a day instead of thousands a second), while a deliberately
+locked-out user only waits 15 minutes. A permanent lock or a manual unlock
+would hand that attacker a much stronger weapon.
+
+**Files:** `api/src/config/lockout.js`, `api/src/utils/lockout.js` (pure
+decision logic and the atomic update), `api/src/utils/accountLockout.js`
+(the password check used by login and change-password),
+`api/src/controllers/authController.js`, `api/src/models/User.js`.
+
+**Tests:**
+- `api/test/lockout.test.js`: 15 unit tests with a fixed clock, covering
+  the window, expiry, reset on success, slow guessing and policy overrides.
+- `api/test/userModel.test.js`: the fields never reach JSON.
+- Newman **Account security**: a throwaway user, five wrong passwords, then
+  the **correct** password is still rejected with exactly the same body as
+  an unknown email.
+
+**Limitations.** Counters live on the user document, so they are shared by
+every API instance (unlike the in-memory rate limits). There is no
+CAPTCHA or "unlock by email" step; the lock simply expires.
+
+#### B. Change password and session revocation
+
+**Threat.** A stolen or leaked token stays valid until it expires, and
+before this feature nobody could change a password at all. A user who
+suspected their account was compromised had no way to lock the attacker
+out.
+
+**How it works.**
+- **Token versions:** every user has a `tokenVersion` (default 0), and
+  every JWT carries it as `tv`. `protect` loads the user's current version
+  on each request and rejects any token whose version doesn't match with
+  the usual `401`. Tokens issued before this feature have no `tv`, and
+  that counts as 0, so existing sessions and existing accounts (including
+  the seeded admin) keep working with no migration.
+- **`POST /api/auth/change-password`** with `{ currentPassword,
+  newPassword }`:
+  - `checkExact`, so any other field is a `400`, plus strict `typeof`
+    checks.
+  - The new password follows the registration rules (8+ characters, a
+    number) and must differ from the current one.
+  - **At most 72 bytes:** bcrypt silently ignores everything after 72
+    bytes. Registration now enforces this too, in bytes, so an emoji counts
+    as 4.
+  - The current password is checked through the same lockout as login, so
+    wrong current passwords count towards locking the account.
+  - The new hash is saved with the shared helper and `tokenVersion` is
+    incremented in the same update. The response carries a fresh token, so
+    this session continues and every other session ends.
+  - Rate limited to 5 per 15 minutes per user.
+- **Wrong current password is a `400`, not a `401`.** The client treats a
+  `401` as "session gone" and logs the user out, so a typo here must not
+  return one. A locked account gets the same `400` and the same message.
+- **`POST /api/auth/logout-all`** increments `tokenVersion`, so every token,
+  the current one included, stops working at once.
+- Both routes use `protect` and only ever act on the logged-in user. Both
+  are logged as `AUTH` events and written to the audit log.
+- **The Account page** (`/account`, in the nav for every role) has the
+  change-password form:
+  - inline validation and `autocomplete="current-password"` /
+    `"new-password"`
+  - the stored token is replaced on success
+  - clear success and generic error messages
+  - the inputs are uncontrolled, so passwords never sit in React state, and
+    the form is cleared after a change.
+
+  It also has a **Sign out of all devices** button with a confirmation step;
+  afterwards the login page says so.
+- This also removes an old limitation: the seeded admin password could
+  only be changed by editing the database. Now an admin changes it on the
+  Account page like anyone else.
+
+While building this, the login validator also got a `typeof` check. An
+array sent as the password used to reach bcrypt and fail with a `500`; it
+is now a `400`.
+
+**Files:** `api/src/utils/generateToken.js` (`tv` in the token),
+`api/src/middleware/authMiddleware.js`, `api/src/controllers/authController.js`,
+`api/src/routes/authRoutes.js`, `api/src/middleware/validators.js`,
+`client/src/pages/Account.jsx`, `client/src/context/AuthProvider.jsx`.
+
+**Tests:**
+- Unit: `tokenVersion.test.js` (token payload, missing `tv` counts as 0)
+  and `authValidators.test.js` (field rules, unknown fields, the 72-byte
+  limit counted in bytes).
+- Newman **Account security**:
+  - every validation failure is a `400`, and no token is a `401`
+  - a wrong current password is a `400` and the session survives it
+  - after a change, the **old** token gets `401` and the **new** one works
+  - the old password no longer logs in and the new one does
+  - after logout-all, the current and the earlier tokens are both `401`.
+- The smoke test checks the change through the Docker stack.
+- Vitest `Account.test.jsx` covers validation, success, the `400` error
+  (no logout), the generic `500` message and the confirmation step.
+
+**Limitations.** Every protected request already reads the user from the
+database (for the role), so checking the version costs nothing extra. There
+is no list of individual sessions, so you can sign out everywhere but not
+one specific device. Changing a password doesn't email the user.
+
+#### C. Admin audit log
+
+**Threat.** Without a record, an admin's destructive actions and the
+security events on accounts (lockouts, password changes, sign-outs) can't
+be reviewed afterwards, so abuse or an account takeover goes unnoticed.
+Logs alone are easy to lose and not visible in the app.
+
+**How it works.**
+- **Model:** a new `AuditLog` model ([`api/src/models/AuditLog.js`](api/src/models/AuditLog.js))
+  stores `actorId`, `actorRole`, `action` (an enum), `targetType`,
+  `targetId`, `outcome`, `ip`, `createdAt` and a small whitelisted `meta`
+  object (`failedAttempts`, `lockMinutes`, `hadBookings`).
+  - `strict: 'throw'` refuses any other field.
+  - It never stores passwords, tokens, emails or request bodies.
+  - Indexes: `createdAt` descending, and `action` + `createdAt`.
+- **Append-only:** there is no route that updates or deletes entries, and
+  the model throws on every update, replace and delete operation
+  (`updateOne`, `findOneAndUpdate`, `deleteMany`, `bulkWrite`, re-saving a
+  loaded entry, ...) before anything reaches the database.
+- **What is recorded:** admin gig deletion and deactivation, password
+  changed, sign out of all devices, and account locked.
+- **Failure handling** ([`api/src/utils/audit.js`](api/src/utils/audit.js)):
+  if an audit record can't be written, the failure is logged as an `ERROR`
+  event (action and error type only, never the entry or the raw error
+  message) and the request carries on. It isn't failed or undone, and
+  nothing leaks to the client. The admin gig removal doesn't use a
+  database transaction, so its audit entry is written straight after the
+  removal succeeds.
+- **`GET /api/admin/audit-logs`** (admin only, through the existing
+  router-level guard):
+  - paginated like the transactions list (default 20, max 50)
+  - optional `action` filter, validated against the enum
+  - `checkExact`, so any other query parameter is a `400`
+  - actors shown by name and id only.
+- **The admin "Audit log" page** (`/admin/audit-log`) has a table, an
+  action filter and paging, in the same style as Users and Transactions.
+
+**Files:** `api/src/models/AuditLog.js`, `api/src/utils/audit.js`,
+`api/src/controllers/adminController.js`, `api/src/middleware/adminValidators.js`,
+`api/src/routes/adminRoutes.js`, `client/src/pages/AdminAuditLog.jsx`.
+
+**Tests:**
+- Unit: `auditLog.test.js` (every append-only guard, the whitelist and the
+  indexes), `audit.test.js` (a failed write is logged and never throws,
+  without the raw error) and `adminValidators.test.js`.
+- Newman, with admin credentials, finds each entry:
+  - after the password change, the logout-all and the lockout (with
+    `{ failedAttempts: 5, lockMinutes: 15 }`)
+  - after the admin gig deletion.
+- Newman also checks `403` for clients and freelancers, `401` with no token,
+  and `400` for a bad `action` or an unknown parameter.
+- Vitest: `AdminAuditLog.test.jsx` and `Layout.test.jsx` (who sees which
+  link).
+
+**Limitations.** Append-only is enforced by the application. Someone with
+direct database access could still change entries; a real deployment
+would add a database user without update and delete rights, or ship the
+entries to write-once storage. Entries are kept forever, with no retention
+policy.
 
 ## 11. Testing
 
