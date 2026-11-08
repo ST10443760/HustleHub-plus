@@ -59,8 +59,10 @@ async function login(req, res, next) {
   try {
     const { email, password } = req.body;
 
-    // passwordHash is select: false on the model, so ask for it explicitly.
-    const user = await User.findOne({ email }).select('+passwordHash');
+    // passwordHash and tokenVersion are select: false on the model, so ask
+    // for them explicitly. Without tokenVersion the new token would carry
+    // the wrong version and be rejected straight away.
+    const user = await User.findOne({ email }).select('+passwordHash +tokenVersion');
 
     // Unknown email: bcrypt still runs, against a dummy hash. Known email:
     // the lockout is applied (a locked account never has its real password
