@@ -25,7 +25,7 @@ app.set('trust proxy', resolveTrustProxy());
 // The health check is skipped: container healthchecks call it every few
 // seconds and would bury the real traffic.
 app.use((req, res, next) => {
-  if (req.path !== HEALTH_PATH) logger.info(`${req.method} ${req.originalUrl}`);
+  if (req.path !== HEALTH_PATH) logger.info(`${req.method} ${req.path}`);
   next();
 });
 

@@ -48,6 +48,8 @@ function notFoundHandler(req, res, next) {
  * that logic rather than creating a second error handler.
  */
 function errorHandler(err, req, res, next) {
+  // Delegate if Express has already started sending the response.
+  if (res.headersSent) return next(err);
   // Mongoose rejected the data (schema validation, bad cast, unknown field
   // under strict: 'throw'). That's bad input, not a server fault, but the
   // raw message names schema paths, so it's replaced with a generic one.
@@ -68,7 +70,7 @@ function errorHandler(err, req, res, next) {
     logger.event('CORS', 'Blocked request from a disallowed origin', {
       origin: err.blockedOrigin,
       method: req.method,
-      path: req.originalUrl,
+      path: req.path,
       ip: req.ip,
     });
   }
@@ -81,7 +83,7 @@ function errorHandler(err, req, res, next) {
   const logStack = !err.isOperational && process.env.NODE_ENV !== 'production';
   logger.error(err.message, {
     statusCode,
-    path: req.originalUrl,
+    path: req.path,
     method: req.method,
     cause: err.cause,
     stack: logStack ? err.stack : undefined,
