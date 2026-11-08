@@ -12,6 +12,9 @@ Smoke testing http://localhost:5173
   PASS  protected route with the token returns 200
   PASS  protected route without a token returns 401
   PASS  admin-only route as a client returns 403
+  PASS  change the password and get a fresh token
+  PASS  the token from before the change no longer works
+  PASS  the new token works
   PASS  no password hashes or stack traces in the responses
 
-Smoke test passed: 12 checks.
+Smoke test passed: 15 checks.
