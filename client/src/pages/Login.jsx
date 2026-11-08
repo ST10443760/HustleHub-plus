@@ -26,6 +26,7 @@ export default function Login() {
 
   const returnTo = safeReturnPath(location.state && location.state.from);
   const sessionExpired = Boolean(location.state && location.state.expired);
+  const signedOutEverywhere = Boolean(location.state && location.state.signedOutEverywhere);
 
   if (user && !submitting) {
     return <Navigate to={returnTo || '/gigs'} replace />;
@@ -64,6 +65,11 @@ export default function Login() {
       {sessionExpired && !formError && (
         <p className="alert info" role="status">
           Your session has ended. Please log in again.
+        </p>
+      )}
+      {signedOutEverywhere && !formError && (
+        <p className="alert success" role="status">
+          You have been signed out of all devices. Log in again to continue.
         </p>
       )}
 
