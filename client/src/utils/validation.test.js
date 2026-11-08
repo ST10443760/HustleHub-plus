@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateGig, validateRegister } from './validation';
+import { validateChangePassword, validateGig, validateRegister } from './validation';
 
 const options = { categories: ['design', 'video'], maxPrice: 100000 };
 const goodGig = { title: ' Logo design ', description: 'A clean, modern logo', price: '149.99', category: 'design', deliveryDays: '5' };
@@ -46,5 +46,34 @@ describe('validateRegister', () => {
     expect(errors.password).toMatch(/number/);
     expect(errors.role).toBeDefined();
     expect(validateRegister({ name: 'Ann', email: 'ann@example.com', password: 'password1', role: 'client' })).toEqual({});
+  });
+});
+
+describe('validateChangePassword', () => {
+  const ok = { currentPassword: 'OldPassword1', newPassword: 'NewPassword2', confirmPassword: 'NewPassword2' };
+
+  it('accepts a valid change', () => {
+    expect(validateChangePassword(ok)).toEqual({});
+  });
+
+  it('needs every field', () => {
+    expect(Object.keys(validateChangePassword({ currentPassword: '', newPassword: '', confirmPassword: '' })).sort()).toEqual([
+      'confirmPassword',
+      'currentPassword',
+      'newPassword',
+    ]);
+  });
+
+  it('uses the registration rules for the new password, including the 72 byte limit', () => {
+    expect(validateChangePassword({ ...ok, newPassword: 'short1', confirmPassword: 'short1' }).newPassword).toMatch(/at least 8/);
+    expect(validateChangePassword({ ...ok, newPassword: 'nodigitshere', confirmPassword: 'nodigitshere' }).newPassword).toMatch(/one number/);
+    const emoji = `Pass1${'😀'.repeat(17)}`; // 73 bytes
+    expect(validateChangePassword({ ...ok, newPassword: emoji, confirmPassword: emoji }).newPassword).toMatch(/at most 72 bytes/);
+    expect(validateRegister({ name: 'Ann', email: 'a@b.co', password: 'a1'.repeat(37), role: 'client' }).password).toMatch(/72 bytes/);
+  });
+
+  it('the new password must differ and be confirmed', () => {
+    expect(validateChangePassword({ ...ok, newPassword: 'OldPassword1', confirmPassword: 'OldPassword1' }).newPassword).toMatch(/different/);
+    expect(validateChangePassword({ ...ok, confirmPassword: 'NewPassword3' }).confirmPassword).toMatch(/do not match/);
   });
 });
