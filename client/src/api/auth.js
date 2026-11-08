@@ -23,3 +23,18 @@ export function registerRequest({ name, email, password, role }) {
 export function fetchCurrentUser(signal) {
   return apiRequest('/api/auth/me', { signal, redirectOn401: false });
 }
+
+// Any logged-in user. A wrong current password comes back as a 400 (not a
+// 401), so it shows as a form error and never logs the user out. A 401 here
+// really means the session is gone, so the normal redirect applies.
+export function changePasswordRequest(currentPassword, newPassword) {
+  return apiRequest('/api/auth/change-password', {
+    method: 'POST',
+    body: { currentPassword, newPassword },
+  });
+}
+
+// Ends every session of this account, including this one.
+export function logoutAllRequest() {
+  return apiRequest('/api/auth/logout-all', { method: 'POST' });
+}
