@@ -45,13 +45,11 @@ phone shot is 390 wide. The admin's email is greyed out on the Users page.
 | `part3-08-account-wrong-current.png` | A wrong current password: "Current password is incorrect, or there have been too many attempts. Try again later." The user stays logged in |
 | `part3-09-account-success.png` | A successful change: "Password changed. You have been signed out everywhere else." and the fields cleared |
 | `part3-10-lockout-correct-password-rejected.png` | After 5 wrong passwords, the CORRECT password is still refused with the same "Invalid email or password" (the password field is masked) |
+| `part3-11-session-ended.png` | A second browser logged in as the same user, after the password was changed in the first: on reload it lands on Log in with "Your session has ended. Please log in again." |
 | `part3-12-sign-out-confirm.png` | The "Sign out of all devices?" confirmation box with "Yes, sign out everywhere" and Cancel |
+| `part3-13-signed-out-all-devices.png` | Log in after "Sign out of all devices": "You have been signed out of all devices. Log in again to continue." |
 | `part3-14-audit-log.png` | The admin Audit log: Account locked (5 failed attempts, locked 15 min), Signed out of all devices, Password changed and Admin deleted a gig, each with actor, target, outcome and IP |
 | `part3-15-audit-log-filtered.png` | The Audit log filtered to "Password changed" |
 | `part3-16-admin-users.png` | The admin Users page: name, email, role and join date (the admin's email greyed out) |
 | `part3-17-admin-transactions.png` | The admin All transactions page: three R 100 000,00 transactions, each linked to its client and freelancer |
 | `part3-18-client-transactions.png` | The client's My transactions page with each `TXN-...` reference |
-
-Numbers 11 and 13 are not used: the login page does not show the "Your
-session has ended" and "You have been signed out of all devices" messages
-(see Known limitations in the main README).
