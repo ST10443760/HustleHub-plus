@@ -13,7 +13,7 @@ async function listUsers(req, res, next) {
   try {
     const users = await User.find().sort({ createdAt: -1 });
 
-    logger.event('ADMIN', 'Listed all users', { adminId: req.user.id, count: users.length });
+    logger.event('ADMIN_ACTION', 'Listed all users', { action: 'list_users', count: users.length });
 
     res.status(200).json({
       success: true,
@@ -42,7 +42,7 @@ async function listTransactions(req, res, next) {
       Transaction.countDocuments(),
     ]);
 
-    logger.event('ADMIN', 'Listed all transactions', { adminId: req.user.id, page, limit });
+    logger.event('ADMIN_ACTION', 'Listed all transactions', { action: 'list_transactions', page, limit });
 
     res.status(200).json({
       success: true,
@@ -64,8 +64,8 @@ async function deleteAnyGig(req, res, next) {
 
     const result = await removeOrDeactivateGig(gig);
 
-    logger.event('ADMIN', result.deleted ? 'Admin deleted a gig' : 'Admin deactivated a gig - it has bookings', {
-      adminId: req.user.id,
+    logger.event('ADMIN_ACTION', result.deleted ? 'Admin deleted a gig' : 'Admin deactivated a gig - it has bookings', {
+      action: result.deleted ? 'gig_deleted' : 'gig_deactivated',
       gigId: result.id,
       freelancerId: gig.freelancer.toString(),
     });
@@ -104,7 +104,7 @@ async function listAuditLogs(req, res, next) {
       AuditLog.countDocuments(filter),
     ]);
 
-    logger.event('ADMIN', 'Viewed the audit log', { adminId: req.user.id, page, limit, action: req.query.action });
+    logger.event('ADMIN_ACTION', 'Viewed the audit log', { action: 'view_audit_log', page, limit, filter: req.query.action });
 
     const logs = entries.map((entry) => {
       const { actorId, ...rest } = entry.toJSON();

@@ -49,7 +49,7 @@ async function seedAdmin() {
   const passwordHash = await hashPassword(password);
   const admin = await User.create({ name, email, passwordHash, role: 'admin' });
 
-  logger.event('ADMIN', 'Admin account seeded', { userId: admin.id, email });
+  logger.event('ADMIN_ACTION', 'Admin account seeded', { action: 'admin_seeded', userId: admin.id, email });
   return 0;
 }
 
