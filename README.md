@@ -2360,6 +2360,58 @@ and a smaller set was shipped to the real Axiom dataset
 - **Thresholds.** The monitor thresholds are guesses for a small project.
   They should be tuned against real traffic.
 
+## 15. Demonstration evidence
+
+### Evidence folders
+
+| Folder | What is in it |
+|---|---|
+| [`docs/test-evidence/`](docs/test-evidence/README.md) | Raw output of every test run: api unit tests, both Newman collections (local and Docker), Vitest, the Docker smoke test and `docker compose ps` |
+| [`docs/pipeline-evidence/`](docs/pipeline-evidence/README.md) | The pipeline's checks run locally (actionlint, zizmor, hadolint, Compose config, npm audit, gitleaks, Trivy, ZAP) and the status of the remote run under the billing lock |
+| [`docs/static-analysis/`](docs/static-analysis/README.md) | ESLint and Semgrep results before any fix (`baseline/`) and after (`final/`), as text, JSON and SARIF |
+| [`docs/logging-evidence/`](docs/logging-evidence/README.md) | Real sample log records for every event, JSON lines from the API container, the mock and live Axiom checks, and ready-to-paste Axiom queries |
+| [`docs/screenshots/`](docs/screenshots/README.md) | The screenshots below |
+
+### Screenshots
+
+These screenshots were taken for Part 2. The pages look the same today
+apart from the new Account and Audit log links and the income page,
+which is now the tax dashboard. The Part 3 screens (tax dashboard,
+Account page, audit log, Axiom) are not in this list yet.
+
+| File | What it shows |
+|---|---|
+| [`01-register.png`](docs/screenshots/01-register.png) | Register page with inline "Name is required", "Email is required" and "Password is required" errors; only Client or Freelancer can be chosen |
+| [`02-login.png`](docs/screenshots/02-login.png) | Login page with the generic "Invalid email or password" message, so accounts can't be enumerated |
+| [`03-browse-gigs.png`](docs/screenshots/03-browse-gigs.png) | A client browsing gigs with search, category and price filters; freelancers shown by name only |
+| [`04-create-gig.png`](docs/screenshots/04-create-gig.png) | A freelancer's New gig form; there is no owner field, because the API takes the owner from the token |
+| [`05-my-gigs.png`](docs/screenshots/05-my-gigs.png) | My gigs: only the freelancer's own gigs, with Active and Inactive badges |
+| [`06-book-confirm.png`](docs/screenshots/06-book-confirm.png) | The booking confirmation step: title, price R 450,00 from the database and the "Payment is simulated" notice |
+| [`07-booking-confirmed.png`](docs/screenshots/07-booking-confirmed.png) | Booking confirmed with transaction reference TXN-20261012-889A22AF615D |
+| [`08-client-bookings.png`](docs/screenshots/08-client-bookings.png) | A client's My bookings: only their own bookings, each at the price it was booked at |
+| [`09-freelancer-income.png`](docs/screenshots/09-freelancer-income.png) | A freelancer's income (Part 2 version of the page, before the tax dashboard): R 750,00 from 2 bookings, including the reference from screenshot 7 |
+| [`10-admin-transactions.png`](docs/screenshots/10-admin-transactions.png) | The admin's All transactions: every transaction linked to its client and freelancer |
+| [`11-newman-pass.png`](docs/screenshots/11-newman-pass.png) | Part 2 run of the main collection: 80 requests and 134 assertions, 0 failed, without admin credentials (the current run is 131 and 246, see [Testing](#10-testing)) |
+| [`11b-newman-rate-limits.png`](docs/screenshots/11b-newman-rate-limits.png) | The rate limit collection: 20 requests and 26 assertions, 0 failed |
+| [`12-vitest-pass.png`](docs/screenshots/12-vitest-pass.png) | Part 2 Vitest run: 16 files and 67 tests passed (now 21 files and 110 tests) |
+| [`13-security-headers.png`](docs/screenshots/13-security-headers.png) | API response headers in DevTools: CSP, cross-origin policies, no-referrer, HSTS, nosniff, and no `X-Powered-By` |
+| [`13b-security-headers-continued.png`](docs/screenshots/13b-security-headers-continued.png) | The rest of the Helmet headers, including `X-Frame-Options: DENY` |
+| [`14-rate-limit-429.png`](docs/screenshots/14-rate-limit-429.png) | The 6th failed login refused with "Too many requests, please try again in 896 seconds." |
+| [`part1/`](docs/screenshots/part1/) | Part 1 Postman screenshots: health check, registration (success, duplicate, invalid), login (success, wrong password), protected route (no token, valid token) |
+
+The two billing lock images are shown in
+[Pipeline status and the billing lock](#pipeline-status-and-the-billing-lock).
+
+### Demonstration videos
+
+- **Part 3 demonstration video:** the link is added at submission.
+- **Part 2:** https://youtu.be/H5GcOdMPQNw (registration and login, gig
+  creation, booking creation and viewing, transaction recording,
+  role-based access, the security headers, the tests and rate limiting)
+- **Part 1** (API only): https://youtu.be/qTK6iV_0lmI
+
+[![Watch the Part 2 demo](https://img.youtube.com/vi/H5GcOdMPQNw/hqdefault.jpg)](https://youtu.be/H5GcOdMPQNw)
+
 ## 7. Troubleshooting
 
 The problems below all came up while building and testing this project.
@@ -2419,141 +2471,3 @@ The 11 Part 2 requirements, what was built for each, where, and how it is tested
 - **Local HTTPS only.** The self-signed certificate is for development; a
   deployment needs a real certificate, and the production host should send
   the client's security headers (including `frame-ancestors 'none'`).
-
-## 14. Screenshots
-
-The images live in `docs/screenshots/`; [`docs/screenshots/README.md`](docs/screenshots/README.md)
-describes what each one should show.
-
-**01-register**
-
-![Register page showing inline "Name is required", "Email is required" and "Password is required" errors and a role choice of only Client or Freelancer](docs/screenshots/01-register.png)
-
-_Invalid input is caught next to each field before anything is sent, and the only roles on offer are client and freelancer; admin can never be chosen (the API rejects it too)._
-
-**02-login**
-
-![Login page showing the generic "Invalid email or password" message with the password field masked](docs/screenshots/02-login.png)
-
-_A failed login shows the same generic message whether the email exists or not, so accounts can't be enumerated._
-
-**03-browse-gigs**
-
-![Browse gigs page for a logged-in client with search, category and price filters and gig cards showing prices in rand and freelancer names](docs/screenshots/03-browse-gigs.png)
-
-_Clients browse active gigs with search and filters; each gig shows its freelancer by name only, never their email._
-
-**04-create-gig**
-
-![New gig form filled in by a freelancer with title, description, price, delivery days and category](docs/screenshots/04-create-gig.png)
-
-_Freelancers create gigs through a form whose limits mirror the API validators; there is no owner field, because the API takes the owner from the login token._
-
-**05-my-gigs**
-
-![My gigs page for a freelancer listing only their own gigs with Active and Inactive badges and a confirmation that a gig is now inactive](docs/screenshots/05-my-gigs.png)
-
-_A freelancer sees and manages only their own gigs (edit, activate/deactivate, delete)._
-
-**06-book-confirm**
-
-![Booking confirmation step on a gig page showing the gig title, the price R 450,00 and the "Payment is simulated" notice](docs/screenshots/06-book-confirm.png)
-
-_The price shown comes from the gig in the database; the booking request sends only the gig id, and the payment is simulated._
-
-**07-booking-confirmed**
-
-![Booking confirmed message with the transaction reference TXN-20261012-889A22AF615D](docs/screenshots/07-booking-confirmed.png)
-
-_Every booking immediately creates a transaction record; its reference is returned with the confirmation._
-
-**08-client-bookings**
-
-![My bookings page for a client listing three confirmed bookings with gig, freelancer, price and date](docs/screenshots/08-client-bookings.png)
-
-_A client sees only their own bookings, each keeping the price it was booked at._
-
-**09-freelancer-income**
-
-![Income page for a freelancer showing R 750,00 earned from 2 bookings with each transaction reference](docs/screenshots/09-freelancer-income.png)
-
-_Income is computed from completed transactions and attributed to the right freelancer; reference TXN-20261012-889A22AF615D from screenshot 7 appears here, linking the booking to this freelancer._
-
-**10-admin-transactions**
-
-![Admin all transactions page listing each reference with its client, freelancer, amount, status and date](docs/screenshots/10-admin-transactions.png)
-
-_Admin-only view: every transaction is linked to both the client and the freelancer of its booking, including the same reference again._
-
-**11-newman-pass**
-
-![Terminal summary of the main Newman run with 80 requests and 134 assertions, 0 failed (editor pane redacted)](docs/screenshots/11-newman-pass.png)
-
-_The main Postman collection passes (this run without admin credentials, so the 5 admin requests were skipped; the committed evidence file has the full 85 / 145 run). The editor pane was blacked out because it showed the local .env._
-
-**11b-newman-rate-limits**
-
-![Terminal summary of the rate limit Newman run with 20 requests and 26 assertions, 0 failed](docs/screenshots/11b-newman-rate-limits.png)
-
-_Against the strict limits, the 6th failed login and the 11th booking are refused with 429, a Retry-After header and a meaningful message._
-
-**12-vitest-pass**
-
-![Terminal summary of Vitest showing 16 test files and 67 tests passed (editor pane redacted)](docs/screenshots/12-vitest-pass.png)
-
-_All frontend tests pass. The editor pane was blacked out because it showed the local .env._
-
-**13-security-headers**
-
-![Browser DevTools showing API response headers including Content-Security-Policy, Cross-Origin policies, Referrer-Policy no-referrer, Strict-Transport-Security and X-Content-Type-Options nosniff](docs/screenshots/13-security-headers.png)
-
-_The API sends a strict CSP (default-src 'self', frame-ancestors 'none', no unsafe-inline), HSTS, nosniff and no-referrer, and no X-Powered-By. (Captured on the relaxed test server, hence the 10000 RateLimit policy.)_
-
-**13b-security-headers-continued**
-
-![The same response headers scrolled further, showing X-Frame-Options DENY, X-Permitted-Cross-Domain-Policies none and X-XSS-Protection 0](docs/screenshots/13b-security-headers-continued.png)
-
-_The rest of the Helmet headers, including X-Frame-Options DENY against clickjacking._
-
-**14-rate-limit-429**
-
-![Login page showing "Too many requests, please try again in 896 seconds." after repeated failed logins](docs/screenshots/14-rate-limit-429.png)
-
-_Rate limiting with a meaningful response: after 5 failed logins the 6th is refused and the user is told how long to wait._
-
-## 15. Demonstration Video
-
-**Part 2:** https://youtu.be/H5GcOdMPQNw
-
-[![Watch the demo](https://img.youtube.com/vi/H5GcOdMPQNw/hqdefault.jpg)](https://youtu.be/H5GcOdMPQNw)
-
-The video shows registration and login, gig creation, booking creation and
-viewing, transaction recording, role-based access, the security headers, the
-tests and rate limiting.
-
-Part 1 (API only): https://youtu.be/qTK6iV_0lmI
-
-## Appendix: Part 1 API Screenshots
-
-From the Part 1 submission (Postman, API only), kept for reference in
-`docs/screenshots/part1/`.
-
-| Scenario | Screenshot |
-|---|---|
-| Health check | `docs/screenshots/part1/01-health-check.png` |
-| Successful registration (token issued, no password hash leaked) | `docs/screenshots/part1/02-register-success.png` |
-| Duplicate email registration rejected | `docs/screenshots/part1/03-register-duplicate.png` |
-| Invalid registration input rejected | `docs/screenshots/part1/04-register-invalid.png` |
-| Successful login (token issued) | `docs/screenshots/part1/05-login-success.png` |
-| Login with wrong password rejected | `docs/screenshots/part1/06-login-wrong-password.png` |
-| Protected route rejected with no token | `docs/screenshots/part1/07-protected-no-token.png` |
-| Protected route succeeds with valid token | `docs/screenshots/part1/08-protected-valid-token.png` |
-
-![Health Check](./docs/screenshots/part1/01-health-check.png)
-![Register Success](./docs/screenshots/part1/02-register-success.png)
-![Register Duplicate](./docs/screenshots/part1/03-register-duplicate.png)
-![Register Invalid](./docs/screenshots/part1/04-register-invalid.png)
-![Login Success](./docs/screenshots/part1/05-login-success.png)
-![Login Wrong Password](./docs/screenshots/part1/06-login-wrong-password.png)
-![Protected No Token](./docs/screenshots/part1/07-protected-no-token.png)
-![Protected Valid Token](./docs/screenshots/part1/08-protected-valid-token.png)
