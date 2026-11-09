@@ -10,15 +10,13 @@ const logger = require('../utils/logger');
  * validators (which already reject unknown fields and wrong types) as
  * defence in depth.
  *
- * Only the location and IP are logged - never the stripped value, which
- * could contain anything the attacker sent.
+ * Only the location and IP are logged (INPUT_SANITIZED) - never the
+ * stripped value, which could contain anything the attacker sent.
  */
 const sanitize = mongoSanitize({
   onSanitize: ({ req, key }) => {
-    logger.event('SANITIZE', 'Removed operator keys from request input', {
+    logger.event('INPUT_SANITIZED', 'Removed operator keys from request input', {
       location: key,
-      method: req.method,
-      path: req.originalUrl,
       ip: req.ip,
     });
   },

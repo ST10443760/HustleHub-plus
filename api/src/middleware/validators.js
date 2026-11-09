@@ -1,5 +1,6 @@
 const { body, query, checkExact, validationResult } = require('express-validator');
 const { AppError } = require('./errorHandler');
+const logger = require('../utils/logger');
 
 /**
  * Validation rule sets for auth routes. Kept separate from the controller
@@ -111,10 +112,23 @@ const paginationQueryRules = [
  * them into a single clean 400 response via the centralised error handler -
  * never lets a raw validation error object reach the client.
  */
+// The names of the fields that failed (including unknown fields that
+// checkExact rejected). Never their values.
+function failedFields(errors) {
+  const names = errors.flatMap((e) => (e.type === 'unknown_fields' ? (e.fields || []).map((f) => f.path) : [e.path]));
+  return [...new Set(names.filter((name) => typeof name === 'string' && name))].slice(0, 20);
+}
+
 function handleValidationErrors(req, res, next) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    const messages = errors.array().map((e) => e.msg);
+    const list = errors.array();
+    logger.event('VALIDATION_FAILED', 'Request failed validation', {
+      source: 'validator',
+      fields: failedFields(list),
+      unknownFields: list.some((e) => e.type === 'unknown_fields') || undefined,
+    });
+    const messages = list.map((e) => e.msg);
     return next(new AppError(messages.join('; '), 400));
   }
   next();
