@@ -4,6 +4,16 @@ const { AppError } = require('./errorHandler');
 const User = require('../models/User');
 const logger = require('../utils/logger');
 const { tokenVersionOf } = require('../utils/generateToken');
+const { setContextUser, routeOf } = require('../utils/requestContext');
+
+const INVALID_TOKEN_MESSAGE = 'Not authenticated - invalid or expired token';
+
+// Logs the refusal (ACCESS_DENIED, with the internal reason and the route)
+// and returns the error for next(). The response message stays generic.
+function denied(req, reason, message, status) {
+  logger.event('ACCESS_DENIED', 'Access denied', { reason, status, route: routeOf(req) });
+  return new AppError(message, status);
+}
 
 /**
  * Protects a route - requires a valid JWT in the Authorization header
@@ -16,7 +26,7 @@ async function protect(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(new AppError('Not authenticated - no token provided', 401));
+    return next(denied(req, 'no_token', 'Not authenticated - no token provided', 401));
   }
 
   const token = authHeader.split(' ')[1];
@@ -24,14 +34,15 @@ async function protect(req, res, next) {
   let decoded;
   try {
     decoded = jwt.verify(token, process.env.JWT_SECRET);
-  } catch {
+  } catch (err) {
     // Covers both expired and tampered/invalid tokens - same generic
     // message either way, no need to tell an attacker which case it was.
-    return next(new AppError('Not authenticated - invalid or expired token', 401));
+    // The log keeps the difference.
+    return next(denied(req, err.name === 'TokenExpiredError' ? 'expired_token' : 'invalid_token', INVALID_TOKEN_MESSAGE, 401));
   }
 
   if (!mongoose.isValidObjectId(decoded.id)) {
-    return next(new AppError('Not authenticated - invalid or expired token', 401));
+    return next(denied(req, 'invalid_token', INVALID_TOKEN_MESSAGE, 401));
   }
 
   try {
@@ -40,16 +51,17 @@ async function protect(req, res, next) {
     const user = await User.findById(decoded.id).select('role +tokenVersion');
 
     if (!user) {
-      return next(new AppError('Not authenticated - user no longer exists', 401));
+      return next(denied(req, 'user_not_found', 'Not authenticated - user no longer exists', 401));
     }
 
     // A password change or "sign out of all devices" bumps tokenVersion,
     // which ends every token issued before it.
     if (tokenVersionOf(decoded) !== tokenVersionOf(user)) {
-      return next(new AppError('Not authenticated - invalid or expired token', 401));
+      return next(denied(req, 'revoked_token', INVALID_TOKEN_MESSAGE, 401));
     }
 
     req.user = { id: user.id, role: user.role };
+    setContextUser(req.user); // every later log line in this request carries the user
     next();
   } catch (err) {
     // A database failure is a server error, not an auth failure.
@@ -67,13 +79,7 @@ async function protect(req, res, next) {
 function requireRole(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
-      logger.event('RBAC', 'Access denied - wrong role', {
-        userId: req.user ? req.user.id : null,
-        role: req.user ? req.user.role : null,
-        method: req.method,
-        path: req.originalUrl,
-      });
-      return next(new AppError('You do not have permission to perform this action', 403));
+      return next(denied(req, 'wrong_role', 'You do not have permission to perform this action', 403));
     }
     next();
   };

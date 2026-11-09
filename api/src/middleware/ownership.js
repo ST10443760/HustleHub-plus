@@ -1,5 +1,6 @@
 const { AppError } = require('./errorHandler');
 const logger = require('../utils/logger');
+const { routeOf } = require('../utils/requestContext');
 
 /**
  * Loads the document for req.params.id and checks the logged-in user owns it.
@@ -43,13 +44,12 @@ function requireOwnership(Model, { ownerField, resourceName = 'Resource', allowA
       );
 
       if (!isAdminBypass && !isOwner) {
-        logger.event('RBAC', 'Access denied - not the owner', {
-          userId: req.user.id,
-          role: req.user.role,
+        logger.event('ACCESS_DENIED', 'Access denied - not the owner', {
+          reason: 'not_owner',
+          status: 403,
+          route: routeOf(req),
           resource: resourceName,
           resourceId: req.params.id,
-          method: req.method,
-          path: req.originalUrl,
         });
         throw new AppError('You do not have permission to perform this action', 403);
       }
