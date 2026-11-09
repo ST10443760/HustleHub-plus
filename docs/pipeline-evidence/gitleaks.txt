@@ -1,0 +1,5 @@
+$ gitleaks git --no-banner --redact --exit-code 1 /repo   (full history, pinned image from ci.yml)
+INF 543 commits scanned.
+INF scanned ~4302494 bytes (4.30 MB) in 52.8s
+INF no leaks found
+(exit 0)
