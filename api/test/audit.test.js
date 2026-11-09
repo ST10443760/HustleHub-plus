@@ -56,7 +56,7 @@ test('a failed write is logged as an error event and never throws', async () => 
   );
   assert.equal(result, false);
   const line = lines.join('\n');
-  assert.match(line, /EVENT:ERROR\] Audit log write failed/);
+  assert.match(line, /EVENT:AUDIT_WRITE_FAILED\] Audit log write failed/);
   assert.match(line, /"action":"password_changed"/);
   assert.match(line, /"errorName":"MongoNetworkError"/);
   // The raw error message (which can contain connection details) is not logged.

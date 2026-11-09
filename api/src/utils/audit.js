@@ -4,7 +4,7 @@ const logger = require('./logger');
 /**
  * Writes one audit log entry. Never throws: if the write fails (database
  * down, invalid entry), the failure is logged as an error event and the
- * request that triggered it carries on. The action itself has already
+ * request that triggered it carries on (AUDIT_WRITE_FAILED). The action itself has already
  * happened and must not be undone or reported as failed just because the
  * audit record couldn't be saved. Only the action name and error type are
  * logged, never the entry contents.
@@ -30,7 +30,7 @@ async function recordAudit(req, entry, { model = AuditLog } = {}) {
     });
     return true;
   } catch (err) {
-    logger.event('ERROR', 'Audit log write failed', { action: entry.action, errorName: err.name });
+    logger.event('AUDIT_WRITE_FAILED', 'Audit log write failed', { action: entry.action, errorName: err.name });
     return false;
   }
 }
