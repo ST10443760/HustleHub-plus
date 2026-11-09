@@ -91,7 +91,7 @@ async function getTaxEstimate(req, res, next) {
       { $project: { _id: 0, month: '$_id', incomeCents: 1, bookings: 1 } },
     ]);
 
-    logger.event('INCOME', 'Tax estimate requested', { userId: req.user.id, taxYear: startYear });
+    logger.info('Tax estimate requested', { taxYear: startYear });
 
     res.status(200).json({ success: true, data: buildTaxEstimate(startYear, rows) });
   } catch (err) {
