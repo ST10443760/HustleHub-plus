@@ -299,7 +299,7 @@ describe('logger integration', () => {
       );
       assert.deepEqual(result, { enabled: true, reason: null });
       logger.event('AUTH_LOGIN_FAILURE', 'Failed login', { reason: 'bad_credentials', email: 'sam@example.com', password: 'nope-nope' });
-      await logger.flush(2000);
+      await logger.shutdown(2000);
       const [sent] = mock.requests[0].body;
       assert.equal(sent.event, 'AUTH_LOGIN_FAILURE');
       assert.equal(sent.level, 'warn');

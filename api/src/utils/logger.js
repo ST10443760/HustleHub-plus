@@ -159,8 +159,17 @@ const logger = {
     return { enabled: true, reason: null };
   },
 
-  /** Sends whatever is queued, giving up after `deadlineMs`. Never rejects. */
+  /** Sends whatever is queued now, waiting at most `deadlineMs`. Shipping carries on. Never rejects. */
   async flush(deadlineMs = 2000) {
+    if (!shipper) return null;
+    let timer;
+    await Promise.race([shipper.flush(), new Promise((resolve) => (timer = setTimeout(resolve, deadlineMs)))]);
+    clearTimeout(timer);
+    return shipper.getStats();
+  },
+
+  /** For shutdown: stops the send timer and sends what is left, waiting at most `deadlineMs`. */
+  async shutdown(deadlineMs = 2000) {
     return shipper ? shipper.close(deadlineMs) : null;
   },
 
