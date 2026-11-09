@@ -8,16 +8,17 @@ host, Newman 6.2.3, Vitest 5.0.3). Every run passed with 0 failures.
 
 | File | What it is | Command (run from the folder shown) | Result |
 |---|---|---|---|
-| [`newman-main-results.txt`](newman-main-results.txt) | Main Postman collection: Health, Auth, RBAC, Gigs, Bookings, Income (including the tax estimate), Account security (lockout, change password, sign out everywhere, audit log) and Security folders, **including the admin tests** | `api/`: API started with `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure --reporters cli --color off --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>` | **131 requests, 246 assertions, 0 failed** (119 and 213 without the admin credentials) |
-| [`newman-rate-limits-results.txt`](newman-rate-limits-results.txt) | Rate limit collection against the **strict** limits: the 6th failed login and the 11th booking are refused with `429` + `Retry-After` | `api/`: API freshly started with `npm run start:test:strict` (the real limits, no cloud logging), then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure --reporters cli --color off` | **20 requests, 26 assertions, 0 failed** |
+| [`newman-main-results.txt`](newman-main-results.txt) | Main Postman collection: Health, Auth, RBAC, Gigs, Bookings, Income (including the tax estimate), Account security (lockout, change password, sign out everywhere, audit log) and Security folders, **including the admin tests** | `api/`: API started with `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure --reporters cli --color off --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>` | **131 requests, 246 assertions, 0 failed** (119 and 213 without the admin credentials). Run before the final pass; the API code hasn't changed since, and the Docker run below repeats the collection |
+| [`newman-rate-limits-results.txt`](newman-rate-limits-results.txt) | Rate limit collection against the **strict** limits: the 6th failed login and the 11th booking are refused with `429` + `Retry-After` | Repo root: a freshly started `docker compose up -d --wait` stack (strict limits, `NODE_ENV=production`), then `npx newman run api/postman/HustleHub_RateLimits.postman_collection.json --env-var base_url=http://localhost:5173 --reporters cli --color off`, through nginx like the pipeline. Locally the same collection also passes against `npm run start:test:strict` | **20 requests, 26 assertions, 0 failed** |
 | [`vitest-results.txt`](vitest-results.txt) | Frontend tests (Vitest + React Testing Library), one line per test | `client/`: `npm run test:run -- --reporter=verbose` | **21 test files, 110 tests passed** |
 | [`api-unit-results.txt`](api-unit-results.txt) | Backend unit tests (Node test runner): tax calculator and tax years, health check, startup settings check, trust proxy and rate limit buckets, account lockout logic, token versions, auth and audit log validators, audit log append-only guards, money rounding, rate limit config, the log scrubber (redaction), the structured logger and event catalogue, request ids and the access log, and the cloud log shipper against a local mock server (it never reaches the real service). No database or secrets needed | `api/`: `npm test` | **191 tests passed** |
 
 **Docker runs**, against the Compose stack and its own MongoDB replica set
 (started with the `LOG_SHIPPING_*` values blanked, so nothing went to
-Axiom). `docker-newman-results.txt` is from the run earlier the same day,
-before the documentation-only final update; the code has not changed
-since:
+Axiom), all from the final pass on 9 November 2026. The smoke test ran on
+a freshly restarted API, because the rate limit collection uses up the
+per-IP login limit (the pipeline runs the smoke test first for the same
+reason):
 
 | File | What it is | Command (repo root) | Result |
 |---|---|---|---|
