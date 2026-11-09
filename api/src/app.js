@@ -7,10 +7,9 @@ const sanitize = require('./middleware/sanitize');
 const { helmetOptions, corsOptions } = require('./config/security');
 const { resolveTrustProxy } = require('./config/proxy');
 const { generalLimiter } = require('./middleware/rateLimiters');
-const logger = require('./utils/logger');
+const { requestId, restoreContext, accessLog, HEALTH_PATH } = require('./middleware/requestLogging');
 
 const app = express();
-const HEALTH_PATH = '/api/health';
 
 // Don't advertise the framework (Helmet removes the header too).
 app.disable('x-powered-by');
@@ -19,15 +18,14 @@ app.disable('x-powered-by');
 // set before the rate limiters, which key on req.ip. See config/proxy.js.
 app.set('trust proxy', resolveTrustProxy());
 
-// Lightweight request logger - not a replacement for the event-specific
-// logging in each controller, just a trace of what hit the API. First, so
-// requests blocked by CORS or a rate limiter still show up.
-// The health check is skipped: container healthchecks call it every few
-// seconds and would bury the real traffic.
-app.use((req, res, next) => {
-  if (req.path !== HEALTH_PATH) logger.info(`${req.method} ${req.originalUrl}`);
-  next();
-});
+// Request id + access log, first, so requests blocked by CORS or a rate
+// limiter are logged too. Every log line for a request carries its id,
+// which is also returned in the X-Request-Id header. The access log is one
+// line per request (method, path without the query string, status,
+// duration, user); the health check and CORS preflights are skipped.
+// See middleware/requestLogging.js.
+app.use(requestId);
+app.use(accessLog);
 
 // ---- Security & parsing middleware pipeline ----
 // Order matters here - keep helmet/cors first, body parsing next, then routes.
@@ -44,6 +42,7 @@ app.get(HEALTH_PATH, (req, res) => {
 app.use('/api', generalLimiter); // safety net, before any body is parsed
 app.use(express.json({ limit: '10kb' })); // body parser, with a sane size limit
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(restoreContext); // the body parsers can drop the logging context, so put it back
 app.use(sanitize); // strips $ / . keys from body, query and params - must come after parsing
 
 // ---- Routes ----
