@@ -593,6 +593,277 @@ conveniences only: the API enforces every rule itself.
   `401`, the token is cleared and the user goes to Log in. The client
   never logs tokens or request data.
 
+## 6. API reference
+
+Base URL: `https://localhost:5000` (through the client: `/api/...`). "Token"
+means a valid `Authorization: Bearer <token>` header. Every response is
+`{ "success": true, "data": ... }` or `{ "success": false, "error": "..." }`.
+Every route except the health check also counts towards the **general**
+limit (100 requests per 15 minutes per IP).
+
+| Method | Path | Auth | Roles | Rate limit | Notes |
+|---|---|---|---|---|---|
+| GET | `/api/health` | None | Anyone | None | `{ "status": "ok" }` and nothing else. Not logged |
+| POST | `/api/auth/register` | None | Anyone | Register: 10 per hour per IP | `role` is `client` (default) or `freelancer`; `admin` gets `400`. Duplicate email: `409` |
+| POST | `/api/auth/login` | None | Anyone | Login: 5 **failed** per 15 min per IP; plus the account lockout | The same `401 Invalid email or password` for a wrong password, an unknown email and a locked account |
+| GET | `/api/auth/me` | Token | Any | General | The current user |
+| POST | `/api/auth/change-password` | Token | Any (own account) | Password change: 5 per 15 min per user | Body `{ currentPassword, newPassword }` only. Wrong current password: `400`, not `401`. Success returns a new token and ends every other session |
+| POST | `/api/auth/logout-all` | Token | Any (own account) | General | Empty body only. Ends every session, this one included |
+| GET | `/api/admin/users` | Token | Admin | General | All users, newest first, no password hashes |
+| GET | `/api/admin/transactions` | Token | Admin | General | Query `page`, `limit` (max 50) only |
+| DELETE | `/api/admin/gigs/:id` | Token | Admin | General | Deletes any gig, or deactivates it if it has bookings. Written to the audit log |
+| GET | `/api/admin/audit-logs` | Token | Admin | General | Query `page`, `limit` (max 50), `action` only. Read only |
+| GET | `/api/gigs` | Token | Any | General | Active gigs. Query `page` (max 1000), `limit` (max 50), `category`, `q` (max 50 characters, literal text), `minPrice`, `maxPrice` only |
+| GET | `/api/gigs/mine` | Token | Freelancer | General | Your own gigs, including inactive ones |
+| GET | `/api/gigs/:id` | Token | Any | General | Inactive gigs only for their owner (`404` for everyone else) |
+| POST | `/api/gigs` | Token | Freelancer | General | Exactly `title`, `description`, `price`, `category`, `deliveryDays`. The owner comes from the token |
+| PUT | `/api/gigs/:id` | Token | Freelancer, **owner only** | General | Any of `title`, `description`, `price`, `category`, `deliveryDays`, `isActive` |
+| DELETE | `/api/gigs/:id` | Token | Freelancer, **owner only** | General | Deletes the gig, or deactivates it if it has bookings |
+| POST | `/api/bookings` | Token | Client | Booking: 10 per 10 min per user | Body `{ "gigId": "..." }` only. Creates the booking and its transaction; returns a simulated payment confirmation |
+| GET | `/api/bookings/mine` | Token | Client, Freelancer | General | Clients: their bookings. Freelancers: bookings on their gigs |
+| GET | `/api/bookings/:id` | Token | The booking's client or freelancer | General | Anyone else gets `403` |
+| GET | `/api/transactions/mine` | Token | Client, Freelancer | General | What you paid, or what you were paid |
+| GET | `/api/income` | Token | Freelancer | General | `{ totalEarned, bookingCount, items }` from completed transactions |
+| GET | `/api/income/tax-estimate` | Token | Freelancer | General | Query `taxYear` only (optional). See [Tax estimation](#7-tax-estimation) |
+
+Unknown fields and query parameters are rejected with `400` on every
+route above that lists its fields with "only" or "exactly". Registration
+and login read only their named fields and ignore anything else.
+
+### Route audit
+
+Every route and its middleware, in order, read from the route files.
+Every request first passes the global pipeline (see
+[Request pipeline](#request-pipeline)).
+
+| Method | Route | Middleware, in order |
+|---|---|---|
+| GET | `/api/health` | none (registered before the general limit) |
+| POST | `/api/auth/register` | registerLimiter, validators |
+| POST | `/api/auth/login` | loginLimiter, validators |
+| GET | `/api/auth/me` | protect |
+| POST | `/api/auth/change-password` | protect, passwordChangeLimiter (per user), validators (exact fields) |
+| POST | `/api/auth/logout-all` | protect, validators (empty body) |
+| all | `/api/admin/*` | router-level protect, requireRole(admin), then per route: |
+| GET | `/api/admin/users` | (none) |
+| GET | `/api/admin/transactions` | pagination validators (exact params) |
+| DELETE | `/api/admin/gigs/:id` | validateObjectId |
+| GET | `/api/admin/audit-logs` | query validators (exact params) |
+| all | `/api/gigs/*` | router-level protect, then per route: |
+| GET | `/api/gigs` | query validators (exact params) |
+| GET | `/api/gigs/mine` | requireRole(freelancer) |
+| GET | `/api/gigs/:id` | validateObjectId (inactive gigs only for the owner, in the controller) |
+| POST | `/api/gigs` | requireRole(freelancer), body validators (exact fields) |
+| PUT | `/api/gigs/:id` | requireRole(freelancer), validateObjectId, **requireOwnership**, body validators (exact fields) |
+| DELETE | `/api/gigs/:id` | requireRole(freelancer), validateObjectId, **requireOwnership** |
+| all | `/api/bookings/*` | router-level protect, then per route: |
+| POST | `/api/bookings` | requireRole(client), bookingLimiter (per user), validators (gigId only) |
+| GET | `/api/bookings/mine` | requireRole(client, freelancer) |
+| GET | `/api/bookings/:id` | validateObjectId, **requireOwnership** (client or freelancer) |
+| GET | `/api/transactions/mine` | router-level protect, requireRole(client, freelancer) |
+| GET | `/api/income` | protect, requireRole(freelancer) |
+| GET | `/api/income/tax-estimate` | protect, requireRole(freelancer), validators (`taxYear` only) |
+
+Every route except health, register and login requires a valid JWT.
+Every role-restricted route uses `requireRole`. Every route that reads or
+changes one specific gig or booking validates the id and checks
+ownership (or, for reading a gig, that it is active or yours). The "mine"
+routes never take an id from the request: they filter by `req.user.id`.
+
+### Booking and transaction flow
+
+1. **The client books a gig.** `POST /api/bookings` takes only a `gigId`.
+   Any other field (price, freelancer, client, status) is a `400`. The gig
+   must exist and be active, otherwise `404`.
+2. **The booking is created.** The freelancer and the price come from the
+   gig in the database. The booking keeps a snapshot of the gig's title
+   and price, so later edits don't change what was booked.
+3. **The transaction is created in the same database transaction**
+   (`withTransaction` on a Mongoose session). If anything fails part-way,
+   neither is saved. A unique index allows exactly one transaction per
+   booking. Payment is simulated: the transaction is `completed` with a
+   reference such as `TXN-20261009-9F3A1C2B7D4E`.
+4. **Income comes from completed transactions.** `GET /api/income` adds up
+   the freelancer's `completed` transactions (refunded ones are left out).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant UI as React client
+    participant API as Express API
+    participant DB as MongoDB
+
+    C->>UI: Book this gig, then Confirm booking
+    UI->>API: POST /api/bookings with only gigId and the Bearer token
+    API->>DB: protect: verify JWT, load user, role and token version
+    DB-->>API: user (role client)
+    Note over API: requireRole(client), booking rate limit per user,<br/>validator rejects any field except gigId
+    API->>DB: start session, withTransaction
+    API->>DB: find gig (inside the transaction)
+    alt gig missing or inactive
+        DB-->>API: none or inactive
+        API->>DB: abort, nothing is saved
+        API-->>UI: 404 Gig not found
+    else gig is active
+        API->>DB: insert Booking (client from token, freelancer, title and price from gig)
+        API->>DB: insert Transaction (amount, completed, TXN reference)
+        API->>DB: commit, both saved or neither
+        API-->>UI: 201 booking, transaction, simulated payment confirmation
+        UI-->>C: Booking confirmed, reference TXN-...
+    end
+```
+
+Money is stored as a number rounded to 2 decimals and totals are rounded
+the same way. Each booking is logged as `BOOKING_CREATED` and
+`TRANSACTION_CREATED`; a refused booking as `BOOKING_FAILED`.
+
+## 7. Tax estimation
+
+Freelancers get an estimate of the South African income tax on what they
+earned through HustleHub+, on the **Income dashboard** (`/income`) and from
+`GET /api/income/tax-estimate`. It is a planning aid, not tax advice: the
+API returns a disclaimer with every estimate and the dashboard shows it
+next to the figures.
+
+### How the estimate is calculated
+
+1. **Gross income.** All of the freelancer's `completed` transactions
+   whose date falls in the selected tax year are added up (refunded ones
+   are left out). This total is treated as taxable income.
+2. **Sliding scale.** Each slice of that income is taxed at its bracket's
+   rate: the first R245 100 at 18%, the next slice up to R383 100 at 26%,
+   and so on. The sum is the *tax before rebate*.
+3. **Primary rebate.** The primary rebate (R17 820 for the 2027 tax year)
+   is subtracted. The result is never allowed to go below zero, so anyone
+   earning the tax-free threshold (R99 000) or less pays R0.
+4. **Summary figures.** Take-home = gross − estimated tax. Effective rate =
+   estimated tax ÷ gross × 100 (0% when gross is 0).
+
+### Tax tables used
+
+The brackets, rebate and threshold come from the SARS page
+[Rates of Tax for Individuals](https://www.sars.gov.za/tax-rates/income-tax/rates-of-tax-for-individuals/),
+checked on 7 November 2026. They live as data in
+[`api/src/config/tax.js`](api/src/config/tax.js), with the source and date
+in a comment.
+
+| `taxYear` | Period | SARS name | Primary rebate | Tax-free threshold (under 65) |
+|---|---|---|---|---|
+| `2026` (current) | 1 March 2026 to 28 February 2027 | 2027 tax year | R17 820 | R99 000 |
+| `2025` | 1 March 2025 to 28 February 2026 | 2026 tax year | R17 235 | R95 750 |
+| `2024` | 1 March 2024 to 28 February 2025 | 2025 tax year | R17 235 | R95 750 |
+| `2023` | 1 March 2023 to 29 February 2024 | 2024 tax year | R17 235 | R95 750 |
+
+SARS lists the 2025 and 2026 tax years as "no changes", so those two use
+the 2024 tax year's brackets. 2027 tax year brackets (the current year):
+
+| Taxable income (R) | Rate of tax (R) |
+|---|---|
+| 0 to 245 100 | 18% of taxable income |
+| 245 101 to 383 100 | 44 118 + 26% of taxable income above 245 100 |
+| 383 101 to 530 200 | 79 998 + 31% of taxable income above 383 100 |
+| 530 201 to 695 800 | 125 599 + 36% of taxable income above 530 200 |
+| 695 801 to 887 000 | 185 215 + 39% of taxable income above 695 800 |
+| 887 001 to 1 878 600 | 259 783 + 41% of taxable income above 887 000 |
+| 1 878 601 and above | 666 339 + 45% of taxable income above 1 878 600 |
+
+The calculator works the tax out bracket by bracket rather than copying
+SARS's fixed amounts, and a unit test checks that this gives exactly the
+SARS base amount (44 118, 79 998, ...) at the bottom of every bracket, and
+that tax at the threshold equals the rebate. That catches a typo in the
+config.
+
+### Worked example
+
+A freelancer earns **R300 000** in the 2027 tax year. The same numbers are
+asserted in [`api/test/taxCalculator.test.js`](api/test/taxCalculator.test.js).
+
+| Step | Calculation | Amount |
+|---|---|---|
+| First bracket | 18% × R245 100 | R44 118.00 |
+| Second bracket | 26% × (R300 000 − R245 100) = 26% × R54 900 | R14 274.00 |
+| Tax before rebate | R44 118 + R14 274 | R58 392.00 |
+| Less primary rebate | R58 392 − R17 820 | **R40 572.00 estimated tax** |
+| Take-home | R300 000 − R40 572 | **R259 428.00** |
+| Effective rate | R40 572 ÷ R300 000 × 100 = 13.524% | **13.52%** |
+
+### Money and dates
+
+- Amounts are summed as whole cents in the database query, and the
+  calculator works in integer cents and hundredths of a cent, so there is
+  no floating point drift. The total tax is rounded to the cent once,
+  half up, at the end. Breakdown lines are rounded on their own for
+  display, so in rare cases they can differ from the total by a cent.
+  Every amount in the response is a number with at most 2 decimals.
+- A tax year runs from 1 March to the last day of February. Its start and
+  end, and the monthly buckets, are worked out in South African time
+  (UTC+02:00, no daylight saving), so a booking at 00:30 on 1 March counts
+  in the new tax year even though it is still 28 February in UTC.
+- Without `taxYear`, the API uses the tax year containing today. If the
+  tables for a new tax year haven't been added to `config/tax.js` yet, it
+  falls back to the newest year that is configured. It never guesses rates.
+
+### Assumptions and limitations
+
+- Resident individual **under 65**: only the primary rebate is applied
+  (no secondary or tertiary rebate).
+- **No deductions**: no business expenses, retirement fund contributions
+  or medical scheme credits.
+- **No UIF**, provisional tax payments, or income from outside HustleHub+.
+- **Income to date is treated as the whole year's taxable income.** It is
+  not projected forward, so early in the tax year the estimate is low.
+- Only the tax years in the table above are supported. Any other
+  `taxYear` gets a `400`.
+
+### The endpoint
+
+`GET /api/income/tax-estimate?taxYear=2026` runs protect →
+requireRole(freelancer) → query validation. The freelancer is always taken
+from the verified token, never from the request. Clients and admins get
+`403`, no token gets `401`. `taxYear` must be a single 4-digit year that is
+in the table, and any other query parameter (for example `freelancerId`)
+is rejected with `400` by `checkExact`. The query uses the existing
+`{ freelancer, status, createdAt }` index on transactions, and each request
+is logged as a plain info line with the tax year (the request id and
+user id come from the request context). The
+general API rate limiter applies. Response (`data`):
+
+```json
+{
+  "taxYear": { "label": "1 March 2026 to 28 February 2027 (SARS 2027 tax year)", "start": "2026-03-01", "end": "2027-02-28" },
+  "totals": { "gross": 300000, "taxBeforeRebate": 58392, "estimatedTax": 40572, "takeHome": 259428, "effectiveRatePercent": 13.52 },
+  "rebate": 17820,
+  "taxFreeThreshold": 99000,
+  "breakdown": [{ "from": 0, "to": 245100, "ratePercent": 18, "amountInBracket": 245100, "tax": 44118 }, "... 7 brackets, the top one has to: null"],
+  "monthly": [{ "month": "2026-03", "income": 0, "bookings": 0 }, "... all 12 months, March to February"],
+  "assumptions": ["Resident individual under 65, so only the primary rebate applies.", "..."],
+  "disclaimer": "This is an estimate for planning only, not tax advice and not a SARS assessment. ...",
+  "source": { "name": "SARS - Rates of Tax for Individuals", "url": "https://www.sars.gov.za/...", "checkedOn": "2026-11-07" },
+  "availableTaxYears": [2026, 2025, 2024, 2023]
+}
+```
+
+### The dashboard
+
+The dashboard (`client/src/pages/Income.jsx`) has a tax year selector,
+four summary cards (total earned, estimated tax, take-home, effective
+rate), a monthly income bar chart, the tax-by-bracket table with the
+rebate, an assumptions and disclaimer panel, and the existing per-booking
+income table. The chart (`components/MonthlyIncomeChart.jsx`) is
+hand-drawn SVG with no chart library, so the strict client CSP
+(`style-src 'self'`, no `'unsafe-inline'`) needed no change. It uses only
+SVG attributes and CSS classes, no inline styles and no
+`dangerouslySetInnerHTML`. It has an `aria-label` summary, and the same
+figures are in a visually hidden table for screen readers.
+
+**Tests:** `api/test/` (run with `npm test` in `api/`, Node's built-in test
+runner, no database or secrets needed) covers the calculator, tax-year
+dates, config consistency and the response builder. The Newman **Income**
+folder covers the endpoint (200 with values, 403 for client and admin,
+401 without a token, 400 for a bad `taxYear` or an unknown parameter).
+`Income.test.jsx` and `MonthlyIncomeChart.test.jsx` cover the dashboard.
+
 ## 13. Docker
 
 How to start the stack is in [Getting started, B](#b-docker-compose). This
@@ -747,284 +1018,6 @@ The problems below all came up while building and testing this project.
 | `EADDRINUSE: address already in use :::5000` (API) | Another copy of the API is still running | Stop it. To find it: Windows `netstat -ano \| findstr :5000` then `taskkill /PID <pid> /F`; macOS/Linux `lsof -i :5000`. Don't just change `PORT`: the client proxy and the Postman collections expect 5000 |
 | `429 Too many requests, please try again in N seconds` while testing repeatedly | The strict limits are working (5 failed logins per 15 min, 10 registrations per hour, 10 bookings per 10 min) | Start the API with `npm run start:test` (relaxed limits, refused in production) for repeated manual or Newman testing. The counters live in memory, so restarting the API also clears them |
 | Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the transaction that writes the booking and its transaction record together | Use Atlas, or run the local MongoDB as a single-node replica set (see **Getting a MONGO_URI**) |
-
-## 9. API
-
-All routes are under `https://localhost:5000` (the client reaches them through its `/api` proxy). "Logged in" means a valid `Authorization: Bearer <token>` header. Every response is `{ "success": true, "data": ... }` or `{ "success": false, "error": "..." }`.
-
-### Roles and access control
-
-Every user has exactly one role. It's stored on the user record in MongoDB,
-and `protect` reads it from the database on each request rather than
-trusting the token, so a role change takes effect immediately.
-
-| Role | How you get it | What it can do |
-|---|---|---|
-| `client` | Default at registration | Browse gigs, book gigs, view their own bookings and transactions |
-| `freelancer` | Choose it at registration | Create, edit and delete their **own** gigs, view bookings on their gigs, view their income |
-| `admin` | Only via `npm run seed:admin` | List all users, view all transactions, remove any gig, read the audit log |
-
-Every role can change its own password and sign out of all its devices
-(`/api/auth/change-password`, `/api/auth/logout-all`). Nobody can change
-another user's password.
-
-Registration only accepts `client` or `freelancer`. Sending
-`"role": "admin"` is rejected with a `400`, so nobody can make themselves an
-admin through the API.
-
-Routes are restricted with `requireRole(...)`. A user with the wrong role
-gets a generic `403` that doesn't say which role would have been allowed, and
-the attempt is logged (user id, role, method and path). All `/api/admin`
-routes require both a valid token and the admin role.
-
-**Ownership rule.** Being the right role isn't enough to change a record: you
-also have to own it. `requireOwnership` loads the record by its id, returns
-`404` if it doesn't exist and `403` if its owner isn't the logged-in user.
-The owner is always compared against the user from the verified token and
-database lookup, never against an id sent in the request body or query
-string. Admins only bypass this on routes that explicitly allow it. Malformed
-ids are rejected with a `400` by `validateObjectId` before they reach the
-database.
-
-### Endpoints
-
-| Method | Path | Who can call it | Notes |
-|---|---|---|---|
-| GET | `/api/health` | Anyone | Health check |
-| POST | `/api/auth/register` | Anyone | `role` may be `client` (default) or `freelancer`, never `admin`. Rate limited |
-| POST | `/api/auth/login` | Anyone | Same generic `401` for a wrong password, an unknown email and a locked account. Rate limited per IP, plus the per-account lockout |
-| GET | `/api/auth/me` | Logged in | The current user |
-| POST | `/api/auth/change-password` | Logged in | Body `{ currentPassword, newPassword }` only. Wrong current password: `400`. Success: new token, every other session ends. Rate limited per user |
-| POST | `/api/auth/logout-all` | Logged in | No body. Ends every session of the account, this one included |
-| GET | `/api/admin/users` | Admin | All users, newest first, no password hashes |
-| GET | `/api/admin/transactions` | Admin | All transactions, newest first. Query: `page`, `limit` (max 50) |
-| DELETE | `/api/admin/gigs/:id` | Admin | Removes any gig: deleted if it has no bookings, otherwise deactivated. Recorded in the audit log |
-| GET | `/api/admin/audit-logs` | Admin | The audit log, newest first. Query: `page`, `limit` (max 50), `action` (one of the audit actions). Read only |
-| GET | `/api/gigs` | Logged in | Active gigs, newest first. Query: `page`, `limit` (max 50), `category`, `q`, `minPrice`, `maxPrice` |
-| GET | `/api/gigs/mine` | Freelancer | Your own gigs, including inactive ones |
-| GET | `/api/gigs/:id` | Logged in | One gig. Inactive gigs are only visible to their owner (404 for everyone else) |
-| POST | `/api/gigs` | Freelancer | Creates a gig owned by you |
-| PUT | `/api/gigs/:id` | Freelancer, **owner only** | Update `title`, `description`, `price`, `category`, `deliveryDays`, `isActive` |
-| DELETE | `/api/gigs/:id` | Freelancer, **owner only** | Deletes the gig, or deactivates it if it already has bookings |
-| POST | `/api/bookings` | Client | Body is `{ "gigId": "..." }` only. Creates the booking and its transaction, returns a simulated payment confirmation. Rate limited per user |
-| GET | `/api/bookings/mine` | Client, Freelancer | Clients: their bookings. Freelancers: bookings on their gigs. Newest first |
-| GET | `/api/bookings/:id` | The booking's client or freelancer | Anyone else gets `403` |
-| GET | `/api/transactions/mine` | Client, Freelancer | Clients: what they paid. Freelancers: what they were paid |
-| GET | `/api/income` | Freelancer | `{ totalEarned, bookingCount, items }` from completed transactions |
-| GET | `/api/income/tax-estimate` | Freelancer | Estimated SA income tax for one tax year, with a monthly breakdown. Query: `taxYear` (optional, the year the tax year starts in). See [Tax estimation](#tax-estimation) |
-
-**Gig rules**
-
-- The owner of a gig is always the logged-in freelancer (`req.user.id`).
-  Sending `freelancer`, `isActive` or any other field that isn't allowed
-  is rejected with a `400`, not silently ignored.
-- Text fields (title, description, category) are trimmed, length-checked
-  and HTML-escaped before they're saved, so markup can't run in a browser
-  later. Price must be a number from 1 to 100000 (at most 2 decimals),
-  delivery days a whole number from 1 to 90, and category one of
-  `design`, `writing`, `development`, `marketing`, `video`, `other`.
-- Search (`q`) is plain text: regex characters are escaped, so `.*` only
-  matches the literal text `.*`.
-- Updating or deleting someone else's gig returns `403` and is logged.
-  A gig with bookings is deactivated instead of deleted so booking and
-  transaction history keeps a valid reference.
-
-### Booking and transaction flow
-
-1. **The client books a gig.** `POST /api/bookings` takes only a `gigId`.
-   Any other field (price, freelancer, client, status) is rejected with a
-   `400`. The client is the logged-in user, and the gig must exist and be
-   active, otherwise the response is `404`.
-2. **The booking is created.** The freelancer and the price come from the
-   gig in the database, never from the request. The booking stores a
-   snapshot of the gig's title and price, so if the freelancer edits the
-   gig later, existing bookings keep what was actually booked.
-3. **The transaction is created in the same database transaction.** The
-   booking and its transaction record are written together using a MongoDB
-   transaction (a Mongoose session with `withTransaction`). If anything
-   fails part-way, neither is saved, so a booking can never exist without
-   its transaction. Each booking has exactly one transaction (enforced by a
-   unique index). Payment is simulated: the transaction is marked
-   `completed`, gets a unique reference such as `TXN-20261009-9F3A1C2B7D4E`,
-   and the response includes a payment confirmation with that reference.
-4. **Income is computed from completed transactions.** `GET /api/income`
-   adds up the logged-in freelancer's transactions with status `completed`
-   (refunded ones are left out) and lists each one with its booking, gig
-   title, amount, date and reference.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor C as Client
-    participant UI as React client
-    participant API as Express API
-    participant DB as MongoDB Atlas
-
-    C->>UI: Book this gig, then Confirm booking
-    UI->>API: POST /api/bookings with only gigId and the Bearer token
-    API->>DB: protect - verify JWT, load user and role
-    DB-->>API: user (role client)
-    Note over API: requireRole(client), booking rate limit per user,<br/>validator rejects any field except gigId
-    API->>DB: start session, withTransaction
-    API->>DB: find gig (inside the transaction)
-    alt gig missing or inactive
-        DB-->>API: none or inactive
-        API->>DB: abort - nothing is saved
-        API-->>UI: 404 Gig not found
-    else gig is active
-        API->>DB: insert Booking (client from token, freelancer, title and price from gig)
-        API->>DB: insert Transaction (amount, completed, TXN reference)
-        API->>DB: commit - both saved, or neither
-        API-->>UI: 201 booking, transaction, simulated payment confirmation
-        UI-->>C: Booking confirmed, reference TXN-...
-    end
-```
-
-Money is stored as a plain number rounded to 2 decimal places, and totals
-are rounded the same way, so amounts like 19.99 add up exactly. Booking
-creation, transaction creation and failed booking attempts are all logged.
-
-### Tax estimation
-
-Freelancers get an estimate of the South African income tax on what they
-earned through HustleHub+, on the **Income dashboard** (`/income`) and from
-`GET /api/income/tax-estimate`. It is a planning aid, not tax advice: the
-API returns a disclaimer with every estimate and the dashboard shows it
-next to the figures.
-
-**How the estimate is calculated**
-
-1. **Gross income.** All of the freelancer's `completed` transactions
-   whose date falls in the selected tax year are added up (refunded ones
-   are left out). This total is treated as taxable income.
-2. **Sliding scale.** Each slice of that income is taxed at its bracket's
-   rate: the first R245 100 at 18%, the next slice up to R383 100 at 26%,
-   and so on. The sum is the *tax before rebate*.
-3. **Primary rebate.** The primary rebate (R17 820 for the 2027 tax year)
-   is subtracted. The result is never allowed to go below zero, so anyone
-   earning the tax-free threshold (R99 000) or less pays R0.
-4. **Summary figures.** Take-home = gross − estimated tax. Effective rate =
-   estimated tax ÷ gross × 100 (0% when gross is 0).
-
-**Tax tables used**
-
-The brackets, rebate and threshold come from the SARS page
-[Rates of Tax for Individuals](https://www.sars.gov.za/tax-rates/income-tax/rates-of-tax-for-individuals/),
-checked on 7 November 2026. They live as data in
-[`api/src/config/tax.js`](api/src/config/tax.js), with the source and date
-in a comment.
-
-| `taxYear` | Period | SARS name | Primary rebate | Tax-free threshold (under 65) |
-|---|---|---|---|---|
-| `2026` (current) | 1 March 2026 to 28 February 2027 | 2027 tax year | R17 820 | R99 000 |
-| `2025` | 1 March 2025 to 28 February 2026 | 2026 tax year | R17 235 | R95 750 |
-| `2024` | 1 March 2024 to 28 February 2025 | 2025 tax year | R17 235 | R95 750 |
-| `2023` | 1 March 2023 to 29 February 2024 | 2024 tax year | R17 235 | R95 750 |
-
-SARS lists the 2025 and 2026 tax years as "no changes", so those two use
-the 2024 tax year's brackets. 2027 tax year brackets (the current year):
-
-| Taxable income (R) | Rate of tax (R) |
-|---|---|
-| 0 to 245 100 | 18% of taxable income |
-| 245 101 to 383 100 | 44 118 + 26% of taxable income above 245 100 |
-| 383 101 to 530 200 | 79 998 + 31% of taxable income above 383 100 |
-| 530 201 to 695 800 | 125 599 + 36% of taxable income above 530 200 |
-| 695 801 to 887 000 | 185 215 + 39% of taxable income above 695 800 |
-| 887 001 to 1 878 600 | 259 783 + 41% of taxable income above 887 000 |
-| 1 878 601 and above | 666 339 + 45% of taxable income above 1 878 600 |
-
-The calculator works the tax out bracket by bracket rather than copying
-SARS's fixed amounts, and a unit test checks that this gives exactly the
-SARS base amount (44 118, 79 998, ...) at the bottom of every bracket, and
-that tax at the threshold equals the rebate. That catches a typo in the
-config.
-
-**Worked example** (the same numbers are asserted in
-[`api/test/taxCalculator.test.js`](api/test/taxCalculator.test.js)):
-a freelancer earns **R300 000** in the 2027 tax year.
-
-| Step | Calculation | Amount |
-|---|---|---|
-| First bracket | 18% × R245 100 | R44 118.00 |
-| Second bracket | 26% × (R300 000 − R245 100) = 26% × R54 900 | R14 274.00 |
-| Tax before rebate | R44 118 + R14 274 | R58 392.00 |
-| Less primary rebate | R58 392 − R17 820 | **R40 572.00 estimated tax** |
-| Take-home | R300 000 − R40 572 | **R259 428.00** |
-| Effective rate | R40 572 ÷ R300 000 × 100 = 13.524% | **13.52%** |
-
-**Money and dates**
-
-- Amounts are summed as whole cents in the database query, and the
-  calculator works in integer cents and hundredths of a cent, so there is
-  no floating point drift. The total tax is rounded to the cent once,
-  half up, at the end. Breakdown lines are rounded on their own for
-  display, so in rare cases they can differ from the total by a cent.
-  Every amount in the response is a number with at most 2 decimals.
-- A tax year runs from 1 March to the last day of February. Its start and
-  end, and the monthly buckets, are worked out in South African time
-  (UTC+02:00, no daylight saving), so a booking at 00:30 on 1 March counts
-  in the new tax year even though it is still 28 February in UTC.
-- Without `taxYear`, the API uses the tax year containing today. If the
-  tables for a new tax year haven't been added to `config/tax.js` yet, it
-  falls back to the newest year that is configured. It never guesses rates.
-
-**Assumptions and limitations**
-
-- Resident individual **under 65**: only the primary rebate is applied
-  (no secondary or tertiary rebate).
-- **No deductions**: no business expenses, retirement fund contributions
-  or medical scheme credits.
-- **No UIF**, provisional tax payments, or income from outside HustleHub+.
-- **Income to date is treated as the whole year's taxable income.** It is
-  not projected forward, so early in the tax year the estimate is low.
-- Only the tax years in the table above are supported. Any other
-  `taxYear` gets a `400`.
-
-**The endpoint**
-
-`GET /api/income/tax-estimate?taxYear=2026` runs protect →
-requireRole(freelancer) → query validation. The freelancer is always taken
-from the verified token, never from the request. Clients and admins get
-`403`, no token gets `401`. `taxYear` must be a single 4-digit year that is
-in the table, and any other query parameter (for example `freelancerId`)
-is rejected with `400` by `checkExact`. The query uses the existing
-`{ freelancer, status, createdAt }` index on transactions, and each request
-is logged as an `INCOME` event with the user id and tax year only. The
-general API rate limiter applies. Response (`data`):
-
-```json
-{
-  "taxYear": { "label": "1 March 2026 to 28 February 2027 (SARS 2027 tax year)", "start": "2026-03-01", "end": "2027-02-28" },
-  "totals": { "gross": 300000, "taxBeforeRebate": 58392, "estimatedTax": 40572, "takeHome": 259428, "effectiveRatePercent": 13.52 },
-  "rebate": 17820,
-  "taxFreeThreshold": 99000,
-  "breakdown": [{ "from": 0, "to": 245100, "ratePercent": 18, "amountInBracket": 245100, "tax": 44118 }, "... 7 brackets, the top one has to: null"],
-  "monthly": [{ "month": "2026-03", "income": 0, "bookings": 0 }, "... all 12 months, March to February"],
-  "assumptions": ["Resident individual under 65, so only the primary rebate applies.", "..."],
-  "disclaimer": "This is an estimate for planning only, not tax advice and not a SARS assessment. ...",
-  "source": { "name": "SARS - Rates of Tax for Individuals", "url": "https://www.sars.gov.za/...", "checkedOn": "2026-11-07" },
-  "availableTaxYears": [2026, 2025, 2024, 2023]
-}
-```
-
-**The dashboard** (`client/src/pages/Income.jsx`) has a tax year selector,
-four summary cards (total earned, estimated tax, take-home, effective
-rate), a monthly income bar chart, the tax-by-bracket table with the
-rebate, an assumptions and disclaimer panel, and the existing per-booking
-income table. The chart (`components/MonthlyIncomeChart.jsx`) is
-hand-drawn SVG with no chart library, so the strict client CSP
-(`style-src 'self'`, no `'unsafe-inline'`) needed no change. It uses only
-SVG attributes and CSS classes, no inline styles and no
-`dangerouslySetInnerHTML`. It has an `aria-label` summary, and the same
-figures are in a visually hidden table for screen readers.
-
-**Tests:** `api/test/` (run with `npm test` in `api/`, Node's built-in test
-runner, no database or secrets needed) covers the calculator, tax-year
-dates, config consistency and the response builder. The Newman **Income**
-folder covers the endpoint (200 with values, 403 for client and admin,
-401 without a token, 400 for a bad `taxYear` or an unknown parameter).
-`Income.test.jsx` and `MonthlyIncomeChart.test.jsx` cover the dashboard.
 
 ## 10. Security
 
