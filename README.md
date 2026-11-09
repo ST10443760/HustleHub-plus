@@ -2466,44 +2466,53 @@ The two billing lock images are shown in
 | 10 | README: features, security, how to run, testing | This document | |
 | 11 | Demonstration video | Part 2 video | https://youtu.be/H5GcOdMPQNw |
 
-## 7. Troubleshooting
+## 18. Troubleshooting, limitations, team and repository
 
-The problems below all came up while building and testing this project.
+### Troubleshooting
+
+These problems all came up while building and testing the project. Docker
+problems are in [Docker troubleshooting](#docker-troubleshooting).
 
 | Problem | Cause | Fix |
 |---|---|---|
-| The API exits with `MongoDB connection failed {"errorName":"Error","code":"ECONNREFUSED"}`, and the SRV lookup (`querySrv ECONNREFUSED`) fails, although Atlas is reachable | On some Windows networks Node can't resolve the DNS SRV record that a `mongodb+srv://` string needs | Use the **standard, non-SRV** connection string: in Atlas, Connect → Drivers, choose the older driver version / "Legacy URI String" option, which gives `mongodb://host1:27017,host2:27017,host3:27017/hustlehub?replicaSet=...&ssl=true&authSource=admin`. Add `/hustlehub` as the database name and put it in `MONGO_URI` |
-| The API exits with `MongoDB connection failed` (other codes) | Wrong user or password, or your IP isn't allowed | Check the database user and password, and add your current IP under Atlas **Network Access** |
-| The API logs `No SSL certificate found in api/certs - falling back to plain HTTP`; the client shows errors and Vite logs `EPROTO ... wrong version number` (`502`); Newman fails | `api/certs/key.pem` and `cert.pem` don't exist, so the API runs on HTTP while the proxy and Postman expect HTTPS | Run `npm run certs` in `api/` and restart the API |
-| Every save, login or booking in the browser fails with **"Origin not allowed"** (`403`) | The client isn't on `http://localhost:5173`, the only origin `CLIENT_ORIGIN` allows (for example, preview or dev ended up on another port) | Run the client on port 5173 (both `npm run dev` and `npm run preview` use it), keep `CLIENT_ORIGIN=http://localhost:5173` with no trailing slash, and use `http://localhost:5173`, not `127.0.0.1` |
-| `Port 5173 is already in use` (Vite) | Another dev or preview server is running. Both refuse to switch ports, because any other port would fail CORS | Stop the other one (Ctrl+C in its terminal) and start again |
-| `EADDRINUSE: address already in use :::5000` (API) | Another copy of the API is still running | Stop it. To find it: Windows `netstat -ano \| findstr :5000` then `taskkill /PID <pid> /F`; macOS/Linux `lsof -i :5000`. Don't just change `PORT`: the client proxy and the Postman collections expect 5000 |
-| `429 Too many requests, please try again in N seconds` while testing repeatedly | The strict limits are working (5 failed logins per 15 min, 10 registrations per hour, 10 bookings per 10 min) | Start the API with `npm run start:test` (relaxed limits, refused in production) for repeated manual or Newman testing. The counters live in memory, so restarting the API also clears them |
-| Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the transaction that writes the booking and its transaction record together | Use Atlas, or run the local MongoDB as a single-node replica set (see **Getting a MONGO_URI**) |
+| The API exits with `MongoDB connection failed {"errorName":"Error","code":"ECONNREFUSED"}` and the SRV lookup (`querySrv ECONNREFUSED`) fails, although Atlas is reachable | On some Windows networks Node can't resolve the DNS SRV record a `mongodb+srv://` string needs | Use the standard (non-SRV) connection string: in Atlas, Connect, Drivers, choose the "Legacy URI String" option. It looks like `mongodb://host1:27017,host2:27017,host3:27017/hustlehub?replicaSet=...&ssl=true&authSource=admin` |
+| The API exits with `MongoDB connection failed` (other codes) | Wrong database user or password, or your IP isn't allowed | Check the user and password, and add your IP under Atlas **Network Access** |
+| `Startup aborted: JWT_SECRET is not set` or `MONGO_URI is not set` | A required setting is missing from `api/.env` | Copy `api/.env.example` to `api/.env` and fill it in |
+| The API logs `No SSL certificate found in api/certs`; the client gets `502` and Vite logs `EPROTO ... wrong version number`; Newman fails | The certificate doesn't exist, so the API runs on plain HTTP | Run `npm run certs` in `api/` and restart the API |
+| Every save, login or booking fails with **"Origin not allowed"** (`403`) | The client isn't on `http://localhost:5173`, the only origin `CLIENT_ORIGIN` allows | Run the client on port 5173, keep `CLIENT_ORIGIN=http://localhost:5173` with no trailing slash, and use `localhost`, not `127.0.0.1` |
+| `Port 5173 is already in use` (Vite) | Another dev or preview server is running; both refuse to switch ports, because another port would fail CORS | Stop the other one and start again |
+| `EADDRINUSE: address already in use :::5000` | Another copy of the API is still running (for example an earlier `start:test`) | Stop it. Windows: `netstat -ano \| findstr :5000`, then `taskkill /PID <pid> /F`; macOS and Linux: `lsof -i :5000`. Don't just change `PORT`: the client proxy and the collections expect 5000 |
+| `429 Too many requests, please try again in N seconds` while testing | The strict limits are working | Use `npm run start:test` for repeated testing. The counters are in memory, so restarting the API clears them |
+| The correct password is rejected right after several wrong ones | The account is locked for 15 minutes | Wait 15 minutes. For local testing the policy can be changed with the `LOCKOUT_*` variables (ignored in production) |
+| Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the booking's database transaction | Use Atlas, Docker, or a local single-node replica set |
+| `npm run log:test` prints `HTTP 401` or `HTTP 403` | The Axiom token is wrong or can't ingest into the dataset | Create a Basic token with access to the dataset and update both `.env` files |
+| `npm run log:test` prints `HTTP 404` | The dataset name or the edge domain in `LOG_SHIPPING_URL` is wrong | Check the URL against Axiom's Settings |
+| Nothing arrives in Axiom from `npm run start:test` | Test runs never ship | Set `LOG_SHIPPING_IN_TEST=1` for a demo, or use `npm run dev` |
 
-## 13. Known Limitations and Part 3 Notes
+### Known limitations
 
-- **JWT in `localStorage`.** Accepted for this POE; any XSS could read the
-  token. The risk is reduced by escaping, React's text rendering and the
-  strict CSP (see **JWT in localStorage: the trade-off**). An `httpOnly`
-  cookie with CSRF protection is the stronger option for a real deployment.
-- **`trust proxy` is off.** The API uses the connection's IP for rate
-  limiting, so a client can't fake its IP with an `X-Forwarded-For` header.
-  Behind a reverse proxy or load balancer (Part 3), every request would
-  appear to come from the proxy and share one limit: set
-  `app.set('trust proxy', 1)` (the number of proxies in front of the API),
-  never `true`.
-- **Rate limit counters live in memory.** They reset when the API restarts
-  and aren't shared between multiple API instances; a shared store such as
-  Redis would be needed when scaling out.
-- **Dev-only audit finding:** `braces` via `nodemon` (see **Dependency
-  audit**). Production dependencies have 0 known vulnerabilities.
-- **Payments are simulated.** A transaction is created as `completed` with a
-  reference; no payment provider is involved and no money moves.
-- **Not built yet (Part 3):** tax estimation, income dashboard charts,
-  GitHub Actions CI/CD, Docker images, static analysis and cloud logging. The
-  data model is ready for them: amounts are numbers, every record has
-  timestamps, and income is already aggregated per freelancer.
-- **Local HTTPS only.** The self-signed certificate is for development; a
-  deployment needs a real certificate, and the production host should send
-  the client's security headers (including `frame-ancestors 'none'`).
+The security limitations are listed in
+[Residual risks and accepted limitations](#residual-risks-and-accepted-limitations).
+Beyond those:
+
+- **Payments are simulated.** A transaction is created as `completed` with
+  a reference; no payment provider is involved and there is no refund
+  flow.
+- **The tax estimate** treats income to date as the whole year's income,
+  applies only the primary rebate and no deductions, and supports only the
+  tax years in its table (see [Tax estimation](#7-tax-estimation)).
+- **Sessions** can be ended all at once but not one device at a time, and
+  a locked account simply waits 15 minutes (no unlock by email).
+- **The audit log** keeps entries forever, with no retention policy.
+- **Logs in Axiom** are kept for 30 days on the free plan, and monitors
+  have to be created by hand in Axiom.
+- **Screenshots** of the Part 3 screens are not in `docs/screenshots/` yet.
+
+### Team and repository
+
+**Group:** Null Devs
+**Group Leader:** Muaaz (ST10443760)
+**Module:** INSY7314/w (Information Systems 3D) and APDS7311/w (Application
+Development Security)
+**Repository:** <https://github.com/EMKNDW/insy7314-g2-2026-insy7314-2026-poe-st10443760>
+(the `main` branch is the graded version)
