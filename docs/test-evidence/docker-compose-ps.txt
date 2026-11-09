@@ -1,9 +1,9 @@
 $ docker compose ps -a
 SERVICE   IMAGE                    STATUS                      PORTS
-api       hustlehub-api:local      Up 20 seconds (healthy)     5000/tcp
-certs     hustlehub-certs:local    Exited (0) 27 seconds ago   
-client    hustlehub-client:local   Up 14 seconds (healthy)     0.0.0.0:5173->8080/tcp, [::]:5173->8080/tcp
-mongo     mongo:8.0.34-noble       Up 28 seconds (healthy)     27017/tcp
+api       hustlehub-api:local      Up 25 seconds (healthy)     5000/tcp
+certs     hustlehub-certs:local    Exited (0) 33 seconds ago   
+client    hustlehub-client:local   Up 19 seconds (healthy)     0.0.0.0:5173->8080/tcp, [::]:5173->8080/tcp
+mongo     mongo:8.0.34-noble       Up 34 seconds (healthy)     27017/tcp
 
 $ docker compose exec api id
 uid=1000(node) gid=1000(node) groups=1000(node)

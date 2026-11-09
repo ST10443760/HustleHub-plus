@@ -4,27 +4,27 @@ HustleHub+ - Rate Limits
 
 □ Login Limiter
 └ Failed Login 1 of 5
-  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 198ms]
+  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 163ms]
   √  Status is 401
 
 └ Failed Login 2 of 5
-  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 111ms]
+  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 124ms]
   √  Status is 401
 
 └ Failed Login 3 of 5
-  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 111ms]
+  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 171ms]
   √  Status is 401
 
 └ Failed Login 4 of 5
-  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 134ms]
+  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 122ms]
   √  Status is 401
 
 └ Failed Login 5 of 5
-  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 162ms]
+  POST http://localhost:5173/api/auth/login [401 Unauthorized, 1.19kB, 114ms]
   √  Status is 401
 
 └ Failed Login 6 (rate limited)
-  POST http://localhost:5173/api/auth/login [429 Too Many Requests, 1.24kB, 18ms]
+  POST http://localhost:5173/api/auth/login [429 Too Many Requests, 1.24kB, 14ms]
   √  Status is 429
   √  Retry-After header with a sensible number of seconds
   √  Meaningful message that matches Retry-After
@@ -32,59 +32,59 @@ HustleHub+ - Rate Limits
 
 □ Booking Limiter
 └ Register Client (setup)
-  POST http://localhost:5173/api/auth/register [201 Created, 1.58kB, 176ms]
+  POST http://localhost:5173/api/auth/register [201 Created, 1.58kB, 248ms]
   √  Status is 201
 
 └ Register Freelancer (setup)
-  POST http://localhost:5173/api/auth/register [201 Created, 1.59kB, 148ms]
+  POST http://localhost:5173/api/auth/register [201 Created, 1.59kB, 207ms]
   √  Status is 201
 
 └ Freelancer Creates Gig (setup)
-  POST http://localhost:5173/api/gigs [201 Created, 1.37kB, 31ms]
+  POST http://localhost:5173/api/gigs [201 Created, 1.37kB, 78ms]
   √  Status is 201
 
 └ Booking 1 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 57ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 83ms]
   √  Status is 201
 
 └ Booking 2 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 45ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 44ms]
   √  Status is 201
 
 └ Booking 3 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 28ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 33ms]
   √  Status is 201
 
 └ Booking 4 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 48ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 34ms]
   √  Status is 201
 
 └ Booking 5 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 54ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 36ms]
   √  Status is 201
 
 └ Booking 6 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 49ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 33ms]
   √  Status is 201
 
 └ Booking 7 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 68ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 27ms]
   √  Status is 201
 
 └ Booking 8 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 35ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 28ms]
   √  Status is 201
 
 └ Booking 9 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 42ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 35ms]
   √  Status is 201
 
 └ Booking 10 of 10
-  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 38ms]
+  POST http://localhost:5173/api/bookings [201 Created, 1.98kB, 41ms]
   √  Status is 201
 
 └ Booking 11 (rate limited)
-  POST http://localhost:5173/api/bookings [429 Too Many Requests, 1.24kB, 17ms]
+  POST http://localhost:5173/api/bookings [429 Too Many Requests, 1.24kB, 39ms]
   √  Status is 429
   √  Retry-After header with a sensible number of seconds
   √  Meaningful message that matches Retry-After
@@ -103,11 +103,11 @@ HustleHub+ - Rate Limits
 ├─────────────────────────┼───────────────────┼───────────────────┤
 │              assertions │                26 │                 0 │
 ├─────────────────────────┴───────────────────┴───────────────────┤
-│ total run duration: 3.2s                                        │
+│ total run duration: 3.5s                                        │
 ├─────────────────────────────────────────────────────────────────┤
-│ total data received: 10.06kB (approx)                           │
+│ total data received: 10.07kB (approx)                           │
 ├─────────────────────────────────────────────────────────────────┤
-│ average response time: 78ms [min: 17ms, max: 198ms, s.d.: 55ms] │
+│ average response time: 83ms [min: 14ms, max: 248ms, s.d.: 66ms] │
 └─────────────────────────────────────────────────────────────────┘
-(node:56656) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(node:25008) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
 (Use `node --trace-deprecation ...` to show where the warning was created)
