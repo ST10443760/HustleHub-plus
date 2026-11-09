@@ -31,4 +31,10 @@ for (const key of OVERRIDES) {
 }
 logger.warn('Starting with RELAXED rate limits - for local testing only');
 
+// Marks this as a test run, so cloud log shipping stays OFF even though
+// api/.env has the Axiom settings: the Newman runs must not fill the real
+// dataset with test data. Set LOG_SHIPPING_IN_TEST=1 to ship anyway (for a
+// demo of the lockout in the cloud logs).
+process.env.HUSTLEHUB_TEST_RUN = '1';
+
 require('../src/server');
