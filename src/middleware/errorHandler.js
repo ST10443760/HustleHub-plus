@@ -1,5 +1,13 @@
+
+const logger = require('../utils/logger');
+
 const errorHandler = (err, req, res, next) => {
-    console.error(err);
+    logger.error('API error occurred', {
+        message: err.message,
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: err.statusCode || 500
+    });
 
     const statusCode = err.statusCode || 500;
 

@@ -6,3 +6,5 @@ node_modules/
 cert/server.key 
 .DS_Store
 npm-debug.log*
+.env.*
+!.env.example

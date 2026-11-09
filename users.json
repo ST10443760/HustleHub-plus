@@ -5,5 +5,12 @@
     "email": "lihle@example.com",
     "password": "$2a$12$rb36MQz9kM1QJeNEe9f2UOmsRd.N59mptZd2DHKX29xnfwqXiLScK",
     "createdAt": "2026-09-01T08:56:27.065Z"
+  },
+  {
+    "id": "1791452148073",
+    "username": "lihle2026",
+    "email": "lihle2026@example.com",
+    "password": "$2a$12$AfOcwgwOXDa0M.UaGJsXZuGXj7QTC8YcnMU8KyC71DtxXzpQqScMe",
+    "createdAt": "2026-10-08T09:35:48.073Z"
   }
 ]
