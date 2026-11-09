@@ -1,109 +1,129 @@
 # HustleHub+
 
-[![CI](https://github.com/ST10443760/HustleHub-plus/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ST10443760/HustleHub-plus/actions/workflows/ci.yml)
+[![CI](https://github.com/EMKNDW/insy7314-g2-2026-insy7314-2026-poe-st10443760/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EMKNDW/insy7314-g2-2026-insy7314-2026-poe-st10443760/actions/workflows/ci.yml)
 
-HustleHub+ is a secure freelance marketplace platform. Freelancers advertise
-services, clients browse and book them, and the platform records the
-resulting transactions and tracks freelancer income. (Tax estimation and
-income charts are planned for Part 3 and are not built yet.) Because the
-system handles credentials, transaction records and income data, security
-was treated as a core requirement from the first line of code, not something
-added afterward.
+HustleHub+ is a secure freelance marketplace. Freelancers advertise gigs,
+clients browse and book them, every booking creates a transaction record,
+and freelancers track their income and an estimate of the income tax on
+it. The system handles credentials, payment records and income data, so
+security was treated as a requirement from the first line of code, not
+something added at the end.
 
-This repository is **Part 2 (Secure Stack)** of the INSY7314 / APDS7311 POE:
-a full MERN application - a React client, an Express API and MongoDB - with
-gig management, bookings, simulated payments, transaction records, income
-tracking and an admin area, built on the secure foundations from Part 1.
+This is the final submission (**Part 3: DevSecOps, Monitoring and
+Finalisation**) of the INSY7314 / APDS7311 POE. It is a full MERN
+application (React, Express, MongoDB) that runs locally with npm or as
+containers with Docker Compose, is tested and scanned by a GitHub Actions
+pipeline, and ships its security logs to a cloud logging platform.
 
-**Module:** INSY7314/w (Information Systems 3D) & APDS7311/w (Application
+**Module:** INSY7314/w (Information Systems 3D) and APDS7311/w (Application
 Development Security)
 **Group:** Null Devs
 **Group Leader:** Muaaz (ST10443760)
+**Repository:** <https://github.com/EMKNDW/insy7314-g2-2026-insy7314-2026-poe-st10443760>
+
+> The pipeline badge above shows a failing or empty state. That is not a
+> code failure: GitHub will not start any job for this repository while
+> the account is locked for a billing issue. See
+> [Pipeline status and the billing lock](#pipeline-status-and-the-billing-lock).
 
 ---
 
 ## Contents
 
-1. [Overview](#1-overview)
-2. [Features](#2-features)
-3. [What Changed Since Part 1](#3-what-changed-since-part-1)
-4. [Architecture](#4-architecture)
-5. [Project Structure](#5-project-structure)
-6. [How to Run](#6-how-to-run)
-7. [Troubleshooting](#7-troubleshooting)
-8. [Using the App](#8-using-the-app)
-9. [API](#9-api)
-10. [Security](#10-security)
-11. [Testing](#11-testing)
-12. [Requirements Traceability](#12-requirements-traceability)
-13. [Known Limitations and Part 3 Notes](#13-known-limitations-and-part-3-notes)
-14. [Screenshots](#14-screenshots)
-15. [Demonstration Video](#15-demonstration-video)
+1. [Overview and features](#1-overview-and-features)
+2. [Architecture](#2-architecture)
+3. [Tech stack](#3-tech-stack)
+4. [Getting started](#4-getting-started)
+5. [Using the app](#5-using-the-app)
+6. [API reference](#6-api-reference)
+7. [Tax estimation](#7-tax-estimation)
+8. [Security implementation](#8-security-implementation)
+9. [Final security review](#9-final-security-review)
+10. [Testing](#10-testing)
+11. [CI/CD pipeline](#11-cicd-pipeline)
+12. [Static code analysis](#12-static-code-analysis)
+13. [Docker](#13-docker)
+14. [Logging and monitoring](#14-logging-and-monitoring)
+15. [Demonstration evidence](#15-demonstration-evidence)
+16. [What changed in Part 3](#16-what-changed-in-part-3)
+17. [Requirements traceability](#17-requirements-traceability)
+18. [Troubleshooting, limitations, team and repository](#18-troubleshooting-limitations-team-and-repository)
 
-Appendix: [Part 1 API Screenshots](#appendix-part-1-api-screenshots)
-
-## 1. Overview
+## 1. Overview and features
 
 HustleHub+ has three user types:
 
 - **Clients** browse active gigs, book them (with a simulated payment) and
   see their bookings and transactions.
 - **Freelancers** create and manage their own gigs, see the bookings on
-  them, and track their income.
+  them, and track their income on a dashboard with a South African income
+  tax estimate.
 - **Admins** (created by a seed script, never through sign-up) see every
-  user and transaction and can remove any gig.
+  user and transaction, can remove any gig, and read the audit log.
 
-Every booking creates a transaction record linked to both the client and the
-freelancer, in the same database transaction. Part 1 delivered the secure
-authentication layer; Part 2 adds the marketplace on top of it, with
-security enforced on every request by the API (the client's checks are
-only for convenience).
+Every booking creates a transaction record linked to both the client and
+the freelancer, in the same database transaction. Every rule (who is
+logged in, which role may call a route, who owns a record, which fields a
+request may set) is enforced by the API on every request. The React
+client only hides what a user can't use.
 
-## 2. Features
+### Features
 
 **For clients**
-- Register and log in (role chosen at sign-up: client or freelancer)
-- Browse active gigs with search, category and price filters and pagination
-- Gig detail page and booking with a confirmation step; payment is simulated
-  and every booking returns a transaction reference
+- Register and log in (the role is chosen at sign-up: client or freelancer)
+- Browse active gigs with search, category and price filters and paging
+- Gig detail page and booking with a confirmation step. Payment is
+  simulated and every booking returns a transaction reference
 - My bookings and My transactions
 
 **For freelancers**
-- Create, edit, activate/deactivate and delete their own gigs (a gig that
+- Create, edit, activate, deactivate and delete their own gigs (a gig that
   already has bookings is deactivated instead of deleted)
 - See the bookings on their gigs, with the client's name
-- Income page: total earned, number of bookings and a per-booking table
+- Income dashboard: total earned, estimated tax, take-home pay, effective
+  tax rate, a monthly income chart, the tax-by-bracket table and the
+  per-booking income table, for a selectable tax year
 
 **For admins**
 - List all users and all transactions (paginated)
 - Remove any gig, with the same delete-or-deactivate rule
+- Audit log of admin gig removals, password changes, sign-outs and
+  account lockouts, with an action filter
 
-**Security and quality**
-- JWT authentication with the role read from the database on every request;
-  RBAC and ownership checks on every route
-- Validation with unknown fields rejected, HTML escaping, NoSQL operator
-  stripping, regex-safe search
-- Rate limiting (login, register, booking, plus a general limit), Helmet
-  with a strict CSP on the API and the client, CORS locked to the client
-- Bookings and their transactions written atomically in one MongoDB
-  transaction; money stored as numbers rounded to 2 decimals
-- Security event logging without secrets; no stack traces in responses
-- 171 automated API assertions in Newman (145 in the main collection, 26 in
-  the rate limit collection) and 67 frontend tests (Vitest + React Testing
-  Library), all passing
+**For everyone who is logged in**
+- An Account page to change the password and to sign out of all devices
 
-## 3. What Changed Since Part 1
+**Security and operations**
+- JWT authentication with the role read from the database on every
+  request; RBAC and ownership checks on every route
+- Validation with strict types, unknown fields rejected on the gig,
+  booking, account and query routes (registration and login read only
+  their named fields), HTML escaping, NoSQL operator stripping and a
+  regex-safe search
+- Rate limits on login, registration, booking and password changes, plus
+  a general limit; per-account lockout after 5 failed logins
+- Session revocation: changing the password or signing out everywhere
+  ends every older token
+- Helmet with a strict CSP on the API, the same strict policy on the
+  client, CORS locked to the client's origin
+- Bookings and their transactions written atomically; money kept to 2
+  decimals; tax worked out in whole cents
+- Structured security logging with request ids and redaction, shipped to
+  Axiom; an append-only audit log
+- Hardened Docker images and Compose stack; a GitHub Actions pipeline with
+  tests, secret scanning, image scanning, static analysis and a dynamic
+  scan
+- 191 API unit tests, 110 frontend tests, 151 Newman requests with 272
+  assertions over two Postman collections, and a 15-check smoke test, all
+  passing
 
-| Area | Part 1 | Part 2 (this submission) |
-|---|---|---|
-| Data | Users kept in memory (lost on restart) | MongoDB via Mongoose: users, gigs, bookings and transactions, with indexes |
-| Features | Register, log in, one protected test route | The full marketplace: gig management, browsing and search, bookings with simulated payment, transaction records, income, an admin area |
-| Frontend | None (Postman only) | React client (Vite) with pages for every role |
-| Access control | JWT `protect` and a basic `requireRole` | Role read from the database on every request, `requireRole` on every role-restricted route, ownership checks (`requireOwnership`) on gigs and bookings, admin created only by a seed script |
-| Input handling | express-validator on register and login | Validators on every route with unknown fields rejected, HTML escaping, NoSQL operator stripping, strict id checks, regex-safe search |
-| Abuse protection | None | Rate limits on login, register and booking, plus a general limit |
-| Headers | Helmet defaults | Explicit Helmet config with a strict CSP on the API, a separate CSP on the built client, CORS locked to the client origin |
-| Tests | One Postman collection (auth) | Main Postman collection (Auth, RBAC, Gigs, Bookings, Income, Security), a rate limit collection, and 67 Vitest + React Testing Library tests |
+### How the project progressed
+
+| Part | What it delivered |
+|---|---|
+| **Part 1: Secure Foundations** | Express API with register, login and one protected route; bcryptjs password hashing; JWT with `protect` and `requireRole`; express-validator; a central error handler; HTTPS with a self-signed certificate; a Postman collection. Users were kept in memory. |
+| **Part 2: Secure Stack** | MongoDB with Mongoose; the React client; gig management with ownership checks; bookings with simulated payments and a transaction for every booking; income tracking; the admin area; rate limiting; an explicit Helmet CSP; CORS; NoSQL sanitising; the main and rate limit Newman collections and the first Vitest tests. |
+| **Part 3: DevSecOps, Monitoring and Finalisation** | The tax estimate and income dashboard; Dockerfiles and Docker Compose; the GitHub Actions pipeline; ESLint security rules and Semgrep with every finding fixed; account lockout, change password with session revocation and the admin audit log; structured logging shipped to Axiom; this final security review and README. See [What changed in Part 3](#16-what-changed-in-part-3). |
 
 ## 4. Architecture
 
