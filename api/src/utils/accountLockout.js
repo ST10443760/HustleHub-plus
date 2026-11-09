@@ -30,9 +30,12 @@ function burnPasswordCheck(password) {
  *    instead and the result is a failure.
  * 2. Right password: the counters are reset.
  * 3. Wrong password on the attempt that reaches the limit: the account is
- *    now locked; logged (user id only) and written to the audit log.
+ *    now locked; logged as AUTH_LOCKOUT (user id only) and written to the
+ *    audit log.
  *
- * Resolves to true only for the right password on an unlocked account.
+ * Resolves to { ok, reason }: ok is true only for the right password on an
+ * unlocked account; otherwise reason is "locked" or "bad_credentials".
+ * The reason is for the server log only, never for the response.
  */
 async function verifyPassword(req, user, password, { now = new Date(), policy = LOCKOUT_POLICY } = {}) {
   const { filter, update } = claimAttemptUpdate(now, policy);
@@ -44,18 +47,22 @@ async function verifyPassword(req, user, password, { now = new Date(), policy = 
 
   if (!claimed || claimed.failedLoginAttempts > policy.maxAttempts) {
     await burnPasswordCheck(password);
-    logger.event('AUTH', 'Attempt on a locked account - password not checked', { userId: user.id, ip: req.ip });
-    return false;
+    return { ok: false, reason: 'locked' };
   }
 
   if (await comparePassword(password, user.passwordHash)) {
     await User.updateOne({ _id: user._id }, { $set: RESET_STATE });
-    return true;
+    return { ok: true, reason: null };
   }
 
   if (claimed.failedLoginAttempts === policy.maxAttempts) {
     const lockMinutes = Math.round(policy.lockMs / 60000);
-    logger.event('AUTH', 'Account locked after too many failed attempts', { userId: user.id, lockMinutes, ip: req.ip });
+    logger.event('AUTH_LOCKOUT', 'Account locked after too many failed attempts', {
+      userId: user.id,
+      failedAttempts: claimed.failedLoginAttempts,
+      lockMinutes,
+      ip: req.ip,
+    });
     await recordAudit(req, {
       actor: { id: user.id, role: user.role },
       action: 'account_locked',
@@ -64,7 +71,7 @@ async function verifyPassword(req, user, password, { now = new Date(), policy = 
       meta: { failedAttempts: claimed.failedLoginAttempts, lockMinutes },
     });
   }
-  return false;
+  return { ok: false, reason: 'bad_credentials' };
 }
 
 module.exports = { verifyPassword, burnPasswordCheck, LOCKOUT_POLICY };

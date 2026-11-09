@@ -24,17 +24,15 @@ async function register(req, res, next) {
     if (existing) {
       // 409 Conflict - don't reveal *why* beyond "already registered",
       // and definitely don't confirm/deny in a way that helps enumerate users.
-      logger.event('AUTH', 'Registration attempt with existing email', {
-        email: logger.maskEmail(email),
-        ip: req.ip,
-      });
+      const meta = { outcome: 'rejected', reason: 'duplicate_email', email: logger.maskEmail(email), ip: req.ip };
+      logger.event('AUTH_REGISTER', 'Registration refused - email already registered', meta, { level: 'warn' });
       throw new AppError(DUPLICATE_EMAIL_MESSAGE, 409);
     }
 
     const passwordHash = await hashPassword(password);
     const user = await User.create({ name, email, passwordHash, role });
 
-    logger.event('AUTH', 'User registered', { userId: user.id, role: user.role, ip: req.ip });
+    logger.event('AUTH_REGISTER', 'User registered', { outcome: 'success', userId: user.id, role: user.role, ip: req.ip });
 
     const token = generateToken(user);
 
@@ -68,17 +66,22 @@ async function login(req, res, next) {
     // the lockout is applied (a locked account never has its real password
     // checked, a dummy compare runs instead). Either way every failure
     // takes about the same time.
-    const passwordMatches = user ? await verifyPassword(req, user, password) : (await burnPasswordCheck(password), false);
+    const check = user
+      ? await verifyPassword(req, user, password)
+      : (await burnPasswordCheck(password), { ok: false, reason: 'bad_credentials' });
 
-    if (!passwordMatches) {
+    if (!check.ok) {
       // ONE message, status and shape for an unknown email, a wrong password
-      // and a locked account, so none of them can be told apart. The log
-      // doesn't say which either. Never the password.
-      logger.event('AUTH', 'Failed login', { email: logger.maskEmail(email), ip: req.ip });
+      // and a locked account, so none of them can be told apart. Only the
+      // server log keeps the internal reason (bad_credentials or locked).
+      // Never the password.
+      const message = check.reason === 'locked' ? 'Failed login - account locked, password not checked' : 'Failed login';
+      const meta = { reason: check.reason, email: logger.maskEmail(email), userId: user ? user.id : undefined, ip: req.ip };
+      logger.event('AUTH_LOGIN_FAILURE', message, meta);
       throw new AppError(INVALID_LOGIN_MESSAGE, 401);
     }
 
-    logger.event('AUTH', 'User logged in', { userId: user.id, ip: req.ip });
+    logger.event('AUTH_LOGIN_SUCCESS', 'User logged in', { userId: user.id, role: user.role, ip: req.ip });
 
     const token = generateToken(user);
 
@@ -107,11 +110,9 @@ async function changePassword(req, res, next) {
       throw new AppError('Not authenticated - user no longer exists', 401);
     }
 
-    if (!(await verifyPassword(req, user, currentPassword))) {
-      logger.event('AUTH', 'Password change refused - current password wrong or account locked', {
-        userId: user.id,
-        ip: req.ip,
-      });
+    const check = await verifyPassword(req, user, currentPassword);
+    if (!check.ok) {
+      logger.event('AUTH_PASSWORD_CHANGE_FAILED', 'Password change refused', { reason: check.reason, ip: req.ip });
       throw new AppError(CURRENT_PASSWORD_MESSAGE, 400);
     }
 
@@ -122,7 +123,7 @@ async function changePassword(req, res, next) {
       { returnDocument: 'after' }
     ).select('+tokenVersion');
 
-    logger.event('AUTH', 'Password changed - every other session signed out', { userId: updated.id, ip: req.ip });
+    logger.event('AUTH_PASSWORD_CHANGED', 'Password changed - every other session signed out', { ip: req.ip });
     await recordAudit(req, { action: 'password_changed', targetType: 'user', targetId: updated._id });
 
     res.status(200).json({
@@ -148,7 +149,7 @@ async function logoutAll(req, res, next) {
       throw new AppError('Not authenticated - user no longer exists', 401);
     }
 
-    logger.event('AUTH', 'Signed out of all devices', { userId: updated.id, ip: req.ip });
+    logger.event('AUTH_LOGOUT_ALL', 'Signed out of all devices', { ip: req.ip });
     await recordAudit(req, { action: 'logout_all', targetType: 'user', targetId: updated._id });
 
     res.status(200).json({ success: true, data: { message: 'You have been signed out of all devices.' } });
