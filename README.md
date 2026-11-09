@@ -2406,16 +2406,14 @@ accounts. The admin's email is greyed out on the Users page.
 | [`part3-08-account-wrong-current.png`](docs/screenshots/part3-08-account-wrong-current.png) | A wrong current password: a `400` message, and the user stays logged in |
 | [`part3-09-account-success.png`](docs/screenshots/part3-09-account-success.png) | "Password changed. You have been signed out everywhere else." |
 | [`part3-10-lockout-correct-password-rejected.png`](docs/screenshots/part3-10-lockout-correct-password-rejected.png) | After 5 wrong passwords the correct password is still refused with "Invalid email or password" |
+| [`part3-11-session-ended.png`](docs/screenshots/part3-11-session-ended.png) | A second browser for the same user after the password was changed in the first: it lands on Log in with "Your session has ended. Please log in again." |
 | [`part3-12-sign-out-confirm.png`](docs/screenshots/part3-12-sign-out-confirm.png) | The "Sign out of all devices?" confirmation |
+| [`part3-13-signed-out-all-devices.png`](docs/screenshots/part3-13-signed-out-all-devices.png) | Log in after "Sign out of all devices": "You have been signed out of all devices. Log in again to continue." |
 | [`part3-14-audit-log.png`](docs/screenshots/part3-14-audit-log.png) | The admin Audit log: account locked, signed out of all devices, password changed, admin deleted a gig |
 | [`part3-15-audit-log-filtered.png`](docs/screenshots/part3-15-audit-log-filtered.png) | The Audit log filtered to "Password changed" |
 | [`part3-16-admin-users.png`](docs/screenshots/part3-16-admin-users.png) | The admin Users page |
 | [`part3-17-admin-transactions.png`](docs/screenshots/part3-17-admin-transactions.png) | The admin All transactions page: each transaction linked to its client and freelancer |
 | [`part3-18-client-transactions.png`](docs/screenshots/part3-18-client-transactions.png) | The client's My transactions with each `TXN-...` reference |
-
-Numbers 11 and 13 are not used: the login page doesn't show its "session
-ended" and "signed out of all devices" messages (see
-[Known limitations](#known-limitations)).
 
 ### Part 2 screenshots
 
