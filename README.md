@@ -1439,6 +1439,427 @@ The raw outputs are in [`docs/test-evidence/`](docs/test-evidence/README.md),
 - **Payments are simulated.** No payment provider is involved and no money
   moves.
 
+## 10. Testing
+
+Every suite was run on 9 November 2026 and passed. The raw output is in
+[`docs/test-evidence/`](docs/test-evidence/README.md).
+
+| Suite | What it covers | Result | How to run it | Evidence |
+|---|---|---|---|---|
+| API unit tests (Node's test runner) | Tax calculator, tax years and config, money rounding, startup settings, trust proxy and rate limit buckets, health check, gig validators, account lockout, token versions, auth and admin validators, audit log guards and helper, the log scrubber, the logger and event catalogue, request ids and the access log, and the log shipper against a local mock server. No database or secrets needed | **191 tests, 21 files, 0 failed** | `cd api; npm test` | [`api-unit-results.txt`](docs/test-evidence/api-unit-results.txt) |
+| Main Postman collection (Newman) | Health, auth, RBAC, gigs, bookings, income and tax estimate, account security (lockout, change password, sign out everywhere, audit log) and security (headers, injection, CORS, body limits, admin delete) | **131 requests, 246 assertions, 0 failed** with the admin credentials (119 requests and 213 assertions without them, when the 12 admin-only requests are skipped) | API on `npm run start:test`, then Newman (below) | [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt) |
+| Rate limit collection (Newman) | The 6th failed login and the 11th booking get `429` with `Retry-After` and a matching message | **20 requests, 26 assertions, 0 failed** | API freshly started with `npm run start:test:strict`, then Newman | [`newman-rate-limits-results.txt`](docs/test-evidence/newman-rate-limits-results.txt) |
+| Frontend (Vitest and React Testing Library) | Rendering and user interaction for every main page, the API client, XSS rendering, the tax dashboard and chart, the Account page, the audit log page and the security header consistency | **110 tests, 21 files, 0 failed** | `cd client; npm run test:run` | [`vitest-results.txt`](docs/test-evidence/vitest-results.txt) |
+| Main collection against Docker | The same collection against the API container, with bookings using the Compose MongoDB replica set | **131 requests, 246 assertions, 0 failed** | See [Docker](#13-docker) | [`docker-newman-results.txt`](docs/test-evidence/docker-newman-results.txt) |
+| Docker smoke test | The page and its CSP, `/api/health` through nginx, register, login, a protected route with and without a token, an admin route as a client, and a password change that ends the old token | **15 checks passed** | `node docker/smoke-test.mjs` (stack running) | [`docker-smoke-test-results.txt`](docs/test-evidence/docker-smoke-test-results.txt) |
+| Lint and static analysis | ESLint (with the security plugin) in both packages, Semgrep with 152 rules | **0 problems, 0 findings** | `npm run lint` in `api/` and `client/`, `node .semgrep/run.mjs` | [Static code analysis](#12-static-code-analysis) |
+| Pipeline checks run locally | actionlint, zizmor, hadolint, `docker compose config`, npm audit, gitleaks, Trivy, ZAP baseline | **all clean** | [CI/CD pipeline](#11-cicd-pipeline) | [`docs/pipeline-evidence/`](docs/pipeline-evidence/README.md) |
+| Client production build | `npm run build`, and the CSP meta tag is in the built `index.html` | **passes** | `cd client; npm run build` | |
+
+### Running the Newman collections
+
+The main collection registers and logs in far more often than the strict
+limits allow, so it runs against the API with relaxed limits. The limits
+themselves are proven by the second collection against the strict ones.
+Both start commands are test runs, so nothing is shipped to Axiom.
+
+```bash
+cd api
+
+# 1. Main collection, relaxed limits
+npm run start:test          # terminal 1 (refuses to run in production)
+npx newman run postman/HustleHub_API.postman_collection.json --insecure \
+  --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>   # terminal 2
+
+# 2. Rate limit collection, strict limits (stop start:test first)
+npm run start:test:strict   # terminal 1
+npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure    # terminal 2
+
+# afterwards
+npm run clean:test
+```
+
+- The admin credentials are passed as variables and never stored in the
+  collection. Without them the 12 admin-only requests are skipped cleanly.
+- In PowerShell, put each Newman command on one line.
+- Rate limit counters live in memory, so restart the API before running
+  the rate limit collection again.
+- Every run registers users with a fresh `test-...@example.com` email, so
+  the collections can be run repeatedly. `npm run clean:test` removes them
+  with their gigs, bookings and transactions.
+- Both collections can be imported into Postman (turn off "SSL
+  certificate verification" under Settings, General).
+
+### What the main collection checks
+
+| Folder | Requests / assertions | What it checks |
+|---|---|---|
+| Health and Auth | 10 / 19 | Health check; registration (token returned, no password hash), duplicate email `409`, invalid input `400`; login success; wrong password and unknown email get the same `401`; protected route with no, invalid and valid token |
+| RBAC | 8 / 16 | `/api/admin/users`: no token `401`, client and freelancer `403`; registering as admin `400`; the admin gets `200` with no password hashes |
+| Gigs | 22 / 33 | Create as freelancer (owner from the token), client `403`, no token `401`; negative price, empty title and an unknown `freelancer` field `400`; browsing shows names only; regex characters in `q` are plain text; malformed id `400`, unknown id `404`; only the owner can update or delete |
+| Bookings | 26 / 43 | Booking price and parties come from the gig and the token, with a payment confirmation; `price`, `freelancer` or `status` in the body `400`; freelancer `403`; malformed, unknown and inactive gigs; both parties see the booking and the other freelancer gets `403`; the price stays as booked after a gig edit |
+| Income | 14 / 35 | Income for the right freelancer only; the tax estimate (values, `403` for client and admin, `401`, `400` for a bad or unsupported `taxYear` or an unknown parameter); admin transactions |
+| Account security | 36 / 69 | Lockout (5 wrong passwords, then the correct one is rejected with the same body as an unknown email); change password (validation, wrong current password is `400` and the session survives, old token `401`, new token works, old password no longer logs in); sign out everywhere (current and other tokens `401`); audit log access and the entries for each action |
+| Security | 15 / 31 | CSP, nosniff, no-referrer and HSTS headers, no `X-Powered-By`; operator objects in the body and query `400`; a disallowed origin `403` with no CORS header; malformed JSON `400` and an oversized body `413` with no stack trace; admin gig delete (`403` for others) and its audit entry |
+
+### Frontend tests
+
+Vitest with React Testing Library (jsdom). Tests sit next to the code
+(`*.test.js`, `*.test.jsx`). No test touches the network: the API modules
+or `fetch` are mocked, and the setup file fails any unmocked `fetch`.
+`npm test` runs in watch mode.
+
+| Area | Files (tests) | What is checked |
+|---|---|---|
+| API client | `client.test.js` (10) | Bearer header, unwrapping `{ success, data }`, the server's error message, a generic message on network failure, the 429 message, logout on `401` (not on a failed login), absolute URLs refused |
+| Auth pages | `Register.test.jsx` (4), `Login.test.jsx` (4), `ProtectedRoute.test.jsx` (4), `Layout.test.jsx` (5) | Inline errors, only client and freelancer offered, the generic login error, the 429 message, redirects and "Not allowed", who sees which nav link |
+| Gigs and booking | `Gigs.test.jsx` (6), `GigCard.test.jsx` (2), `GigDetail.test.jsx` (5), `BookingPanel.test.jsx` (5), `GigForm.test.jsx` (3), `GigEditor.test.jsx` (3), `MyGigs.test.jsx` (5) | Loading, empty and error states; a debounced search; the XSS title rendered as text; what each role sees; the booking confirmation, a double click booking once, the reference; form limits; edits without double escaping; delete or deactivate |
+| Income and tax | `Income.test.jsx` (7), `MonthlyIncomeChart.test.jsx` (5) | Summary cards, the bracket breakdown and assumptions, switching the tax year, loading, empty and error states, the per-booking list, only a SARS source link; the chart's accessible summary, hidden table and no inline styles |
+| Account and admin | `Account.test.jsx` (8), `AdminAuditLog.test.jsx` (5), `AdminUsers.test.jsx` (2) | Change password validation and success, the `400` that doesn't log out, the generic `500` message, the sign-out confirmation; audit entries shown readably, the action filter, an unknown action ignored, empty and error states; no password field on the Users page |
+| Utilities and headers | `format.test.js` (8), `text.test.js` (4), `validation.test.js` (7), `securityHeaders.test.js` (8) | Rand and date formatting, entity decoding, validation rules that mirror the API, and nginx, preview and the shared header file agreeing |
+
+## 11. CI/CD pipeline
+
+The GitHub Actions workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+(named **CI**) is set to run on every push to `main`, every pull request
+and every manual run (**Run workflow**). It tests the code, runs several
+kinds of security checks, builds and starts the **whole stack** in Docker,
+tests it end to end, and fails if anything fails.
+
+**Current status:** GitHub doesn't start any job for this repository,
+because the account is locked for a billing issue. Every job was therefore
+run locally with the same commands. Read
+[Pipeline status and the billing lock](#pipeline-status-and-the-billing-lock)
+first.
+
+```mermaid
+flowchart LR
+    B["Backend<br/>unit tests + npm audit"]
+    F["Frontend<br/>Vitest, lint, build + npm audit"]
+    G["Secret scan<br/>gitleaks, full history"]
+    L["Lint<br/>hadolint, compose config,<br/>actionlint, zizmor"]
+    S["Stack<br/>build all images, compose up,<br/>smoke test, Newman x2"]
+    I["Image scan<br/>Trivy images + Dockerfiles"]
+    D["Dynamic scan<br/>OWASP ZAP baseline"]
+    A["Static analysis<br/>ESLint + Semgrep"]
+    OK{{"Pipeline OK"}}
+    B --> S
+    F --> S
+    G --> S
+    L --> S
+    B --> D
+    F --> D
+    G --> D
+    L --> D
+    L --> I
+    B --> OK
+    F --> OK
+    G --> OK
+    L --> OK
+    S --> OK
+    I --> OK
+    D --> OK
+    A --> OK
+```
+
+The four fast jobs and the static analysis job run in parallel. The stack
+and the ZAP scan only start when the four fast jobs pass, so nothing is
+deployed or scanned on top of broken code. The image scan starts as soon as
+the Dockerfiles have passed lint.
+
+### What each job checks, and why it matters for security
+
+| Job | What it does | Why |
+|---|---|---|
+| **Backend - unit tests and npm audit** | `npm ci`, `npm test` (191 unit tests: tax calculator, startup settings check, trust proxy and rate limit buckets, health check, gig price validation, account lockout, token versions, audit log guards, log redaction, the structured logger, request ids and the cloud log shipper), `npm audit --omit=dev --audit-level=high` | Proves the money and security logic behaves, and that no known high or critical vulnerability ships in a production dependency |
+| **Frontend - tests, build and npm audit** | `npm ci`, `npm run test:run` (110 Vitest tests, including the CSP and security header consistency test), `npm run lint`, `npm run build` (and checks the CSP meta tag is in the build), `npm audit --omit=dev --audit-level=high` | Same for the React app; a build without its CSP fails |
+| **Secret scan - gitleaks (full history)** | gitleaks over **every commit** (`fetch-depth: 0`), not just the latest | A secret committed and later deleted is still in history; this catches it. No allowlist: the history scans clean |
+| **Lint - Dockerfiles, Compose and workflows** | hadolint on all three Dockerfiles; `docker compose config` on both Compose files, plus a check that Compose **refuses** to run without `JWT_SECRET`; actionlint and zizmor on this workflow | Catches insecure or broken container and pipeline configuration before anything runs. zizmor is a security audit of the workflow itself (injection, credential persistence, unpinned actions) |
+| **Stack - build, smoke test and Newman** | Generates random credentials, builds the certs, api and client images, `docker compose up -d --build --wait`, runs `docker/smoke-test.mjs`, the **rate limit** collection against the strict limits, seeds the admin, switches to the test override and runs the **main** collection (with the admin tests) | Proves the **entire stack** builds, starts healthy and enforces auth, RBAC, ownership, validation, rate limits, CORS and headers end to end |
+| **Image scan - Trivy** | Trivy on the api, client and certs images (fails on HIGH/CRITICAL vulnerabilities that have a fix, `--ignore-unfixed`), and Trivy's Dockerfile misconfiguration scan | Known-vulnerable OS packages or libraries in the images, or risky Dockerfile patterns (root user, no healthcheck, ...), fail the build. There is no `.trivyignore` |
+| **Dynamic scan - OWASP ZAP baseline** | Starts the stack and runs the ZAP baseline scan (spider plus passive scan) against `http://localhost:5173` | Tests the running app from the outside like an attacker would: missing or broken security headers, information leaks, cross-domain problems |
+| **Static analysis - ESLint and Semgrep** | ESLint with eslint-plugin-security on `api/` and `client/` (`--max-warnings 0`), Semgrep with seven rule packs (`--error`). Uploads JSON and SARIF | Finds insecure code patterns in the source before it runs. See [Static code analysis](#12-static-code-analysis) |
+| **Pipeline OK** | Runs last, always, and fails unless **every** job above succeeded | One check to require in branch protection |
+
+The ZAP rules live in [`.zap/rules.tsv`](.zap/rules.tsv). Missing or
+broken security headers (CSP, anti-clickjacking, nosniff,
+Permissions-Policy, site isolation), information leaks (server version,
+`X-Powered-By`, debug errors, source code), cross-domain problems and
+vulnerable JavaScript libraries are set to **FAIL**. Everything else is
+reported as a warning in the report but doesn't fail the job. One rule is
+ignored: *ZAP is Out of Date* (10116), because the image is pinned on
+purpose and updated by Dependabot. The first scan found two real problems,
+both fixed rather than suppressed: no `Permissions-Policy` header and
+missing cross-origin isolation headers. All of them are now sent from
+`client/securityHeaders.js`, and nginx's `/healthz` sends them too. The
+scan takes about a minute.
+
+### How the pipeline itself is secured
+
+- The workflow token is read-only (`permissions: contents: read`), and
+  `actions/checkout` runs with `persist-credentials: false`, so no step can
+  push or reuse the token.
+- Every action is pinned to a full commit SHA, with the version in a
+  comment, and every tool image (gitleaks, hadolint, actionlint, zizmor,
+  Trivy, ZAP) to a tag **and** a digest, so a moved tag can't change what
+  runs.
+- It triggers on `push`, `pull_request` and `workflow_dispatch` only (never
+  `pull_request_target`). Branch names and PR titles are never put into a
+  script. A newer run on the same branch cancels the older one.
+- It needs **no repository secrets**.
+  [`.github/scripts/make-ci-env.sh`](.github/scripts/make-ci-env.sh)
+  generates a random `JWT_SECRET` (96 characters), admin email and admin
+  password (35 characters) in each job, masks them with `::add-mask::`, and
+  writes them to a job-local `.env` that disappears with the runner.
+- Newman's full JSON report contains request bodies and the generated
+  admin password, so it is never uploaded. Only the JUnit files and a slim
+  JSON (request names, status codes, assertion results) are.
+
+### How a failure is enforced
+
+- Every `run:` step uses bash with `-e -o pipefail`, so a failing command
+  fails the step even when its output is piped through `tee`.
+- There is no `continue-on-error` and no `|| true` anywhere.
+- Unit tests, Vitest, Newman and smoke-test failures exit non-zero.
+  `npm audit --audit-level=high`, gitleaks, Trivy (`--exit-code 1`),
+  hadolint, actionlint, zizmor and ZAP FAIL rules all do the same.
+- `Pipeline OK` needs every job and checks each one's result explicitly,
+  so a failed, cancelled or skipped job turns it red.
+- This was tested locally (see the next subsection for the details).
+
+### Where the results appear when the pipeline runs
+
+- **Actions** tab → the run → **Summary**. Each job writes its key results
+  there: unit test and Vitest counts, Newman requests and assertions for
+  both collections, the gitleaks result, the Trivy result and the ZAP
+  FAIL/WARN counts. `Pipeline OK` adds a table of every job's result.
+- **Artifacts** at the bottom of the run summary: `newman-results` (JUnit
+  and slim JSON for both collections, plus the smoke test output),
+  `trivy-results` (one table per image plus the Dockerfile scan) and
+  `zap-report` (HTML, JSON and Markdown report). They're kept for 14 days.
+- If the stack job fails, it prints every container's log before it tears
+  the stack down. Teardown (`docker compose down -v`) always runs.
+- Until the billing lock is cleared there is no remote run. The local
+  results are in [`docs/pipeline-evidence/`](docs/pipeline-evidence/README.md)
+  and [`docs/test-evidence/`](docs/test-evidence/README.md).
+
+### Dependabot
+
+[`.github/dependabot.yml`](.github/dependabot.yml) opens weekly update
+pull requests for the npm packages in `api/` and `client/`, the pinned
+actions, the three Dockerfiles' base images and the mongo image in
+Compose, with a 7-day cooldown after each release. Major versions are
+ignored for npm and Docker. Each pull request is meant to pass this
+pipeline before it is merged; while the billing lock is in place, that has
+to be checked locally.
+
+### Running every job locally
+
+From the repo root, with Docker running. These are the commands the jobs
+run:
+
+```bash
+# Backend
+cd api && npm ci && npm test && npm audit --omit=dev --audit-level=high && cd ..
+
+# Frontend
+cd client && npm ci && npm run test:run && npm run lint && npm run build && npm audit --omit=dev --audit-level=high && cd ..
+
+# Secret scan (full history)
+docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git --no-banner --redact --verbose --exit-code 1 /repo
+
+# Lint
+for f in api/Dockerfile client/Dockerfile docker/certs/Dockerfile; do docker run --rm -i hadolint/hadolint:v2.15.1 hadolint - < "$f"; done
+JWT_SECRET=x docker compose config --quiet
+JWT_SECRET=x docker compose -f docker-compose.yml -f docker-compose.test.yml config --quiet
+docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
+docker run --rm -v "$PWD:/repo:ro" ghcr.io/zizmorcore/zizmor:1.32.0 --offline /repo/.github/workflows
+
+# Image scan (after docker compose build)
+for i in hustlehub-api:local hustlehub-client:local hustlehub-certs:local; do
+  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2 image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$i"
+done
+docker run --rm -v "$PWD:/repo:ro" aquasec/trivy:0.76.2 config --misconfig-scanners dockerfile --exit-code 1 /repo
+# on Windows, add --timeout 20m --skip-dirs "**/node_modules" (the mount is slow)
+
+# Stack (uses your root .env; see section 4 B). The empty LOG_SHIPPING_* values
+# keep this test traffic out of Axiom (the pipeline has no Axiom settings at all)
+LOG_SHIPPING_URL= LOG_SHIPPING_TOKEN= docker compose up -d --build --wait
+node docker/smoke-test.mjs
+npx newman run api/postman/HustleHub_RateLimits.postman_collection.json --env-var base_url=http://localhost:5173
+docker compose run --rm seed
+docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --wait
+npx newman run api/postman/HustleHub_API.postman_collection.json --insecure --env-var base_url=https://localhost:5000 \
+  --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
+
+# Static analysis (see "Static code analysis" below)
+cd api && npm run lint && cd ..
+cd client && npm run lint && cd ..
+node .semgrep/run.mjs
+
+# Dynamic scan (stack running; joins the Compose network, so it works the same on Windows)
+mkdir -p zap-report && cp .zap/rules.tsv zap-report/
+docker run --rm --network hustlehub_default -v "$PWD/zap-report:/zap/wrk:rw" zaproxy/zap-stable:2.17.0 \
+  zap-baseline.py -t http://client:8080 -c rules.tsv -I -r zap-report.html
+
+docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
+```
+
+In PowerShell, use `${PWD}` instead of `$PWD`, run the `for` loops one
+image or file at a time, and put each command on one line. Git Bash on
+Windows needs `MSYS_NO_PATHCONV=1` in front of the `docker run` commands
+that mount a folder. The rate limit collection runs through the client
+(`http://localhost:5173`), exactly like the pipeline. It needs freshly
+started counters, so run it before anything else after `up`.
+
+## 12. Static code analysis
+
+Two static analysis tools read the source code (without running it) and
+look for insecure patterns. Both run in the pipeline's **Static analysis -
+ESLint and Semgrep** job and fail it on **any** finding. Both can be run
+locally with the exact same configuration.
+
+### The tools and why they were chosen
+
+| Tool | What it checks | Configuration |
+|---|---|---|
+| **ESLint 9** with [eslint-plugin-security](https://github.com/eslint-community/eslint-plugin-security) | Runs on every `.js`/`.jsx` file in `api/` and `client/`, including tests and scripts. `@eslint/js` recommended rules catch bugs (undefined or unused variables, unreachable code). eslint-plugin-security catches Node security smells: `eval` with an expression, regular expressions that can backtrack catastrophically (ReDoS), `new RegExp` built from variables, file paths and `require` built from variables, timing-unsafe comparisons, `child_process` with variables, and dynamic object keys that could reach the prototype ("object injection"). In the client, eslint-plugin-react (including `react/no-danger` and `react/jsx-no-target-blank`) and eslint-plugin-react-hooks are also on | [`api/eslint.config.js`](api/eslint.config.js), [`client/eslint.config.js`](client/eslint.config.js) (flat config). `npm run lint` = `eslint . --max-warnings 0` |
+| **Semgrep Community Edition 1.184.0** | Pattern and data-flow rules across the whole repository: JavaScript, Express and React code, but also nginx config, Dockerfiles, YAML and Markdown | Rule packs in [`.semgrep/rulesets.txt`](.semgrep/rulesets.txt): `p/javascript`, `p/nodejs`, `p/expressjs`, `p/react`, `p/owasp-top-ten`, `p/jwt`, `p/secrets` (152 rules in total). Runs from the pinned image `semgrep/semgrep:1.184.0` (tag and digest) through [`.semgrep/run.mjs`](.semgrep/run.mjs), so Windows needs no Python. Metrics are off and only the open-source engine is used (`--oss-only`) |
+
+ESLint is the standard JavaScript linter and sits right in the editor, so
+problems show up while typing. Semgrep adds rules ESLint doesn't have
+(Express-specific injection and XSS sinks, hard-coded JWT secrets, leaked
+keys) and also checks the non-JavaScript files. That's how it found both
+of its real findings below. CodeQL was deliberately not used.
+
+**What is excluded:** only installed packages, build output and the tools'
+own result files ([`.semgrepignore`](.semgrepignore): `node_modules/`,
+`client/dist/`, `coverage/`, the result folders and
+`docs/static-analysis/`; ESLint ignores `node_modules/`, `dist/` and
+`coverage/`). No source, test or script folder is excluded.
+
+### Before and after
+
+The baseline was saved before any fix, in its own commit (`ad1025c`), in
+[`docs/static-analysis/baseline/`](docs/static-analysis/baseline/). The
+final run is in [`docs/static-analysis/final/`](docs/static-analysis/final/).
+
+| Tool | Rule | Severity | Baseline | Final |
+|---|---|---|---|---|
+| ESLint (api) | `security/detect-object-injection` | warning | 12 | 0 |
+| ESLint (api) | `no-unused-vars` | error | 2 | 0 |
+| ESLint (api) | `security/detect-non-literal-fs-filename` | warning | 1 | 0 |
+| ESLint (api) | `security/detect-non-literal-regexp` | warning | 1 | 0 |
+| ESLint (api) | `security/detect-unsafe-regex` | warning | 1 | 0 |
+| ESLint (client) | `react/prop-types` | error | 92 | 0 (rule off, see below) |
+| ESLint (client) | `security/detect-object-injection` | warning | 9 | 0 |
+| ESLint (client) | `security/detect-unsafe-regex` | warning | 2 | 0 |
+| Semgrep | `dependabot-missing-cooldown` | MEDIUM | 5 | 0 |
+| Semgrep | `nginx.security.request-host-used` | WARNING | 1 | 0 |
+| **Total** | | | **126** (ESLint api 17, client 103, Semgrep 6) | **0** |
+
+### What the findings meant
+
+None of the 126 findings was an exploitable vulnerability in the running
+app. Two were real configuration weaknesses, and a handful pointed at code
+that was safe only because of a check somewhere else. Those were all
+fixed. The rest were false positives: patterns that look dangerous in
+general but are safe here because the key, path or pattern is fixed in our
+own code. Each of those has a narrow suppression on that line with the
+reason. The 92 `react/prop-types` errors were about a React feature that
+no longer exists.
+
+### Fixes
+
+| Finding | What was wrong | Fix | Commits |
+|---|---|---|---|
+| Semgrep `request-host-used` (`client/nginx.conf`) | nginx passed the browser's own `Host` header on to the API (`proxy_set_header Host $host`). The API doesn't build links from it today, but forwarding an attacker-chosen Host is the root of host header injection (poisoned password reset links, cache poisoning) | nginx now always sends `Host: api`, the API's own name in its certificate. A test fails if `$host` or `$http_host` ever comes back | `0434d24`, `8794a69` |
+| Semgrep `dependabot-missing-cooldown` (×5, `.github/dependabot.yml`) | Dependabot would propose a version minutes after it was published. Hijacked or malicious package releases are usually caught and pulled within days, so that is the riskiest moment to upgrade | A 7-day cooldown on every ecosystem. Security updates are not delayed | `78639db` |
+| `security/detect-unsafe-regex` (`api/src/middleware/gigValidators.js`, `client/src/utils/validation.js`) | The two-decimal price check `/^\d+(\.\d{1,2})?$/` has a quantifier inside an optional group, the shape that ReDoS attacks exploit. This one is actually linear, but the code relied on that being true | Rewritten as `/^(?:\d+\|\d+\.\d\d?)$/` (two plain alternatives, nothing nested), with new tests: the same prices are accepted and rejected, and a 300-digit input finishes at once | `bfd63c2`, `1f97b7e`, `5556e2e`, `9cc5abe` |
+| `security/detect-object-injection` (`api/src/utils/taxEstimate.js`, `api/test/taxConfig.test.js`) | Tax tables were looked up with `TAX_TABLES[year]` on a plain object, so `buildTaxEstimate('constructor')` found `Object.prototype.constructor` (truthy) and only failed later. The query validator stopped this from being reachable, but the lookup itself wasn't safe | New `getTaxTable(year)` backed by a `Map`, so nothing inherited from `Object.prototype` can ever match. Tests try `__proto__`, `constructor`, `toString` and string or decimal years | `cd159c2`, `a288283`, `ae65b02` |
+| `security/detect-object-injection` (`client/src/utils/text.js`) | The HTML entity decoder used `ENTITIES[entity]` on a plain object | A `Map` (`ENTITIES.get(entity)`); the existing decoder tests still pass | `e622071` |
+| `security/detect-object-injection` (`client/src/pages/Gigs.jsx`, `client/src/test/taxEstimateFixture.js`) | Objects were filled with `obj[key] = value` in a loop (keys were fixed, so not exploitable) | Rewritten with `Object.fromEntries`, a `Map` and `Array.prototype.at`, so there is nothing to suppress | `ba78dcc`, `c158278` |
+| `security/detect-object-injection` (`api/src/config/rateLimits.js`, 3 hits) | The env override was looked up twice and the result object filled by key | Each override is read once and the limits are built with `Object.fromEntries`. One lookup remains, suppressed (see below) | `e86ef1a` |
+| `no-unused-vars` (`api/src/middleware/authMiddleware.js`) | An unused `err` in a `catch` | `catch {` | `6d60c90` |
+| `react/prop-types` (×92, client) | The rule wants a `propTypes` declaration on every component. **React 19 removed propTypes checking**: React now ignores `propTypes` completely, so the declarations would never run. The rule is on only because eslint-plugin-react's recommended set predates React 19 | Turned off in `client/eslint.config.js` with the reason next to it. This is the **only** rule that is turned off, and it isn't a security rule. Every security, React and hooks rule stays on | `315b82d` |
+
+### Remaining suppressions
+
+Each one is `eslint-disable-next-line` for one rule on one line, with the
+reason written after `--`:
+
+| File | Rule | Why it is safe |
+|---|---|---|
+| `api/src/middleware/errorHandler.js` | `no-unused-vars` | Express only treats a middleware as an error handler when it has exactly four arguments, so the unused `next` must stay |
+| `api/src/controllers/gigController.js` (`pick`) | `security/detect-object-injection` | The field names come from a fixed allow-list in the controller, never from the request |
+| `api/src/controllers/gigController.js` (search) | `security/detect-non-literal-regexp` | Every regex character in `q` is escaped first (and `q` is at most 50 characters), so it is a literal text search |
+| `api/src/middleware/ownership.js` | `security/detect-object-injection` | The owner field names (`freelancer`, `client`) are fixed in the route definitions |
+| `api/src/config/rateLimits.js` | `security/detect-object-injection` | The env variable name comes from the fixed `STRICT_LIMITS` table |
+| `api/scripts/startTest.js` | `security/detect-object-injection` | The key is one of the fixed `OVERRIDES` names (local test script) |
+| `api/scripts/generateCerts.js` | `security/detect-non-literal-fs-filename` | The paths are the fixed OpenSSL locations listed in the script |
+| `client/src/api/gigs.js` | `security/detect-object-injection` | The key is one of the fixed `LIST_PARAMS` names |
+| `client/src/test/securityHeaders.test.js` | `security/detect-unsafe-regex` | Test-only: the regex runs once over our own `nginx.conf`, never on user input |
+| `api/src/utils/redact.js` (added with the logging work, after the baseline) | `no-control-regex` | The regex has to match control characters: it removes CR, LF and the rest from every log line to stop log injection |
+
+There are no Semgrep suppressions (`nosemgrep`), no `.eslintignore`, and
+no rule set to `warn` or `off` apart from `react/prop-types`.
+`security/detect-object-injection` keeps the plugin's default level.
+
+Every one of the 21 `detect-object-injection` hits in the baseline was reviewed:
+
+| Hits | Location | Outcome |
+|---|---|---|
+| 3 | `api/src/config/rateLimits.js` | Restructured; 1 suppression left |
+| 3 | `api/src/controllers/gigController.js` (one line) | Suppressed (fixed allow-list) |
+| 2 | `api/src/middleware/ownership.js` (one line) | Suppressed (fixed field names) |
+| 2 | `api/src/utils/taxEstimate.js` | Fixed (prototype-safe `getTaxTable`) |
+| 1 | `api/test/taxConfig.test.js` | Fixed (`getTaxTable`) |
+| 1 | `api/scripts/startTest.js` | Suppressed (fixed names) |
+| 1 | `client/src/api/gigs.js` | Suppressed (fixed names) |
+| 1 | `client/src/pages/Gigs.jsx` | Rewritten with `Object.fromEntries` |
+| 6 | `client/src/test/taxEstimateFixture.js` | Rewritten with a `Map` and `.at()` |
+| 1 | `client/src/utils/text.js` | Fixed (`Map`) |
+
+### Proof that the job fails closed
+
+An `eval` of `req.query` plus a
+hard-coded JWT secret was added to `api/src/app.js` for a moment (never
+committed).
+- `npm run lint` exited 1: `security/detect-eval-with-expression`.
+- `node .semgrep/run.mjs` exited 1 with 3 findings: `hardcoded-jwt-secret`,
+  `direct-response-write` (XSS) and `code-string-concat` (code injection).
+
+After every class of fix, every test suite was re-run and passed (at the
+time: 74 api unit tests, 88 Vitest tests, Newman 94 requests and 173
+assertions, the rate limit collection and a 12-check smoke test). The
+later features were written under the same rules: on 9 November 2026
+ESLint reports 0 problems in both packages and Semgrep 0 findings over
+213 files. The current test counts are in [Testing](#10-testing).
+
+### Running both tools locally
+
+PowerShell, from the repo root, with Docker Desktop running:
+
+```powershell
+# ESLint (fails on any warning or error)
+cd api;    npm ci; npm run lint; cd ..
+cd client; npm ci; npm run lint; cd ..
+
+# Semgrep (pinned container; results in semgrep-results\semgrep.json and .sarif)
+node .semgrep/run.mjs
+
+# Counts by tool, rule and severity, after saving ESLint JSON next to Semgrep's
+cd api;    npx eslint . -f json -o ..\semgrep-results\eslint-api.json; cd ..
+cd client; npx eslint . -f json -o ..\semgrep-results\eslint-client.json; cd ..
+node .github/scripts/static-analysis-summary.mjs semgrep-results
+```
+
+Clean output: `npm run lint` prints only the `> eslint . --max-warnings 0`
+line and returns to the prompt. Semgrep ends with
+`Ran 152 rules on 213 files: 0 findings.` The first Semgrep run downloads
+the image, and on Windows a full scan takes a few minutes because Docker
+reads the files through the Windows file system.
+
 ## 13. Docker
 
 How to start the stack is in [Getting started, B](#b-docker-compose). This
@@ -1880,509 +2301,6 @@ The problems below all came up while building and testing this project.
 | `EADDRINUSE: address already in use :::5000` (API) | Another copy of the API is still running | Stop it. To find it: Windows `netstat -ano \| findstr :5000` then `taskkill /PID <pid> /F`; macOS/Linux `lsof -i :5000`. Don't just change `PORT`: the client proxy and the Postman collections expect 5000 |
 | `429 Too many requests, please try again in N seconds` while testing repeatedly | The strict limits are working (5 failed logins per 15 min, 10 registrations per hour, 10 bookings per 10 min) | Start the API with `npm run start:test` (relaxed limits, refused in production) for repeated manual or Newman testing. The counters live in memory, so restarting the API also clears them |
 | Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the transaction that writes the booking and its transaction record together | Use Atlas, or run the local MongoDB as a single-node replica set (see **Getting a MONGO_URI**) |
-
-## 11. Testing
-
-The main Postman collection (`api/postman/HustleHub_API.postman_collection.json`)
-starts with an **Auth** set covering valid and invalid scenarios:
-
-- Health check
-- Successful registration (+ automated checks that a token is returned and
-  no password hash is leaked)
-- Duplicate email registration (expects `409`)
-- Invalid registration input (expects `400`)
-- Successful login
-- Login with wrong password (expects `401`, generic message)
-- Login with unknown email (expects `401`, same generic message)
-- Protected route with no token (expects `401`)
-- Protected route with an invalid/tampered token (expects `401`)
-- Protected route with a valid token (expects `200` and the authenticated user)
-
-An **RBAC** folder checks access control on `/api/admin/users`:
-
-- No token (expects `401`)
-- Client token (expects `403`, generic message)
-- Freelancer token (expects `403`, generic message)
-- Registering with `"role": "admin"` (expects `400`, no token issued)
-- Admin login and admin token (expects `200`, no password hashes, newest
-  first). These two only run when admin credentials are supplied and are
-  skipped cleanly otherwise.
-
-A **Gigs** folder registers two fresh freelancers and a fresh client, then
-checks:
-
-- Freelancer creates a gig (`201`, owner is the token's user); client
-  (`403`) and no token (`401`) can't
-- Validation: negative price, empty title, and an unknown `freelancer` field
-  in the body (all `400`)
-- Browsing as a client (`200`, freelancer shown by name only, no emails or
-  password hashes), regex characters in `q` treated as plain text
-- Get by id (`200`), malformed id (`400`), unknown id (`404`)
-- `/api/gigs/mine` returns only the caller's gigs
-- Owner updates (`200`); another freelancer updating or deleting, and a
-  client updating, are all `403`
-- Owner deletes (`200`), after which the gig returns `404`
-
-A **Bookings** folder registers a fresh client and two fresh freelancers,
-then checks:
-
-- The client books a gig (`201`): the price matches the gig, the freelancer
-  and client come from the gig and the token, and the response includes the
-  transaction and a payment confirmation with the same reference
-- Sending `price`, `freelancer` or `status` in the body (`400`), a
-  freelancer trying to book (`403`), no token (`401`)
-- Malformed `gigId` (`400`), unknown `gigId` (`404`), inactive gig (`404`)
-- `/api/bookings/mine` and `/api/transactions/mine` show the booking to
-  the client and the gig's freelancer, but not to the other freelancer
-- `GET /api/bookings/:id` works for both parties and is `403` for the
-  other freelancer
-- After the freelancer raises the gig price, the booking still shows the
-  price it was booked at
-
-An **Income** folder then checks that the gig's freelancer has
-`totalEarned` equal to the booked price with one item, the other freelancer
-has `0` and an empty list, a client gets `403` on `/api/income` and on
-`/api/admin/transactions`, and (only when admin credentials are supplied)
-the admin can list all transactions.
-
-A **Security** folder checks:
-
-- The CSP (`default-src 'self'`, `frame-ancestors 'none'`, no
-  `unsafe-inline`), `nosniff`, `no-referrer` and HSTS headers are present,
-  and `X-Powered-By` is absent
-- An operator object in the login email and an operator in a query string
-  are both rejected with `400`
-- A request with `Origin: http://evil.example` gets `403` and no
-  `Access-Control-Allow-Origin`; the client origin is allowed
-- Malformed JSON gives `400` and an oversized body `413`, with no stack trace
-- A client and a freelancer both get `403` on `DELETE /api/admin/gigs/:id`,
-  and (only when admin credentials are supplied) the admin can delete the gig
-
-Every run registers users with a fresh `test-...@example.com` email, so the
-collection can be run repeatedly against the same database. Use
-`npm run clean:test` to clear them out afterwards (it also removes
-their gigs, bookings and transactions).
-
-**Running the tests**
-
-The main collection registers and logs in far more often than the strict
-rate limits allow, so it runs against the API started with relaxed limits.
-The rate limits themselves are proven by a separate collection that runs
-against the strict defaults.
-
-```bash
-cd api
-
-# 1. Main collection, against relaxed limits
-npm run start:test          # terminal 1 (refuses to run in production)
-npx newman run postman/HustleHub_API.postman_collection.json --insecure     # terminal 2
-
-# 2. Rate limit collection, against the strict defaults
-#    stop start:test, then start it with the strict limits (test runs never
-#    ship logs to the cloud, so the Axiom dataset gets no test data)
-npm run start:test:strict   # terminal 1
-npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure    # terminal 2
-```
-
-`npx` downloads Newman on first use; `npm install -g newman` and then plain
-`newman run ...` works too.
-
-To include the admin tests in the main collection, pass the seeded admin's
-credentials as variables (they're never stored in the collection):
-
-```bash
-npx newman run postman/HustleHub_API.postman_collection.json --insecure \
-  --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
-```
-
-The rate limit collection (`api/postman/HustleHub_RateLimits.postman_collection.json`)
-proves that the 6th failed login in the window gets `429` with a
-`Retry-After` header and a message whose number of seconds matches it, and
-that the 11th booking by the same user gets `429`. Rate limit counters live
-in memory, so restart the API before running it again to start with a clean
-window.
-
-Both collections can also be imported into Postman (disable SSL certificate
-verification under Settings → General).
-
-### Test evidence
-
-Real output from fresh runs on 12 October 2026 is committed in
-[`docs/test-evidence/`](docs/test-evidence/README.md) as plain text, alongside
-screenshots of the same runs:
-
-| Suite | How to run it | Result | Evidence |
-|---|---|---|---|
-| Main Postman collection (Newman) | API on `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure` with the admin credentials | **85 requests, 145 assertions, 0 failed** (80 / 134 without admin credentials, when the 5 admin requests are skipped) | [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt), [screenshot 11](docs/screenshots/11-newman-pass.png) |
-| Rate limit collection (Newman) | API freshly started with `npm run start:test:strict` (strict limits), then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure` | **20 requests, 26 assertions, 0 failed** | [`newman-rate-limits-results.txt`](docs/test-evidence/newman-rate-limits-results.txt), [screenshot 11b](docs/screenshots/11b-newman-rate-limits.png), [screenshot 14](docs/screenshots/14-rate-limit-429.png) |
-| Frontend (Vitest + React Testing Library) | `npm run test:run` in `client/` | **16 files, 67 tests passed** | [`vitest-results.txt`](docs/test-evidence/vitest-results.txt), [screenshot 12](docs/screenshots/12-vitest-pass.png) |
-
-### Frontend tests
-
-The React client is tested with **Vitest** and **React Testing Library**
-(jsdom). Tests sit next to the code they cover (`*.test.js` / `*.test.jsx`).
-No test touches the network: the api modules (or `fetch`) are mocked, and the
-setup file makes any unmocked `fetch` fail loudly.
-
-```bash
-cd client
-npm run test:run   # run everything once
-npm test           # watch mode while developing
-```
-
-There are 67 tests across 16 files, covering both rendering and user interaction:
-
-- **Utilities:** `decodeEntities` (every entity the API produces, single-pass
-  decoding), rand and date formatting, and the register and gig validation
-  rules that mirror the API.
-- **API client:** adds the Bearer header, unwraps `{ success, data }`, throws
-  the server's error message, gives a generic message on a network failure or a
-  non-JSON reply, passes on the 429 retry message, clears the session and calls
-  the logout handler on a 401 (but not for a failed login), and refuses
-  absolute URLs.
-- **Register and Login:** inline errors for bad input; only client and
-  freelancer are offered as roles; valid, trimmed data is submitted; the server's
-  message on a duplicate email; the generic login error; the 429 retry message.
-- **ProtectedRoute:** logged-out visitors go to login, the wrong role sees
-  "Not allowed", the right role sees the page.
-- **XSS:** a gig titled `<img src=x onerror=alert(1)>` (escaped, as the API
-  stores it) renders as plain text in the gig card and on the gig page, and no
-  `img` element is created.
-- **Gigs page:** loading, list, empty and error (with retry) states; the
-  search is debounced (fake timers prove there is no request per keystroke);
-  the category filter changes the request; an invalid price range is blocked.
-- **Gig detail by role:** clients see Book, the owner sees Edit, admins see
-  Delete as admin and never Book.
-- **Booking panel:** the confirmation shows the price and the simulated payment
-  notice, Cancel closes it, a double click on Confirm books only once, success
-  shows the transaction reference, and a 429 shows the retry message.
-- **Gig form and edit page:** bad price and delivery days are blocked, price and
-  delivery days are sent as numbers, the edit form is pre-filled with decoded
-  text and saves the raw text (no `&amp;amp;`), and someone else's gig can't be
-  edited.
-- **My gigs:** activate/deactivate, a confirmation before deleting, and the
-  server's message telling "deleted" apart from "deactivated".
-- **Income** (totals, items, empty state with R 0,00) and **admin Users** (rows
-  rendered, no password field anywhere).
-
-### CI/CD pipeline
-
-Every push to `main`, every pull request and every manual run
-(**Run workflow**) goes through the GitHub Actions pipeline in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml). It tests the code,
-runs several kinds of security checks, builds and starts the **whole
-stack** in Docker, tests it end to end, and turns red if anything fails.
-
-```mermaid
-flowchart LR
-    B["Backend<br/>unit tests + npm audit"]
-    F["Frontend<br/>Vitest, lint, build + npm audit"]
-    G["Secret scan<br/>gitleaks, full history"]
-    L["Lint<br/>hadolint, compose config,<br/>actionlint, zizmor"]
-    S["Stack<br/>build all images, compose up,<br/>smoke test, Newman x2"]
-    I["Image scan<br/>Trivy images + Dockerfiles"]
-    D["Dynamic scan<br/>OWASP ZAP baseline"]
-    A["Static analysis<br/>ESLint + Semgrep"]
-    OK{{"Pipeline OK"}}
-    B --> S
-    F --> S
-    G --> S
-    L --> S
-    B --> D
-    F --> D
-    G --> D
-    L --> D
-    L --> I
-    B --> OK
-    F --> OK
-    G --> OK
-    L --> OK
-    S --> OK
-    I --> OK
-    D --> OK
-    A --> OK
-```
-
-The four fast jobs and the static analysis job run in parallel. The stack
-and the ZAP scan only start when the four fast jobs pass, so nothing is
-deployed or scanned on top of broken code. The image scan starts as soon as
-the Dockerfiles have passed lint.
-
-**What each job checks, and why it matters for security**
-
-| Job | What it does | Why |
-|---|---|---|
-| **Backend - unit tests and npm audit** | `npm ci`, `npm test` (191 unit tests: tax calculator, startup settings check, trust proxy and rate limit buckets, health check, gig price validation, account lockout, token versions, audit log guards, log redaction, the structured logger, request ids and the cloud log shipper), `npm audit --omit=dev --audit-level=high` | Proves the money and security logic behaves, and that no known high or critical vulnerability ships in a production dependency |
-| **Frontend - tests, build and npm audit** | `npm ci`, `npm run test:run` (110 Vitest tests, including the CSP and security header consistency test), `npm run lint`, `npm run build` (and checks the CSP meta tag is in the build), `npm audit --omit=dev --audit-level=high` | Same for the React app; a build without its CSP fails |
-| **Secret scan - gitleaks (full history)** | gitleaks over **every commit** (`fetch-depth: 0`), not just the latest | A secret committed and later deleted is still in history; this catches it. No allowlist: the history scans clean |
-| **Lint - Dockerfiles, Compose and workflows** | hadolint on all three Dockerfiles; `docker compose config` on both Compose files, plus a check that Compose **refuses** to run without `JWT_SECRET`; actionlint and zizmor on this workflow | Catches insecure or broken container and pipeline configuration before anything runs. zizmor is a security audit of the workflow itself (injection, credential persistence, unpinned actions) |
-| **Stack - build, smoke test and Newman** | Generates random credentials, builds the certs, api and client images, `docker compose up -d --build --wait`, runs `docker/smoke-test.mjs`, the **rate limit** collection against the strict limits, seeds the admin, switches to the test override and runs the **main** collection (with the admin tests) | Proves the **entire stack** builds, starts healthy and enforces auth, RBAC, ownership, validation, rate limits, CORS and headers end to end |
-| **Image scan - Trivy** | Trivy on the api, client and certs images (fails on HIGH/CRITICAL vulnerabilities that have a fix, `--ignore-unfixed`), and Trivy's Dockerfile misconfiguration scan | Known-vulnerable OS packages or libraries in the images, or risky Dockerfile patterns (root user, no healthcheck, ...), fail the build. There is no `.trivyignore` |
-| **Dynamic scan - OWASP ZAP baseline** | Starts the stack and runs the ZAP baseline scan (spider plus passive scan) against `http://localhost:5173` | Tests the running app from the outside like an attacker would: missing or broken security headers, information leaks, cross-domain problems |
-| **Static analysis - ESLint and Semgrep** | ESLint with eslint-plugin-security on `api/` and `client/` (`--max-warnings 0`), Semgrep with seven rule packs (`--error`). Uploads JSON and SARIF | Finds insecure code patterns in the source before it runs. See [Static code analysis](#static-code-analysis) |
-| **Pipeline OK** | Runs last, always, and fails unless **every** job above succeeded | One check to require in branch protection |
-
-The ZAP rules live in [`.zap/rules.tsv`](.zap/rules.tsv). Missing or
-broken security headers (CSP, anti-clickjacking, nosniff,
-Permissions-Policy, site isolation), information leaks (server version,
-`X-Powered-By`, debug errors, source code), cross-domain problems and
-vulnerable JavaScript libraries are set to **FAIL**. Everything else is
-reported as a warning in the report but doesn't fail the job. One rule is
-ignored: *ZAP is Out of Date* (10116), because the image is pinned on
-purpose and updated by Dependabot. The first scan found two real problems,
-both fixed rather than suppressed: no `Permissions-Policy` header and
-missing cross-origin isolation headers. All of them are now sent from
-`client/securityHeaders.js`, and nginx's `/healthz` sends them too. The
-scan takes about a minute.
-
-**How the pipeline itself is secured**
-
-- The workflow token is read-only (`permissions: contents: read`), and
-  `actions/checkout` runs with `persist-credentials: false`, so no step can
-  push or reuse the token.
-- Every action is pinned to a full commit SHA, with the version in a
-  comment, and every tool image (gitleaks, hadolint, actionlint, zizmor,
-  Trivy, ZAP) to a tag **and** a digest, so a moved tag can't change what
-  runs.
-- It triggers on `push`, `pull_request` and `workflow_dispatch` only (never
-  `pull_request_target`). Branch names and PR titles are never put into a
-  script. A newer run on the same branch cancels the older one.
-- It needs **no repository secrets**.
-  [`.github/scripts/make-ci-env.sh`](.github/scripts/make-ci-env.sh)
-  generates a random `JWT_SECRET` (96 characters), admin email and admin
-  password (35 characters) in each job, masks them with `::add-mask::`, and
-  writes them to a job-local `.env` that disappears with the runner.
-- Newman's full JSON report contains request bodies and the generated
-  admin password, so it is never uploaded. Only the JUnit files and a slim
-  JSON (request names, status codes, assertion results) are.
-
-**How a failure is enforced**
-
-- Every `run:` step uses bash with `-e -o pipefail`, so a failing command
-  fails the step even when its output is piped through `tee`.
-- There is no `continue-on-error` and no `|| true` anywhere.
-- Unit tests, Vitest, Newman and smoke-test failures exit non-zero.
-  `npm audit --audit-level=high`, gitleaks, Trivy (`--exit-code 1`),
-  hadolint, actionlint, zizmor and ZAP FAIL rules all do the same.
-- `Pipeline OK` needs every job and checks each one's result explicitly,
-  so a failed, cancelled or skipped job turns it red.
-- This was tested locally: a broken unit test assertion, the old lockfile
-  with the body-parser advisory, and a broken health check response each
-  made their step exit 1.
-
-**Where to find the results**
-
-- **Actions** tab → the run → **Summary**. Each job writes its key results
-  there: unit test and Vitest counts, Newman requests and assertions for
-  both collections, the gitleaks result, the Trivy result and the ZAP
-  FAIL/WARN counts. `Pipeline OK` adds a table of every job's result.
-- **Artifacts** at the bottom of the run summary: `newman-results` (JUnit
-  and slim JSON for both collections, plus the smoke test output),
-  `trivy-results` (one table per image plus the Dockerfile scan) and
-  `zap-report` (HTML, JSON and Markdown report). They're kept for 14 days.
-- If the stack job fails, it prints every container's log before it tears
-  the stack down. Teardown (`docker compose down -v`) always runs.
-- Saved evidence from a green run: [`docs/pipeline-evidence/`](docs/pipeline-evidence/README.md).
-
-**Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) opens
-weekly update pull requests for the npm packages in `api/` and `client/`,
-the pinned actions, the three Dockerfiles' base images and the mongo image
-in Compose. Every one of them goes through this pipeline before it can be
-merged.
-
-**Running every step locally** (from the repo root, with Docker running):
-
-```bash
-# Backend
-cd api && npm ci && npm test && npm audit --omit=dev --audit-level=high && cd ..
-
-# Frontend
-cd client && npm ci && npm run test:run && npm run lint && npm run build && npm audit --omit=dev --audit-level=high && cd ..
-
-# Secret scan (full history)
-docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git --no-banner --redact --verbose --exit-code 1 /repo
-
-# Lint
-for f in api/Dockerfile client/Dockerfile docker/certs/Dockerfile; do docker run --rm -i hadolint/hadolint:v2.15.1 hadolint - < "$f"; done
-JWT_SECRET=x docker compose config --quiet
-JWT_SECRET=x docker compose -f docker-compose.yml -f docker-compose.test.yml config --quiet
-docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
-docker run --rm -v "$PWD:/repo:ro" ghcr.io/zizmorcore/zizmor:1.32.0 --offline /repo/.github/workflows
-
-# Image scan (after docker compose build)
-for i in hustlehub-api:local hustlehub-client:local hustlehub-certs:local; do
-  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2 image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$i"
-done
-docker run --rm -v "$PWD:/repo:ro" aquasec/trivy:0.76.2 config --misconfig-scanners dockerfile --exit-code 1 /repo
-
-# Stack (uses your root .env; see "Running with Docker")
-docker compose up -d --build --wait
-node docker/smoke-test.mjs
-npx newman run api/postman/HustleHub_RateLimits.postman_collection.json --env-var base_url=http://localhost:5173
-docker compose run --rm seed
-docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --wait
-npx newman run api/postman/HustleHub_API.postman_collection.json --insecure --env-var base_url=https://localhost:5000 \
-  --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>
-
-# Static analysis (see "Static code analysis" below)
-cd api && npm run lint && cd ..
-cd client && npm run lint && cd ..
-node .semgrep/run.mjs
-
-# Dynamic scan (stack running; joins the Compose network, so it works the same on Windows)
-mkdir -p zap-report && cp .zap/rules.tsv zap-report/
-docker run --rm --network hustlehub_default -v "$PWD/zap-report:/zap/wrk:rw" zaproxy/zap-stable:2.17.0 \
-  zap-baseline.py -t http://client:8080 -c rules.tsv -I -r zap-report.html
-
-docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
-```
-
-In PowerShell, use `${PWD}` instead of `$PWD`, run the `for` loops one
-image or file at a time, and put each command on one line. Git Bash on
-Windows needs `MSYS_NO_PATHCONV=1` in front of the `docker run` commands
-that mount a folder. The rate limit collection runs through the client
-(`http://localhost:5173`), exactly like the pipeline. It needs freshly
-started counters, so run it before anything else after `up`.
-
-### Static code analysis
-
-Two static analysis tools read the source code (without running it) and
-look for insecure patterns. Both run in the pipeline's **Static analysis -
-ESLint and Semgrep** job and fail it on **any** finding. Both can be run
-locally with the exact same configuration.
-
-**The tools and why they were chosen**
-
-| Tool | What it checks | Configuration |
-|---|---|---|
-| **ESLint 9** with [eslint-plugin-security](https://github.com/eslint-community/eslint-plugin-security) | Runs on every `.js`/`.jsx` file in `api/` and `client/`, including tests and scripts. `@eslint/js` recommended rules catch bugs (undefined or unused variables, unreachable code). eslint-plugin-security catches Node security smells: `eval` with an expression, regular expressions that can backtrack catastrophically (ReDoS), `new RegExp` built from variables, file paths and `require` built from variables, timing-unsafe comparisons, `child_process` with variables, and dynamic object keys that could reach the prototype ("object injection"). In the client, eslint-plugin-react (including `react/no-danger` and `react/jsx-no-target-blank`) and eslint-plugin-react-hooks are also on | [`api/eslint.config.js`](api/eslint.config.js), [`client/eslint.config.js`](client/eslint.config.js) (flat config). `npm run lint` = `eslint . --max-warnings 0` |
-| **Semgrep Community Edition 1.184.0** | Pattern and data-flow rules across the whole repository: JavaScript, Express and React code, but also nginx config, Dockerfiles, YAML and Markdown | Rule packs in [`.semgrep/rulesets.txt`](.semgrep/rulesets.txt): `p/javascript`, `p/nodejs`, `p/expressjs`, `p/react`, `p/owasp-top-ten`, `p/jwt`, `p/secrets` (152 rules in total). Runs from the pinned image `semgrep/semgrep:1.184.0` (tag and digest) through [`.semgrep/run.mjs`](.semgrep/run.mjs), so Windows needs no Python. Metrics are off and only the open-source engine is used (`--oss-only`) |
-
-ESLint is the standard JavaScript linter and sits right in the editor, so
-problems show up while typing. Semgrep adds rules ESLint doesn't have
-(Express-specific injection and XSS sinks, hard-coded JWT secrets, leaked
-keys) and also checks the non-JavaScript files. That's how it found both
-of its real findings below. CodeQL was deliberately not used.
-
-**What is excluded:** only installed packages, build output and the tools'
-own result files ([`.semgrepignore`](.semgrepignore): `node_modules/`,
-`client/dist/`, `coverage/`, the result folders and
-`docs/static-analysis/`; ESLint ignores `node_modules/`, `dist/` and
-`coverage/`). No source, test or script folder is excluded.
-
-**Before and after**
-
-The baseline was saved before any fix, in its own commit (`ad1025c`), in
-[`docs/static-analysis/baseline/`](docs/static-analysis/baseline/). The
-final run is in [`docs/static-analysis/final/`](docs/static-analysis/final/).
-
-| Tool | Rule | Severity | Baseline | Final |
-|---|---|---|---|---|
-| ESLint (api) | `security/detect-object-injection` | warning | 12 | 0 |
-| ESLint (api) | `no-unused-vars` | error | 2 | 0 |
-| ESLint (api) | `security/detect-non-literal-fs-filename` | warning | 1 | 0 |
-| ESLint (api) | `security/detect-non-literal-regexp` | warning | 1 | 0 |
-| ESLint (api) | `security/detect-unsafe-regex` | warning | 1 | 0 |
-| ESLint (client) | `react/prop-types` | error | 92 | 0 (rule off, see below) |
-| ESLint (client) | `security/detect-object-injection` | warning | 9 | 0 |
-| ESLint (client) | `security/detect-unsafe-regex` | warning | 2 | 0 |
-| Semgrep | `dependabot-missing-cooldown` | MEDIUM | 5 | 0 |
-| Semgrep | `nginx.security.request-host-used` | WARNING | 1 | 0 |
-| **Total** | | | **126** (ESLint api 17, client 103, Semgrep 6) | **0** |
-
-**What the findings meant, in plain language**
-
-None of the 126 findings was an exploitable vulnerability in the running
-app. Two were real configuration weaknesses, and a handful pointed at code
-that was safe only because of a check somewhere else. Those were all
-fixed. The rest were false positives: patterns that look dangerous in
-general but are safe here because the key, path or pattern is fixed in our
-own code. Each of those has a narrow suppression on that line with the
-reason. The 92 `react/prop-types` errors were about a React feature that
-no longer exists.
-
-**Fixes**
-
-| Finding | What was wrong | Fix | Commits |
-|---|---|---|---|
-| Semgrep `request-host-used` (`client/nginx.conf`) | nginx passed the browser's own `Host` header on to the API (`proxy_set_header Host $host`). The API doesn't build links from it today, but forwarding an attacker-chosen Host is the root of host header injection (poisoned password reset links, cache poisoning) | nginx now always sends `Host: api`, the API's own name in its certificate. A test fails if `$host` or `$http_host` ever comes back | `0434d24`, `8794a69` |
-| Semgrep `dependabot-missing-cooldown` (×5, `.github/dependabot.yml`) | Dependabot would propose a version minutes after it was published. Hijacked or malicious package releases are usually caught and pulled within days, so that is the riskiest moment to upgrade | A 7-day cooldown on every ecosystem. Security updates are not delayed | `78639db` |
-| `security/detect-unsafe-regex` (`api/src/middleware/gigValidators.js`, `client/src/utils/validation.js`) | The two-decimal price check `/^\d+(\.\d{1,2})?$/` has a quantifier inside an optional group, the shape that ReDoS attacks exploit. This one is actually linear, but the code relied on that being true | Rewritten as `/^(?:\d+\|\d+\.\d\d?)$/` (two plain alternatives, nothing nested), with new tests: the same prices are accepted and rejected, and a 300-digit input finishes at once | `bfd63c2`, `1f97b7e`, `5556e2e`, `9cc5abe` |
-| `security/detect-object-injection` (`api/src/utils/taxEstimate.js`, `api/test/taxConfig.test.js`) | Tax tables were looked up with `TAX_TABLES[year]` on a plain object, so `buildTaxEstimate('constructor')` found `Object.prototype.constructor` (truthy) and only failed later. The query validator stopped this from being reachable, but the lookup itself wasn't safe | New `getTaxTable(year)` backed by a `Map`, so nothing inherited from `Object.prototype` can ever match. Tests try `__proto__`, `constructor`, `toString` and string or decimal years | `cd159c2`, `a288283`, `ae65b02` |
-| `security/detect-object-injection` (`client/src/utils/text.js`) | The HTML entity decoder used `ENTITIES[entity]` on a plain object | A `Map` (`ENTITIES.get(entity)`); the existing decoder tests still pass | `e622071` |
-| `security/detect-object-injection` (`client/src/pages/Gigs.jsx`, `client/src/test/taxEstimateFixture.js`) | Objects were filled with `obj[key] = value` in a loop (keys were fixed, so not exploitable) | Rewritten with `Object.fromEntries`, a `Map` and `Array.prototype.at`, so there is nothing to suppress | `ba78dcc`, `c158278` |
-| `security/detect-object-injection` (`api/src/config/rateLimits.js`, 3 hits) | The env override was looked up twice and the result object filled by key | Each override is read once and the limits are built with `Object.fromEntries`. One lookup remains, suppressed (see below) | `e86ef1a` |
-| `no-unused-vars` (`api/src/middleware/authMiddleware.js`) | An unused `err` in a `catch` | `catch {` | `6d60c90` |
-| `react/prop-types` (×92, client) | The rule wants a `propTypes` declaration on every component. **React 19 removed propTypes checking**: React now ignores `propTypes` completely, so the declarations would never run. The rule is on only because eslint-plugin-react's recommended set predates React 19 | Turned off in `client/eslint.config.js` with the reason next to it. This is the **only** rule that is turned off, and it isn't a security rule. Every security, React and hooks rule stays on | `315b82d` |
-
-**Remaining suppressions** (each one is `eslint-disable-next-line` for one
-rule on one line, with the reason written after `--`):
-
-| File | Rule | Why it is safe |
-|---|---|---|
-| `api/src/middleware/errorHandler.js` | `no-unused-vars` | Express only treats a middleware as an error handler when it has exactly four arguments, so the unused `next` must stay |
-| `api/src/controllers/gigController.js` (`pick`) | `security/detect-object-injection` | The field names come from a fixed allow-list in the controller, never from the request |
-| `api/src/controllers/gigController.js` (search) | `security/detect-non-literal-regexp` | Every regex character in `q` is escaped first (and `q` is at most 50 characters), so it is a literal text search |
-| `api/src/middleware/ownership.js` | `security/detect-object-injection` | The owner field names (`freelancer`, `client`) are fixed in the route definitions |
-| `api/src/config/rateLimits.js` | `security/detect-object-injection` | The env variable name comes from the fixed `STRICT_LIMITS` table |
-| `api/scripts/startTest.js` | `security/detect-object-injection` | The key is one of the fixed `OVERRIDES` names (local test script) |
-| `api/scripts/generateCerts.js` | `security/detect-non-literal-fs-filename` | The paths are the fixed OpenSSL locations listed in the script |
-| `client/src/api/gigs.js` | `security/detect-object-injection` | The key is one of the fixed `LIST_PARAMS` names |
-| `client/src/test/securityHeaders.test.js` | `security/detect-unsafe-regex` | Test-only: the regex runs once over our own `nginx.conf`, never on user input |
-
-There are no Semgrep suppressions (`nosemgrep`), no `.eslintignore`, and
-no rule set to `warn` or `off` apart from `react/prop-types`.
-`security/detect-object-injection` keeps the plugin's default level.
-
-Every one of the 21 `detect-object-injection` hits was reviewed:
-
-| Hits | Location | Outcome |
-|---|---|---|
-| 3 | `api/src/config/rateLimits.js` | Restructured; 1 suppression left |
-| 3 | `api/src/controllers/gigController.js` (one line) | Suppressed (fixed allow-list) |
-| 2 | `api/src/middleware/ownership.js` (one line) | Suppressed (fixed field names) |
-| 2 | `api/src/utils/taxEstimate.js` | Fixed (prototype-safe `getTaxTable`) |
-| 1 | `api/test/taxConfig.test.js` | Fixed (`getTaxTable`) |
-| 1 | `api/scripts/startTest.js` | Suppressed (fixed names) |
-| 1 | `client/src/api/gigs.js` | Suppressed (fixed names) |
-| 1 | `client/src/pages/Gigs.jsx` | Rewritten with `Object.fromEntries` |
-| 6 | `client/src/test/taxEstimateFixture.js` | Rewritten with a `Map` and `.at()` |
-| 1 | `client/src/utils/text.js` | Fixed (`Map`) |
-
-**Proof that the job fails closed:** an `eval` of `req.query` plus a
-hard-coded JWT secret was added to `api/src/app.js` for a moment (never
-committed).
-- `npm run lint` exited 1: `security/detect-eval-with-expression`.
-- `node .semgrep/run.mjs` exited 1 with 3 findings: `hardcoded-jwt-secret`,
-  `direct-response-write` (XSS) and `code-string-concat` (code injection).
-
-After every class of fix, the api unit tests (74), Vitest (88 tests),
-both Newman collections against the Docker stack (main: 94 requests and
-173 assertions; rate limits: 20 and 26) and `docker/smoke-test.mjs` (12
-checks) were re-run and passed.
-
-**Running both tools locally** (PowerShell, from the repo root, Docker
-Desktop running):
-
-```powershell
-# ESLint (fails on any warning or error)
-cd api;    npm ci; npm run lint; cd ..
-cd client; npm ci; npm run lint; cd ..
-
-# Semgrep (pinned container; results in semgrep-results\semgrep.json and .sarif)
-node .semgrep/run.mjs
-
-# Counts by tool, rule and severity, after saving ESLint JSON next to Semgrep's
-cd api;    npx eslint . -f json -o ..\semgrep-results\eslint-api.json; cd ..
-cd client; npx eslint . -f json -o ..\semgrep-results\eslint-client.json; cd ..
-node .github/scripts/static-analysis-summary.mjs semgrep-results
-```
-
-Clean output: `npm run lint` prints only the `> eslint . --max-warnings 0`
-line and returns to the prompt. Semgrep ends with
-`Ran 152 rules on ... files: 0 findings.` The first Semgrep run downloads
-the image, and on Windows a full scan takes a few minutes because Docker
-reads the files through the Windows file system.
 
 ## 12. Requirements Traceability
 
