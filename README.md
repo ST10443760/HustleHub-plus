@@ -525,6 +525,74 @@ change the password later on the Account page.
 | Health check | `https://localhost:5000/api/health` | `http://localhost:5173/api/health` |
 | API for Newman in Docker | n/a | `https://localhost:5000` with the test override only |
 
+## 5. Using the app
+
+### Roles
+
+| Role | How you get it | What it can do |
+|---|---|---|
+| `client` | Default at registration | Browse gigs, book gigs, see their own bookings and transactions |
+| `freelancer` | Chosen at registration | Create, edit and delete their **own** gigs, see the bookings on their gigs, see their income and tax estimate |
+| `admin` | Only through the seed script | List all users and transactions, remove any gig, read the audit log |
+
+Every role can change its own password and sign out of all its devices.
+Nobody can change another user's password. Each user has exactly one
+role, stored in MongoDB and read from there on every request, so a role
+change takes effect immediately.
+
+### Screens by role
+
+| Role | Screens |
+|---|---|
+| Anyone | Home, Register (client or freelancer only), Log in |
+| Client | Browse gigs (search, category, price range, pages), Gig detail with **Book this gig** and a simulated payment confirmation, My bookings, My transactions, Account |
+| Freelancer | Browse gigs, My gigs (New, Edit, Activate or Deactivate, Delete with confirmation), New and Edit gig form, Bookings on my gigs, Income dashboard with the tax estimate, an **Edit** link on their own gig pages, Account |
+| Admin | Browse gigs, Users, All transactions, **Audit log** (filter by action), **Delete as admin** on any gig page, Account |
+
+A logged-out visitor who opens a protected page is sent to Log in, and a
+logged-in user with the wrong role sees a "Not allowed" page. These are
+conveniences only: the API enforces every rule itself.
+
+### Main flows
+
+1. **Register and log in.** Pick client or freelancer. A wrong password,
+   an unknown email and a locked account all show the same "Invalid email
+   or password".
+2. **Freelancer creates a gig.** My gigs, then New gig: title,
+   description, price (1 to 100 000 rand, 2 decimals), delivery days (1
+   to 90) and a category. The owner is always the logged-in freelancer.
+3. **Client books it.** Browse gigs, open the gig, **Book this gig**, then
+   **Confirm booking**. The confirmation shows the price from the database
+   and a "Payment is simulated" notice. The booking and its transaction
+   are saved together and the transaction reference (`TXN-...`) is shown.
+4. **Both sides see it.** The client's My bookings and My transactions,
+   the freelancer's Bookings on my gigs and Income dashboard, and the
+   admin's All transactions all show the same reference.
+5. **Freelancer checks the tax estimate.** The Income dashboard shows the
+   estimated South African income tax for the selected tax year (see
+   [Tax estimation](#7-tax-estimation)).
+6. **Account security.** On the Account page, change the password (every
+   other session ends) or **Sign out of all devices** (every session
+   ends). Five wrong passwords in 15 minutes lock the account for 15
+   minutes.
+7. **Admin review.** The admin's Audit log lists admin gig removals,
+   password changes, sign-outs and lockouts.
+
+### How the client handles text and sessions
+
+- **Text.** The API HTML-escapes free text before saving it (`<b>` is
+  stored as `&lt;b&gt;`). The client decodes exactly those entities for
+  display (`client/src/utils/text.js`) and React renders the result as
+  plain text. There is no `dangerouslySetInnerHTML` and no HTML is built
+  from strings, so a gig titled `<img src=x onerror=alert(1)>` shows up
+  as those literal characters. The edit form sends back exactly what the
+  freelancer typed, so text never double-escapes.
+- **Session.** Only the JWT is stored, in `localStorage` (see
+  [the trade-off](#jwt-in-localstorage-the-trade-off)). On start-up the
+  client checks it with `GET /api/auth/me`. If the API later answers
+  `401`, the token is cleared and the user goes to Log in. The client
+  never logs tokens or request data.
+
 ## 13. Docker
 
 How to start the stack is in [Getting started, B](#b-docker-compose). This
@@ -679,47 +747,6 @@ The problems below all came up while building and testing this project.
 | `EADDRINUSE: address already in use :::5000` (API) | Another copy of the API is still running | Stop it. To find it: Windows `netstat -ano \| findstr :5000` then `taskkill /PID <pid> /F`; macOS/Linux `lsof -i :5000`. Don't just change `PORT`: the client proxy and the Postman collections expect 5000 |
 | `429 Too many requests, please try again in N seconds` while testing repeatedly | The strict limits are working (5 failed logins per 15 min, 10 registrations per hour, 10 bookings per 10 min) | Start the API with `npm run start:test` (relaxed limits, refused in production) for repeated manual or Newman testing. The counters live in memory, so restarting the API also clears them |
 | Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the transaction that writes the booking and its transaction record together | Use Atlas, or run the local MongoDB as a single-node replica set (see **Getting a MONGO_URI**) |
-
-## 8. Using the App
-
-**Screens by role**
-
-| Role | Screens |
-|---|---|
-| Anyone | Home, Register (client or freelancer only), Log in |
-| Client | Browse gigs (search, category, price range, pages), Gig detail with **Book this gig** and a simulated payment confirmation, My bookings, My transactions, Account |
-| Freelancer | Browse gigs, My gigs (New, Edit, Activate/Deactivate, Delete with confirmation), New/Edit gig form, Bookings on my gigs, Income (total, booking count, per-booking table), an **Edit** link on their own gig pages, Account |
-| Admin | Browse gigs, Users (name, email, role, joined), All transactions (paginated), **Audit log** (paginated, filter by action), **Delete as admin** on any gig page, Account |
-
-Every role has an **Account** page: change password (current, new and
-confirm, with inline validation) and **Sign out of all devices** (with a
-confirmation step). See [Extra security features](#extra-security-features).
-
-A logged-out visitor who opens a protected page is sent to Log in; a
-logged-in user with the wrong role sees a "Not allowed" page. These are
-conveniences only - the API enforces every rule itself.
-
-Deleting a gig (owner or admin) shows the API's own message, because a gig
-that already has bookings is deactivated instead of deleted.
-
-**How the client handles API text.** The API HTML-escapes free text before
-saving it (so `<b>` is stored as `&lt;b&gt;`). The client decodes exactly
-those entities for display (`utils/text.js`) and React renders the result
-as plain text. The edit gig form also decodes the stored text into its inputs
-and sends back exactly what the freelancer typed, so the API escapes it once
-and text never double-escapes (no `&amp;amp;`). Nothing is ever rendered as HTML: there is no
-`dangerouslySetInnerHTML` and no HTML strings are built, so a gig titled
-`<img src=x onerror=alert(1)>` shows up as those literal characters.
-
-**Session.** Only the JWT is stored, in `localStorage` (see the trade-off under
-**Security**). On start-up the client checks it with `GET /api/auth/me`; if the
-API later answers `401`, the token is cleared and the user is sent to the
-login page. The client never logs tokens or request data. Every token carries
-a version number; changing the password or signing out of all devices ends
-every older token (see **Extra security features**).
-
-The client's Content-Security-Policy is described under **Security → Client
-Content-Security-Policy**, and its tests under **Testing → Frontend tests**.
 
 ## 9. API
 
