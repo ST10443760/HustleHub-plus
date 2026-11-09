@@ -3,222 +3,222 @@ newman
 HustleHub+ API
 
 → Health Check
-  GET https://localhost:5001/api/health [200 OK, 958B, 76ms]
+  GET https://localhost:5000/api/health [200 OK, 958B, 43ms]
   √  Status is 200
   √  Says ok and nothing else
   √  Not behind the rate limiter
 
 → Register - Success
-  POST https://localhost:5001/api/auth/register [201 Created, 1.6kB, 556ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.6kB, 268ms]
   √  Status is 201
   √  Returns a token
   √  No password hash leaked
 
 → Register - Duplicate Email (should fail)
-  POST https://localhost:5001/api/auth/register [409 Conflict, 1.23kB, 182ms]
+  POST https://localhost:5000/api/auth/register [409 Conflict, 1.23kB, 69ms]
   √  Status is 409
   √  No stack trace in response
 
 → Register - Invalid Input (should fail)
-  POST https://localhost:5001/api/auth/register [400 Bad Request, 1.29kB, 22ms]
+  POST https://localhost:5000/api/auth/register [400 Bad Request, 1.29kB, 11ms]
   √  Status is 400
 
 → Login - Success
-  POST https://localhost:5001/api/auth/login [200 OK, 1.6kB, 500ms]
+  POST https://localhost:5000/api/auth/login [200 OK, 1.6kB, 296ms]
   √  Status is 200
   √  Returns a token
 
 → Login - Wrong Password (should fail)
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 402ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 207ms]
   √  Status is 401
   √  Generic error message (no user enumeration)
 
 → Login - Unknown Email (should fail)
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 316ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 153ms]
   √  Status is 401
   √  Same generic message as wrong password
 
 → Protected Route - No Token (should fail)
-  GET https://localhost:5001/api/auth/me [401 Unauthorized, 1.11kB, 17ms]
+  GET https://localhost:5000/api/auth/me [401 Unauthorized, 1.11kB, 8ms]
   √  Status is 401
 
 → Protected Route - Invalid Token (should fail)
-  GET https://localhost:5001/api/auth/me [401 Unauthorized, 1.12kB, 10ms]
+  GET https://localhost:5000/api/auth/me [401 Unauthorized, 1.12kB, 7ms]
   √  Status is 401
 
 → Protected Route - Valid Token (should succeed)
-  GET https://localhost:5001/api/auth/me [200 OK, 1.26kB, 188ms]
+  GET https://localhost:5000/api/auth/me [200 OK, 1.26kB, 140ms]
   √  Status is 200
   √  Returns the authenticated user
 
 □ RBAC
 └ Register Client (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.6kB, 434ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.6kB, 222ms]
   √  Status is 201
   √  Role is client
 
 └ Register Freelancer (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.62kB, 421ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.62kB, 276ms]
   √  Status is 201
   √  Role is freelancer
 
 └ Admin Users - No Token (should fail)
-  GET https://localhost:5001/api/admin/users [401 Unauthorized, 1.11kB, 8ms]
+  GET https://localhost:5000/api/admin/users [401 Unauthorized, 1.11kB, 7ms]
   √  Status is 401
 
 └ Admin Users - Client Token (should fail)
-  GET https://localhost:5001/api/admin/users [403 Forbidden, 1.12kB, 100ms]
+  GET https://localhost:5000/api/admin/users [403 Forbidden, 1.12kB, 60ms]
   √  Status is 403
   √  Generic message, required role not revealed
 
 └ Admin Users - Freelancer Token (should fail)
-  GET https://localhost:5001/api/admin/users [403 Forbidden, 1.12kB, 135ms]
+  GET https://localhost:5000/api/admin/users [403 Forbidden, 1.12kB, 64ms]
   √  Status is 403
   √  Generic message, required role not revealed
 
 └ Register - Admin Role (should fail)
-  POST https://localhost:5001/api/auth/register [400 Bad Request, 1.23kB, 13ms]
+  POST https://localhost:5000/api/auth/register [400 Bad Request, 1.23kB, 7ms]
   √  Status is 400
   √  No token issued
 
 └ Admin Login (skipped without admin credentials)
-  POST https://localhost:5001/api/auth/login [200 OK, 1.59kB, 483ms]
+  POST https://localhost:5000/api/auth/login [200 OK, 1.59kB, 295ms]
   √  Status is 200
   √  Logged in as admin
 
 └ Admin Users - Admin Token (skipped without admin credentials)
-  GET https://localhost:5001/api/admin/users [200 OK, 4.93kB, 195ms]
+  GET https://localhost:5000/api/admin/users [200 OK, 2.42kB, 121ms]
   √  Status is 200
   √  Returns users with no password hashes
   √  Newest first
 
 □ Gigs
 └ Register Freelancer A (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.62kB, 403ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.62kB, 234ms]
   √  Status is 201
 
 └ Register Freelancer B (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.62kB, 431ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.62kB, 228ms]
   √  Status is 201
 
 └ Register Client (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.6kB, 451ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.6kB, 267ms]
   √  Status is 201
 
 └ Create Gig - Freelancer A
-  POST https://localhost:5001/api/gigs [201 Created, 1.38kB, 203ms]
+  POST https://localhost:5000/api/gigs [201 Created, 1.38kB, 145ms]
   √  Status is 201
   √  Owner is the logged-in freelancer
 
 └ Create Gig - Client (should fail)
-  POST https://localhost:5001/api/gigs [403 Forbidden, 1.12kB, 88ms]
+  POST https://localhost:5000/api/gigs [403 Forbidden, 1.12kB, 63ms]
   √  Status is 403
 
 └ Create Gig - No Token (should fail)
-  POST https://localhost:5001/api/gigs [401 Unauthorized, 1.11kB, 7ms]
+  POST https://localhost:5000/api/gigs [401 Unauthorized, 1.11kB, 6ms]
   √  Status is 401
 
 └ Create Gig - Negative Price (should fail)
-  POST https://localhost:5001/api/gigs [400 Bad Request, 1.11kB, 97ms]
+  POST https://localhost:5000/api/gigs [400 Bad Request, 1.11kB, 80ms]
   √  Status is 400
 
 └ Create Gig - Empty Title (should fail)
-  POST https://localhost:5001/api/gigs [400 Bad Request, 1.11kB, 73ms]
+  POST https://localhost:5000/api/gigs [400 Bad Request, 1.11kB, 63ms]
   √  Status is 400
 
 └ Create Gig - Unknown Field freelancer (should fail)
-  POST https://localhost:5001/api/gigs [400 Bad Request, 1.12kB, 115ms]
+  POST https://localhost:5000/api/gigs [400 Bad Request, 1.12kB, 84ms]
   √  Status is 400
   √  Rejected as a field that is not allowed
 
 └ Create Gig - Freelancer B
-  POST https://localhost:5001/api/gigs [201 Created, 1.39kB, 220ms]
+  POST https://localhost:5000/api/gigs [201 Created, 1.39kB, 125ms]
   √  Status is 201
 
 └ Browse Gigs - Client
-  GET https://localhost:5001/api/gigs?limit=50 [200 OK, 3.05kB, 325ms]
+  GET https://localhost:5000/api/gigs?limit=50 [200 OK, 2.1kB, 216ms]
   √  Status is 200
   √  Paginated list of active gigs
   √  Freelancer shows name only
   √  No password hashes, emails or stack traces
 
 └ Browse Gigs - Regex Characters in q
-  GET https://localhost:5001/api/gigs?q=.* [200 OK, 1.1kB, 178ms]
+  GET https://localhost:5000/api/gigs?q=.* [200 OK, 1.1kB, 137ms]
   √  Status is 200
   √  Treated as plain text, not a pattern
 
 └ Get Gig by Id - Client
-  GET https://localhost:5001/api/gigs/6af18d2518dcb2dc22d427bd [200 OK, 1.41kB, 270ms]
+  GET https://localhost:5000/api/gigs/6af1a73a6617ebce3d6c6428 [200 OK, 1.41kB, 207ms]
   √  Status is 200
   √  Returns the gig
   √  No password hashes, emails or stack traces
 
 └ Get Gig - Malformed Id (should fail)
-  GET https://localhost:5001/api/gigs/not-a-real-id [400 Bad Request, 1.09kB, 69ms]
+  GET https://localhost:5000/api/gigs/not-a-real-id [400 Bad Request, 1.09kB, 84ms]
   √  Status is 400
 
 └ Get Gig - Unknown Id (should fail)
-  GET https://localhost:5001/api/gigs/dd5e302c6c189eb64839fb1d [404 Not Found, 1.09kB, 198ms]
+  GET https://localhost:5000/api/gigs/0fb52229bf40ae8e6c9c97a9 [404 Not Found, 1.09kB, 154ms]
   √  Status is 404
 
 └ My Gigs - Freelancer A
-  GET https://localhost:5001/api/gigs/mine [200 OK, 1.38kB, 175ms]
+  GET https://localhost:5000/api/gigs/mine [200 OK, 1.38kB, 140ms]
   √  Status is 200
   √  Only gigs owned by the caller
 
 └ Update Gig - Owner
-  PUT https://localhost:5001/api/gigs/6af18d2518dcb2dc22d427bd [200 OK, 1.39kB, 361ms]
+  PUT https://localhost:5000/api/gigs/6af1a73a6617ebce3d6c6428 [200 OK, 1.39kB, 195ms]
   √  Status is 200
   √  Changes saved
 
 └ Update Gig - Other Freelancer (should fail)
-  PUT https://localhost:5001/api/gigs/6af18d2518dcb2dc22d427bd [403 Forbidden, 1.12kB, 202ms]
+  PUT https://localhost:5000/api/gigs/6af1a73a6617ebce3d6c6428 [403 Forbidden, 1.12kB, 130ms]
   √  Status is 403
 
 └ Delete Gig - Other Freelancer (should fail)
-  DELETE https://localhost:5001/api/gigs/6af18d2518dcb2dc22d427bd [403 Forbidden, 1.12kB, 200ms]
+  DELETE https://localhost:5000/api/gigs/6af1a73a6617ebce3d6c6428 [403 Forbidden, 1.12kB, 134ms]
   √  Status is 403
 
 └ Update Gig - Client (should fail)
-  PUT https://localhost:5001/api/gigs/6af18d2518dcb2dc22d427bd [403 Forbidden, 1.12kB, 105ms]
+  PUT https://localhost:5000/api/gigs/6af1a73a6617ebce3d6c6428 [403 Forbidden, 1.12kB, 69ms]
   √  Status is 403
 
 └ Delete Gig - Owner
-  DELETE https://localhost:5001/api/gigs/6af18d2518dcb2dc22d427bd [200 OK, 1.16kB, 430ms]
+  DELETE https://localhost:5000/api/gigs/6af1a73a6617ebce3d6c6428 [200 OK, 1.16kB, 310ms]
   √  Status is 200
   √  Deleted (no bookings)
 
 └ Get Gig After Delete (should fail)
-  GET https://localhost:5001/api/gigs/6af18d2518dcb2dc22d427bd [404 Not Found, 1.09kB, 230ms]
+  GET https://localhost:5000/api/gigs/6af1a73a6617ebce3d6c6428 [404 Not Found, 1.09kB, 128ms]
   √  Status is 404
 
 □ Bookings
 └ Register Client (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.61kB, 422ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.61kB, 257ms]
   √  Status is 201
 
 └ Register Freelancer A (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.62kB, 371ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.62kB, 234ms]
   √  Status is 201
 
 └ Register Freelancer B (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.62kB, 468ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.62kB, 255ms]
   √  Status is 201
 
 └ Freelancer A Creates Gig (setup)
-  POST https://localhost:5001/api/gigs [201 Created, 1.39kB, 233ms]
+  POST https://localhost:5000/api/gigs [201 Created, 1.39kB, 209ms]
   √  Status is 201
 
 └ Freelancer A Creates Second Gig (setup)
-  POST https://localhost:5001/api/gigs [201 Created, 1.38kB, 193ms]
+  POST https://localhost:5000/api/gigs [201 Created, 1.38kB, 153ms]
   √  Status is 201
 
 └ Freelancer A Deactivates Second Gig (setup)
-  PUT https://localhost:5001/api/gigs/6af18d2c18dcb2dc22d427c3 [200 OK, 1.38kB, 312ms]
+  PUT https://localhost:5000/api/gigs/6af1a73f6617ebce3d6c642e [200 OK, 1.38kB, 197ms]
   √  Status is 200
 
 └ Book Gig - Client
-  POST https://localhost:5001/api/bookings [201 Created, 2.01kB, 537ms]
+  POST https://localhost:5000/api/bookings [201 Created, 2.01kB, 420ms]
   √  Status is 201
   √  Price comes from the gig
   √  Client and freelancer come from the token and the gig
@@ -226,112 +226,112 @@ HustleHub+ API
   √  No password hashes, emails or stack traces
 
 └ Book Gig - Price in Body (should fail)
-  POST https://localhost:5001/api/bookings [400 Bad Request, 1.24kB, 114ms]
+  POST https://localhost:5000/api/bookings [400 Bad Request, 1.24kB, 71ms]
   √  Status is 400
 
 └ Book Gig - Freelancer in Body (should fail)
-  POST https://localhost:5001/api/bookings [400 Bad Request, 1.24kB, 118ms]
+  POST https://localhost:5000/api/bookings [400 Bad Request, 1.24kB, 73ms]
   √  Status is 400
 
 └ Book Gig - Status in Body (should fail)
-  POST https://localhost:5001/api/bookings [400 Bad Request, 1.24kB, 117ms]
+  POST https://localhost:5000/api/bookings [400 Bad Request, 1.24kB, 82ms]
   √  Status is 400
 
 └ Book Gig - Freelancer Token (should fail)
-  POST https://localhost:5001/api/bookings [403 Forbidden, 1.12kB, 67ms]
+  POST https://localhost:5000/api/bookings [403 Forbidden, 1.12kB, 84ms]
   √  Status is 403
 
 └ Book Gig - No Token (should fail)
-  POST https://localhost:5001/api/bookings [401 Unauthorized, 1.11kB, 6ms]
+  POST https://localhost:5000/api/bookings [401 Unauthorized, 1.11kB, 5ms]
   √  Status is 401
 
 └ Book Gig - Malformed gigId (should fail)
-  POST https://localhost:5001/api/bookings [400 Bad Request, 1.21kB, 93ms]
+  POST https://localhost:5000/api/bookings [400 Bad Request, 1.21kB, 79ms]
   √  Status is 400
 
 └ Book Gig - Unknown gigId (should fail)
-  POST https://localhost:5001/api/bookings [404 Not Found, 1.21kB, 273ms]
+  POST https://localhost:5000/api/bookings [404 Not Found, 1.21kB, 185ms]
   √  Status is 404
 
 └ Book Gig - Inactive Gig (should fail)
-  POST https://localhost:5001/api/bookings [404 Not Found, 1.21kB, 309ms]
+  POST https://localhost:5000/api/bookings [404 Not Found, 1.21kB, 221ms]
   √  Status is 404
 
 └ My Bookings - Client
-  GET https://localhost:5001/api/bookings/mine [200 OK, 1.44kB, 228ms]
+  GET https://localhost:5000/api/bookings/mine [200 OK, 1.44kB, 217ms]
   √  Status is 200
   √  Includes the booking
   √  Other party shown by name only
   √  No password hashes, emails or stack traces
 
 └ My Bookings - Gig Freelancer
-  GET https://localhost:5001/api/bookings/mine [200 OK, 1.44kB, 281ms]
+  GET https://localhost:5000/api/bookings/mine [200 OK, 1.44kB, 199ms]
   √  Status is 200
   √  Includes the booking
   √  No password hashes, emails or stack traces
 
 └ My Bookings - Other Freelancer
-  GET https://localhost:5001/api/bookings/mine [200 OK, 1.08kB, 201ms]
+  GET https://localhost:5000/api/bookings/mine [200 OK, 1.08kB, 129ms]
   √  Status is 200
   √  Does not include the booking
 
 └ Get Booking - Client
-  GET https://localhost:5001/api/bookings/6af18d2d18dcb2dc22d427c4 [200 OK, 1.47kB, 307ms]
+  GET https://localhost:5000/api/bookings/6af1a7406617ebce3d6c642f [200 OK, 1.47kB, 228ms]
   √  Status is 200
   √  No password hashes, emails or stack traces
 
 └ Get Booking - Gig Freelancer
-  GET https://localhost:5001/api/bookings/6af18d2d18dcb2dc22d427c4 [200 OK, 1.47kB, 265ms]
+  GET https://localhost:5000/api/bookings/6af1a7406617ebce3d6c642f [200 OK, 1.47kB, 225ms]
   √  Status is 200
 
 └ Get Booking - Other Freelancer (should fail)
-  GET https://localhost:5001/api/bookings/6af18d2d18dcb2dc22d427c4 [403 Forbidden, 1.12kB, 193ms]
+  GET https://localhost:5000/api/bookings/6af1a7406617ebce3d6c642f [403 Forbidden, 1.12kB, 154ms]
   √  Status is 403
 
 └ My Transactions - Client
-  GET https://localhost:5001/api/transactions/mine [200 OK, 1.49kB, 270ms]
+  GET https://localhost:5000/api/transactions/mine [200 OK, 1.49kB, 191ms]
   √  Status is 200
   √  Includes the booking
   √  Has the reference from the booking
   √  No password hashes, emails or stack traces
 
 └ My Transactions - Gig Freelancer
-  GET https://localhost:5001/api/transactions/mine [200 OK, 1.48kB, 324ms]
+  GET https://localhost:5000/api/transactions/mine [200 OK, 1.48kB, 211ms]
   √  Status is 200
   √  Includes the booking
 
 └ My Transactions - Other Freelancer
-  GET https://localhost:5001/api/transactions/mine [200 OK, 1.08kB, 166ms]
+  GET https://localhost:5000/api/transactions/mine [200 OK, 1.08kB, 143ms]
   √  Status is 200
   √  Does not include the booking
 
 └ Freelancer A Raises Gig Price
-  PUT https://localhost:5001/api/gigs/6af18d2b18dcb2dc22d427c2 [200 OK, 1.39kB, 275ms]
+  PUT https://localhost:5000/api/gigs/6af1a73f6617ebce3d6c642d [200 OK, 1.39kB, 187ms]
   √  Status is 200
 
 └ Get Booking - Price Unchanged After Gig Edit
-  GET https://localhost:5001/api/bookings/6af18d2d18dcb2dc22d427c4 [200 OK, 1.47kB, 262ms]
+  GET https://localhost:5000/api/bookings/6af1a7406617ebce3d6c642f [200 OK, 1.47kB, 205ms]
   √  Status is 200
   √  Booking keeps the price it was booked at
 
 □ Income
 └ Income - Gig Freelancer
-  GET https://localhost:5001/api/income [200 OK, 1.27kB, 149ms]
+  GET https://localhost:5000/api/income [200 OK, 1.27kB, 140ms]
   √  Status is 200
   √  Total equals the price the gig was booked at
   √  One item for the booking
 
 └ Income - Other Freelancer
-  GET https://localhost:5001/api/income [200 OK, 1.11kB, 292ms]
+  GET https://localhost:5000/api/income [200 OK, 1.11kB, 146ms]
   √  Status is 200
   √  Nothing earned
 
 └ Income - Client (should fail)
-  GET https://localhost:5001/api/income [403 Forbidden, 1.12kB, 107ms]
+  GET https://localhost:5000/api/income [403 Forbidden, 1.12kB, 75ms]
   √  Status is 403
 
 └ Tax Estimate - Gig Freelancer
-  GET https://localhost:5001/api/income/tax-estimate [200 OK, 3.33kB, 159ms]
+  GET https://localhost:5000/api/income/tax-estimate [200 OK, 3.33kB, 146ms]
   √  Status is 200
   √  Has the full response shape
   √  Defaults to the current tax year (1 March to end of February)
@@ -343,228 +343,228 @@ HustleHub+ API
   √  No password hashes, emails or stack traces
 
 └ Tax Estimate - Previous Tax Year
-  GET https://localhost:5001/api/income/tax-estimate?taxYear=2025 [200 OK, 3.32kB, 230ms]
+  GET https://localhost:5000/api/income/tax-estimate?taxYear=2025 [200 OK, 3.32kB, 133ms]
   √  Status is 200
   √  Uses the requested tax year, which has no income yet
 
 └ Tax Estimate - Other Freelancer
-  GET https://localhost:5001/api/income/tax-estimate [200 OK, 3.32kB, 227ms]
+  GET https://localhost:5000/api/income/tax-estimate [200 OK, 3.32kB, 150ms]
   √  Status is 200
   √  Only counts their own transactions, so nothing earned
 
 └ Tax Estimate - Client (should fail)
-  GET https://localhost:5001/api/income/tax-estimate [403 Forbidden, 1.12kB, 119ms]
+  GET https://localhost:5000/api/income/tax-estimate [403 Forbidden, 1.12kB, 71ms]
   √  Status is 403
   √  Standard error shape
 
 └ Tax Estimate - Admin (skipped without admin credentials)
-  GET https://localhost:5001/api/income/tax-estimate [403 Forbidden, 1.12kB, 108ms]
+  GET https://localhost:5000/api/income/tax-estimate [403 Forbidden, 1.12kB, 107ms]
   √  Status is 403
   √  Standard error shape
 
 └ Tax Estimate - No Token (should fail)
-  GET https://localhost:5001/api/income/tax-estimate [401 Unauthorized, 1.11kB, 6ms]
+  GET https://localhost:5000/api/income/tax-estimate [401 Unauthorized, 1.11kB, 5ms]
   √  Status is 401
   √  Standard error shape
 
 └ Tax Estimate - Invalid taxYear (should fail)
-  GET https://localhost:5001/api/income/tax-estimate?taxYear=20x6 [400 Bad Request, 1.12kB, 112ms]
+  GET https://localhost:5000/api/income/tax-estimate?taxYear=20x6 [400 Bad Request, 1.12kB, 80ms]
   √  Status is 400
   √  Standard error shape
 
 └ Tax Estimate - Unsupported taxYear (should fail)
-  GET https://localhost:5001/api/income/tax-estimate?taxYear=1999 [400 Bad Request, 1.12kB, 112ms]
+  GET https://localhost:5000/api/income/tax-estimate?taxYear=1999 [400 Bad Request, 1.12kB, 82ms]
   √  Status is 400
   √  Standard error shape
 
 └ Tax Estimate - Unknown Query Param (should fail)
-  GET https://localhost:5001/api/income/tax-estimate?freelancerId=6af18d2b18dcb2dc22d427c1 [400 Bad Request, 1.13kB, 107ms]
+  GET https://localhost:5000/api/income/tax-estimate?freelancerId=6af1a73f6617ebce3d6c642c [400 Bad Request, 1.13kB, 81ms]
   √  Status is 400
   √  Standard error shape
 
 └ Admin Transactions - Client (should fail)
-  GET https://localhost:5001/api/admin/transactions [403 Forbidden, 1.12kB, 108ms]
+  GET https://localhost:5000/api/admin/transactions [403 Forbidden, 1.12kB, 89ms]
   √  Status is 403
 
 └ Admin Transactions - Admin (skipped without admin credentials)
-  GET https://localhost:5001/api/admin/transactions?limit=5 [200 OK, 3.22kB, 292ms]
+  GET https://localhost:5000/api/admin/transactions?limit=5 [200 OK, 1.96kB, 195ms]
   √  Status is 200
   √  Paginated, newest first, names only
   √  No password hashes, emails or stack traces
 
 □ Account security
 └ Lockout - Register Throwaway User (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.61kB, 430ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.61kB, 228ms]
   √  Status is 201
   √  No password hash, lockout or session fields in the response
 
 └ Lockout - Unknown Email (baseline)
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 299ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 149ms]
   √  Status is 401
   √  Generic message
 
 └ Lockout - Wrong Password 1 of 5
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 417ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 224ms]
   √  Status is 401
   √  Exactly the same response as an unknown email
 
 └ Lockout - Wrong Password 2 of 5
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 434ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 236ms]
   √  Status is 401
   √  Exactly the same response as an unknown email
 
 └ Lockout - Wrong Password 3 of 5
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 405ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 285ms]
   √  Status is 401
   √  Exactly the same response as an unknown email
 
 └ Lockout - Wrong Password 4 of 5
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 419ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 351ms]
   √  Status is 401
   √  Exactly the same response as an unknown email
 
 └ Lockout - Wrong Password 5 of 5
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 497ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 280ms]
   √  Status is 401
   √  Exactly the same response as an unknown email
 
 └ Lockout - Correct Password Is Still Rejected (account locked)
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 452ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 216ms]
   √  Status is 401
   √  Exactly the same response as an unknown email
   √  No token handed out
 
 └ Change Password - Register User (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.61kB, 434ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.61kB, 231ms]
   √  Status is 201
 
 └ Change Password - No Token (should fail)
-  POST https://localhost:5001/api/auth/change-password [401 Unauthorized, 1.11kB, 8ms]
+  POST https://localhost:5000/api/auth/change-password [401 Unauthorized, 1.11kB, 6ms]
   √  Status is 401
 
 └ Change Password - Missing Fields (should fail)
-  POST https://localhost:5001/api/auth/change-password [400 Bad Request, 1.25kB, 120ms]
+  POST https://localhost:5000/api/auth/change-password [400 Bad Request, 1.25kB, 61ms]
   √  Status is 400
   √  Standard error shape
 
 └ Change Password - Unknown Field (should fail)
-  POST https://localhost:5001/api/auth/change-password [400 Bad Request, 1.24kB, 104ms]
+  POST https://localhost:5000/api/auth/change-password [400 Bad Request, 1.24kB, 68ms]
   √  Status is 400
   √  Standard error shape
 
 └ Change Password - Not Text (should fail)
-  POST https://localhost:5001/api/auth/change-password [400 Bad Request, 1.22kB, 127ms]
+  POST https://localhost:5000/api/auth/change-password [400 Bad Request, 1.22kB, 67ms]
   √  Status is 400
   √  Standard error shape
 
 └ Change Password - Same As Current (should fail)
-  POST https://localhost:5001/api/auth/change-password [400 Bad Request, 1.25kB, 99ms]
+  POST https://localhost:5000/api/auth/change-password [400 Bad Request, 1.25kB, 63ms]
   √  Status is 400
   √  Standard error shape
 
 └ Change Password - Weak New Password (should fail)
-  POST https://localhost:5001/api/auth/change-password [400 Bad Request, 1.28kB, 103ms]
+  POST https://localhost:5000/api/auth/change-password [400 Bad Request, 1.28kB, 68ms]
   √  Status is 400
   √  Standard error shape
 
 └ Change Password - Over 72 Bytes (should fail)
-  POST https://localhost:5001/api/auth/change-password [400 Bad Request, 1.26kB, 110ms]
+  POST https://localhost:5000/api/auth/change-password [400 Bad Request, 1.26kB, 60ms]
   √  Status is 400
   √  Standard error shape
 
 └ Change Password - Wrong Current Password (400, not 401)
-  POST https://localhost:5001/api/auth/change-password [400 Bad Request, 1.28kB, 485ms]
+  POST https://localhost:5000/api/auth/change-password [400 Bad Request, 1.28kB, 271ms]
   √  Status is 400
   √  Standard error shape
 
 └ Change Password - Session Still Valid After A Wrong Attempt
-  GET https://localhost:5001/api/auth/me [200 OK, 1.28kB, 267ms]
+  GET https://localhost:5000/api/auth/me [200 OK, 1.28kB, 123ms]
   √  Status is 200
 
 └ Change Password - Success
-  POST https://localhost:5001/api/auth/change-password [200 OK, 1.68kB, 926ms]
+  POST https://localhost:5000/api/auth/change-password [200 OK, 1.68kB, 590ms]
   √  Status is 200
   √  Returns a fresh token for this session
   √  No password hash, lockout or session fields in the response
 
 └ Change Password - Old Token Rejected
-  GET https://localhost:5001/api/auth/me [401 Unauthorized, 1.12kB, 95ms]
+  GET https://localhost:5000/api/auth/me [401 Unauthorized, 1.12kB, 67ms]
   √  Status is 401
 
 └ Change Password - New Token Works
-  GET https://localhost:5001/api/auth/me [200 OK, 1.28kB, 202ms]
+  GET https://localhost:5000/api/auth/me [200 OK, 1.28kB, 105ms]
   √  Status is 200
   √  No password hash, lockout or session fields in the response
 
 └ Change Password - Old Password No Longer Logs In
-  POST https://localhost:5001/api/auth/login [401 Unauthorized, 1.22kB, 344ms]
+  POST https://localhost:5000/api/auth/login [401 Unauthorized, 1.22kB, 217ms]
   √  Status is 401
   √  Standard error shape
 
 └ Change Password - New Password Logs In
-  POST https://localhost:5001/api/auth/login [200 OK, 1.61kB, 480ms]
+  POST https://localhost:5000/api/auth/login [200 OK, 1.61kB, 296ms]
   √  Status is 200
 
 └ Logout All - No Token (should fail)
-  POST https://localhost:5001/api/auth/logout-all [401 Unauthorized, 1.11kB, 11ms]
+  POST https://localhost:5000/api/auth/logout-all [401 Unauthorized, 1.11kB, 6ms]
   √  Status is 401
 
 └ Logout All - Unknown Field (should fail)
-  POST https://localhost:5001/api/auth/logout-all [400 Bad Request, 1.12kB, 140ms]
+  POST https://localhost:5000/api/auth/logout-all [400 Bad Request, 1.12kB, 62ms]
   √  Status is 400
   √  Standard error shape
 
 └ Logout All - Success
-  POST https://localhost:5001/api/auth/logout-all [200 OK, 1.12kB, 345ms]
+  POST https://localhost:5000/api/auth/logout-all [200 OK, 1.12kB, 196ms]
   √  Status is 200
   √  Says so
 
 └ Logout All - Current Token No Longer Works
-  GET https://localhost:5001/api/auth/me [401 Unauthorized, 1.12kB, 82ms]
+  GET https://localhost:5000/api/auth/me [401 Unauthorized, 1.12kB, 55ms]
   √  Status is 401
 
 └ Logout All - Other Session Token No Longer Works
-  GET https://localhost:5001/api/auth/me [401 Unauthorized, 1.12kB, 71ms]
+  GET https://localhost:5000/api/auth/me [401 Unauthorized, 1.12kB, 72ms]
   √  Status is 401
 
 └ Audit Log - Client (should fail)
-  GET https://localhost:5001/api/admin/audit-logs [403 Forbidden, 1.12kB, 73ms]
+  GET https://localhost:5000/api/admin/audit-logs [403 Forbidden, 1.12kB, 69ms]
   √  Status is 403
 
 └ Audit Log - Freelancer (should fail)
-  GET https://localhost:5001/api/admin/audit-logs [403 Forbidden, 1.12kB, 111ms]
+  GET https://localhost:5000/api/admin/audit-logs [403 Forbidden, 1.12kB, 65ms]
   √  Status is 403
 
 └ Audit Log - No Token (should fail)
-  GET https://localhost:5001/api/admin/audit-logs [401 Unauthorized, 1.11kB, 7ms]
+  GET https://localhost:5000/api/admin/audit-logs [401 Unauthorized, 1.11kB, 4ms]
   √  Status is 401
 
 └ Audit Log - Bad Action Filter (skipped without admin credentials)
-  GET https://localhost:5001/api/admin/audit-logs?action=drop_database [400 Bad Request, 1.19kB, 58ms]
+  GET https://localhost:5000/api/admin/audit-logs?action=drop_database [400 Bad Request, 1.19kB, 66ms]
   √  Status is 400
   √  Standard error shape
 
 └ Audit Log - Unknown Query Param (skipped without admin credentials)
-  GET https://localhost:5001/api/admin/audit-logs?actorId=6af18d2a18dcb2dc22d427bf [400 Bad Request, 1.13kB, 73ms]
+  GET https://localhost:5000/api/admin/audit-logs?actorId=6af1a73e6617ebce3d6c642a [400 Bad Request, 1.13kB, 68ms]
   √  Status is 400
   √  Standard error shape
 
 └ Audit Log - Admin Sees The Password Change (skipped without admin credentials)
-  GET https://localhost:5001/api/admin/audit-logs?action=password_changed&limit=50 [200 OK, 2.6kB, 345ms]
+  GET https://localhost:5000/api/admin/audit-logs?action=password_changed&limit=50 [200 OK, 2.95kB, 203ms]
   √  Status is 200
   √  The password change is recorded, by that user, about that user
   √  Newest first, paginated, filtered to one action
   √  No emails, passwords or tokens in the audit log
 
 └ Audit Log - Admin Sees The Logout All (skipped without admin credentials)
-  GET https://localhost:5001/api/admin/audit-logs?action=logout_all&limit=50 [200 OK, 1.81kB, 289ms]
+  GET https://localhost:5000/api/admin/audit-logs?action=logout_all&limit=50 [200 OK, 2.03kB, 169ms]
   √  Status is 200
   √  The sign out everywhere is recorded
   √  Newest first, paginated, filtered to one action
   √  No emails, passwords or tokens in the audit log
 
 └ Audit Log - Admin Sees The Lockout (skipped without admin credentials)
-  GET https://localhost:5001/api/admin/audit-logs?action=account_locked&limit=50 [200 OK, 3.71kB, 293ms]
+  GET https://localhost:5000/api/admin/audit-logs?action=account_locked&limit=50 [200 OK, 4.09kB, 205ms]
   √  Status is 200
   √  The lockout is recorded with its attempt count
   √  Newest first, paginated, filtered to one action
@@ -572,99 +572,99 @@ HustleHub+ API
 
 □ Security
 └ Register Client (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.61kB, 387ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.61kB, 220ms]
   √  Status is 201
 
 └ Register Freelancer (setup)
-  POST https://localhost:5001/api/auth/register [201 Created, 1.62kB, 417ms]
+  POST https://localhost:5000/api/auth/register [201 Created, 1.62kB, 239ms]
   √  Status is 201
 
 └ Freelancer Creates Gig (setup)
-  POST https://localhost:5001/api/gigs [201 Created, 1.39kB, 182ms]
+  POST https://localhost:5000/api/gigs [201 Created, 1.39kB, 127ms]
   √  Status is 201
 
 └ Security Headers
-  GET https://localhost:5001/api/health [200 OK, 958B, 4ms]
+  GET https://localhost:5000/api/health [200 OK, 958B, 4ms]
   √  Status is 200
   √  Strict Content-Security-Policy
   √  nosniff, no-referrer and HSTS
   √  No X-Powered-By header
 
 └ Login - Operator in Email (should fail)
-  POST https://localhost:5001/api/auth/login [400 Bad Request, 1.22kB, 7ms]
+  POST https://localhost:5000/api/auth/login [400 Bad Request, 1.22kB, 11ms]
   √  Status is 400
   √  Generic error shape, no stack trace
 
 └ Browse Gigs - Operator in Query (should fail)
-  GET https://localhost:5001/api/gigs?category[$ne]=design [400 Bad Request, 1.11kB, 98ms]
+  GET https://localhost:5000/api/gigs?category[$ne]=design [400 Bad Request, 1.11kB, 69ms]
   √  Status is 400
   √  Generic error shape, no stack trace
 
 └ CORS - Disallowed Origin
-  GET https://localhost:5001/api/health [403 Forbidden, 958B, 7ms]
+  GET https://localhost:5000/api/health [403 Forbidden, 958B, 4ms]
   √  No Access-Control-Allow-Origin header
   √  Status is 403
   √  Generic error shape, no stack trace
 
 └ CORS - Allowed Origin
-  GET https://localhost:5001/api/health [200 OK, 1.01kB, 5ms]
+  GET https://localhost:5000/api/health [200 OK, 1.01kB, 3ms]
   √  Status is 200
   √  Echoes only the client origin
 
 └ Malformed JSON (should fail)
-  POST https://localhost:5001/api/auth/login [400 Bad Request, 1.11kB, 6ms]
+  POST https://localhost:5000/api/auth/login [400 Bad Request, 1.11kB, 7ms]
   √  Status is 400
   √  Clear message
   √  Generic error shape, no stack trace
 
 └ Oversized Body (should fail)
-  POST https://localhost:5001/api/auth/login [413 Payload Too Large, 1.11kB, 7ms]
+  POST https://localhost:5000/api/auth/login [413 Payload Too Large, 1.11kB, 6ms]
   √  Status is 413
   √  Clear message
   √  Generic error shape, no stack trace
 
 └ Admin Delete Gig - Client (should fail)
-  DELETE https://localhost:5001/api/admin/gigs/6af18d4418dcb2dc22d427cd [403 Forbidden, 1.12kB, 114ms]
+  DELETE https://localhost:5000/api/admin/gigs/6af1a7506617ebce3d6c6438 [403 Forbidden, 1.12kB, 67ms]
   √  Status is 403
 
 └ Admin Delete Gig - Freelancer (should fail)
-  DELETE https://localhost:5001/api/admin/gigs/6af18d4418dcb2dc22d427cd [403 Forbidden, 1.12kB, 61ms]
+  DELETE https://localhost:5000/api/admin/gigs/6af1a7506617ebce3d6c6438 [403 Forbidden, 1.12kB, 54ms]
   √  Status is 403
 
 └ Admin Delete Gig - Admin (skipped without admin credentials)
-  DELETE https://localhost:5001/api/admin/gigs/6af18d4418dcb2dc22d427cd [200 OK, 1.16kB, 380ms]
+  DELETE https://localhost:5000/api/admin/gigs/6af1a7506617ebce3d6c6438 [200 OK, 1.16kB, 276ms]
   √  Status is 200
   √  Gig deleted (no bookings)
 
 └ Get Gig After Admin Delete (skipped without admin credentials)
-  GET https://localhost:5001/api/gigs/6af18d4418dcb2dc22d427cd [404 Not Found, 1.09kB, 223ms]
+  GET https://localhost:5000/api/gigs/6af1a7506617ebce3d6c6438 [404 Not Found, 1.09kB, 114ms]
   √  Status is 404
 
 └ Audit Log - Admin Sees The Gig Deletion (skipped without admin credentials)
-  GET https://localhost:5001/api/admin/audit-logs?action=admin_gig_deleted&limit=50 [200 OK, 2.64kB, 294ms]
+  GET https://localhost:5000/api/admin/audit-logs?action=admin_gig_deleted&limit=50 [200 OK, 3.25kB, 216ms]
   √  Status is 200
   √  The admin gig deletion is recorded, by an admin
   √  Newest first, paginated, filtered to one action
   √  No emails, passwords or tokens in the audit log
 
-┌─────────────────────────┬────────────────────┬───────────────────┐
-│                         │           executed │            failed │
-├─────────────────────────┼────────────────────┼───────────────────┤
-│              iterations │                  1 │                 0 │
-├─────────────────────────┼────────────────────┼───────────────────┤
-│                requests │                131 │                 0 │
-├─────────────────────────┼────────────────────┼───────────────────┤
-│            test-scripts │                131 │                 0 │
-├─────────────────────────┼────────────────────┼───────────────────┤
-│      prerequest-scripts │                 29 │                 0 │
-├─────────────────────────┼────────────────────┼───────────────────┤
-│              assertions │                246 │                 0 │
-├─────────────────────────┴────────────────────┴───────────────────┤
-│ total run duration: 40.9s                                        │
-├──────────────────────────────────────────────────────────────────┤
-│ total data received: 42.99kB (approx)                            │
-├──────────────────────────────────────────────────────────────────┤
-│ average response time: 219ms [min: 4ms, max: 926ms, s.d.: 161ms] │
-└──────────────────────────────────────────────────────────────────┘
-(node:20188) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+┌─────────────────────────┬───────────────────┬───────────────────┐
+│                         │          executed │            failed │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│              iterations │                 1 │                 0 │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│                requests │               131 │                 0 │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│            test-scripts │               131 │                 0 │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│      prerequest-scripts │                29 │                 0 │
+├─────────────────────────┼───────────────────┼───────────────────┤
+│              assertions │               246 │                 0 │
+├─────────────────────────┴───────────────────┴───────────────────┤
+│ total run duration: 29s                                         │
+├─────────────────────────────────────────────────────────────────┤
+│ total data received: 39.84kB (approx)                           │
+├─────────────────────────────────────────────────────────────────┤
+│ average response time: 141ms [min: 3ms, max: 590ms, s.d.: 98ms] │
+└─────────────────────────────────────────────────────────────────┘
+(node:43092) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
 (Use `node --trace-deprecation ...` to show where the warning was created)
