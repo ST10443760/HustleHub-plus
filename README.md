@@ -113,7 +113,7 @@ client only hides what a user can't use.
 - Hardened Docker images and Compose stack; a GitHub Actions pipeline with
   tests, secret scanning, image scanning, static analysis and a dynamic
   scan
-- 191 API unit tests, 110 frontend tests, 151 Newman requests with 272
+- 191 API unit tests, 116 frontend tests, 151 Newman requests with 272
   assertions over two Postman collections, and a 15-check smoke test, all
   passing
 
@@ -1482,7 +1482,7 @@ Every suite was run on 9 November 2026 and passed. The raw output is in
 | API unit tests (Node's test runner) | Tax calculator, tax years and config, money rounding, startup settings, trust proxy and rate limit buckets, health check, gig validators, account lockout, token versions, auth and admin validators, audit log guards and helper, the log scrubber, the logger and event catalogue, request ids and the access log, and the log shipper against a local mock server. No database or secrets needed | **191 tests, 21 files, 0 failed** | `cd api; npm test` | [`api-unit-results.txt`](docs/test-evidence/api-unit-results.txt) |
 | Main Postman collection (Newman) | Health, auth, RBAC, gigs, bookings, income and tax estimate, account security (lockout, change password, sign out everywhere, audit log) and security (headers, injection, CORS, body limits, admin delete) | **131 requests, 246 assertions, 0 failed** with the admin credentials (119 requests and 213 assertions without them, when the 12 admin-only requests are skipped) | API on `npm run start:test`, then Newman (below) | [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt) |
 | Rate limit collection (Newman) | The 6th failed login and the 11th booking get `429` with `Retry-After` and a matching message | **20 requests, 26 assertions, 0 failed** | API freshly started with `npm run start:test:strict`, then Newman | [`newman-rate-limits-results.txt`](docs/test-evidence/newman-rate-limits-results.txt) |
-| Frontend (Vitest and React Testing Library) | Rendering and user interaction for every main page, the API client, XSS rendering, the tax dashboard and chart, the Account page, the audit log page and the security header consistency | **110 tests, 21 files, 0 failed** | `cd client; npm run test:run` | [`vitest-results.txt`](docs/test-evidence/vitest-results.txt) |
+| Frontend (Vitest and React Testing Library) | Rendering and user interaction for every main page, the API client, XSS rendering, the tax dashboard and chart, the Account page, the audit log page and the security header consistency | **116 tests, 22 files, 0 failed** | `cd client; npm run test:run` | [`vitest-results.txt`](docs/test-evidence/vitest-results.txt) |
 | Main collection against Docker | The same collection against the API container, with bookings using the Compose MongoDB replica set | **131 requests, 246 assertions, 0 failed** | See [Docker](#13-docker) | [`docker-newman-results.txt`](docs/test-evidence/docker-newman-results.txt) |
 | Docker smoke test | The page and its CSP, `/api/health` through nginx, register, login, a protected route with and without a token, an admin route as a client, and a password change that ends the old token | **15 checks passed** | `node docker/smoke-test.mjs` (stack running) | [`docker-smoke-test-results.txt`](docs/test-evidence/docker-smoke-test-results.txt) |
 | Lint and static analysis | ESLint (with the security plugin) in both packages, Semgrep with 152 rules | **0 problems, 0 findings** | `npm run lint` in `api/` and `client/`, `node .semgrep/run.mjs` | [Static code analysis](#12-static-code-analysis) |
@@ -1546,6 +1546,7 @@ or `fetch` are mocked, and the setup file fails any unmocked `fetch`.
 |---|---|---|
 | API client | `client.test.js` (10) | Bearer header, unwrapping `{ success, data }`, the server's error message, a generic message on network failure, the 429 message, logout on `401` (not on a failed login), absolute URLs refused |
 | Auth pages | `Register.test.jsx` (4), `Login.test.jsx` (4), `ProtectedRoute.test.jsx` (4), `Layout.test.jsx` (5) | Inline errors, only client and freelancer offered, the generic login error, the 429 message, redirects and "Not allowed", who sees which nav link |
+| Session messages | `AuthProvider.test.jsx` (6) | With the real auth provider, route guard and API client: a revoked session (on the next request or at start-up) lands on Log in with "Your session has ended"; "Sign out of all devices" shows its message; the message is shown once; a plain visit shows none and logging in returns to the original page; the message is plain text |
 | Gigs and booking | `Gigs.test.jsx` (6), `GigCard.test.jsx` (2), `GigDetail.test.jsx` (5), `BookingPanel.test.jsx` (5), `GigForm.test.jsx` (3), `GigEditor.test.jsx` (3), `MyGigs.test.jsx` (5) | Loading, empty and error states; a debounced search; the XSS title rendered as text; what each role sees; the booking confirmation, a double click booking once, the reference; form limits; edits without double escaping; delete or deactivate |
 | Income and tax | `Income.test.jsx` (7), `MonthlyIncomeChart.test.jsx` (5) | Summary cards, the bracket breakdown and assumptions, switching the tax year, loading, empty and error states, the per-booking list, only a SARS source link; the chart's accessible summary, hidden table and no inline styles |
 | Account and admin | `Account.test.jsx` (8), `AdminAuditLog.test.jsx` (5), `AdminUsers.test.jsx` (2) | Change password validation and success, the `400` that doesn't log out, the generic `500` message, the sign-out confirmation; audit entries shown readably, the action filter, an unknown action ignored, empty and error states; no password field on the Users page |
@@ -1605,7 +1606,7 @@ the Dockerfiles have passed lint.
 | Job | What it does | Why |
 |---|---|---|
 | **Backend - unit tests and npm audit** | `npm ci`, `npm test` (191 unit tests: tax calculator, startup settings check, trust proxy and rate limit buckets, health check, gig price validation, account lockout, token versions, audit log guards, log redaction, the structured logger, request ids and the cloud log shipper), `npm audit --omit=dev --audit-level=high` | Proves the money and security logic behaves, and that no known high or critical vulnerability ships in a production dependency |
-| **Frontend - tests, build and npm audit** | `npm ci`, `npm run test:run` (110 Vitest tests, including the CSP and security header consistency test), `npm run lint`, `npm run build` (and checks the CSP meta tag is in the build), `npm audit --omit=dev --audit-level=high` | Same for the React app; a build without its CSP fails |
+| **Frontend - tests, build and npm audit** | `npm ci`, `npm run test:run` (116 Vitest tests, including the CSP and security header consistency test), `npm run lint`, `npm run build` (and checks the CSP meta tag is in the build), `npm audit --omit=dev --audit-level=high` | Same for the React app; a build without its CSP fails |
 | **Secret scan - gitleaks (full history)** | gitleaks over **every commit** (`fetch-depth: 0`), not just the latest | A secret committed and later deleted is still in history; this catches it. No allowlist: the history scans clean |
 | **Lint - Dockerfiles, Compose and workflows** | hadolint on all three Dockerfiles; `docker compose config` on both Compose files, plus a check that Compose **refuses** to run without `JWT_SECRET`; actionlint and zizmor on this workflow | Catches insecure or broken container and pipeline configuration before anything runs. zizmor is a security audit of the workflow itself (injection, credential persistence, unpinned actions) |
 | **Stack - build, smoke test and Newman** | Generates random credentials, builds the certs, api and client images, `docker compose up -d --build --wait`, runs `docker/smoke-test.mjs`, the **rate limit** collection against the strict limits, seeds the admin, switches to the test override and runs the **main** collection (with the admin tests) | Proves the **entire stack** builds, starts healthy and enforces auth, RBAC, ownership, validation, rate limits, CORS and headers end to end |
@@ -1773,7 +1774,7 @@ the exact same commands the workflow runs (listed in
 | Job | Local result |
 |---|---|
 | Backend: unit tests and npm audit | 191 tests passed; `npm audit --omit=dev --audit-level=high`: 0 vulnerabilities |
-| Frontend: tests, build and npm audit | 110 tests passed; lint clean; build passes with the CSP meta tag; npm audit: 0 vulnerabilities |
+| Frontend: tests, build and npm audit | 116 tests passed; lint clean; build passes with the CSP meta tag; npm audit: 0 vulnerabilities |
 | Secret scan: gitleaks | No leaks, full history |
 | Lint: Dockerfiles, Compose and workflows | hadolint clean on all three Dockerfiles; both Compose files valid, and Compose refuses to run without `JWT_SECRET`; actionlint and zizmor (strictest auditor persona): no findings |
 | Stack: build, smoke test and Newman | All images build and the stack is healthy; smoke test 15 checks; rate limit collection 20 requests and 26 assertions; main collection against the test override 131 requests and 246 assertions; 0 failed |
@@ -2451,7 +2452,7 @@ dashboard.
 | [`10-admin-transactions.png`](docs/screenshots/10-admin-transactions.png) | The admin's All transactions: every transaction linked to its client and freelancer |
 | [`11-newman-pass.png`](docs/screenshots/11-newman-pass.png) | Part 2 run of the main collection: 80 requests and 134 assertions, 0 failed, without admin credentials (the current run is 131 and 246, see [Testing](#10-testing)) |
 | [`11b-newman-rate-limits.png`](docs/screenshots/11b-newman-rate-limits.png) | The rate limit collection: 20 requests and 26 assertions, 0 failed |
-| [`12-vitest-pass.png`](docs/screenshots/12-vitest-pass.png) | Part 2 Vitest run: 16 files and 67 tests passed (now 21 files and 110 tests) |
+| [`12-vitest-pass.png`](docs/screenshots/12-vitest-pass.png) | Part 2 Vitest run: 16 files and 67 tests passed (now 22 files and 116 tests) |
 | [`13-security-headers.png`](docs/screenshots/13-security-headers.png) | API response headers in DevTools: CSP, cross-origin policies, no-referrer, HSTS, nosniff, and no `X-Powered-By` |
 | [`13b-security-headers-continued.png`](docs/screenshots/13b-security-headers-continued.png) | The rest of the Helmet headers, including `X-Frame-Options: DENY` |
 | [`14-rate-limit-429.png`](docs/screenshots/14-rate-limit-429.png) | The 6th failed login refused with "Too many requests, please try again in 896 seconds." |
@@ -2486,9 +2487,11 @@ The two billing lock images are shown in
 | Account lockout (5 failures in 15 minutes lock for 15 minutes, counted atomically, no enumeration) | `api/src/config/lockout.js`, `api/src/utils/lockout.js`, `api/src/utils/accountLockout.js` | Additional security features |
 | Change password and session revocation (token versions), "Sign out of all devices", the Account page; the 72-byte password limit; a `typeof` check on the login password | `api/src/controllers/authController.js`, `api/src/middleware/authMiddleware.js`, `api/src/utils/generateToken.js`, `client/src/pages/Account.jsx` | Additional security features |
 | Append-only admin audit log and the admin Audit log page | `api/src/models/AuditLog.js`, `api/src/utils/audit.js`, `api/src/controllers/adminController.js`, `client/src/pages/AdminAuditLog.jsx` | Additional security features |
+| The login page says why a session ended ("Your session has ended", "You have been signed out of all devices"), using a one-shot notice in the auth context | `client/src/context/AuthProvider.jsx`, `client/src/pages/Login.jsx`, `client/src/context/AuthProvider.test.jsx` | Additional security features |
+| nodemon replaced by Node's built-in `node --watch-path=src`, clearing the last npm audit finding; `undici` updated in the client | `api/package.json`, `client/package-lock.json` | Static analysis and dependency security |
 | Structured logging: event catalogue, request ids, access log, redaction, `LOG_FORMAT`, crash and shutdown handling | `api/src/utils/logger.js`, `logEvents.js`, `redact.js`, `requestContext.js`, `api/src/middleware/requestLogging.js`, `api/src/server.js` | Logging and monitoring |
 | Cloud logging to Axiom with batching, retries and a bounded queue; `npm run log:test`; `npm run start:test:strict`; Axiom queries and monitors | `api/src/utils/logShipper.js`, `api/scripts/sendTestLog.js`, `api/scripts/startTest.js`, `docs/logging-evidence/` | Logging and monitoring |
-| New tests: 191 api unit tests (from 0 in Part 2), 110 Vitest tests (from 67), 151 Newman requests (from 105) | `api/test/`, `client/src/**/*.test.*`, `api/postman/` | Testing across every row |
+| New tests: 191 api unit tests (from 0 in Part 2), 116 Vitest tests (from 67), 151 Newman requests (from 105) | `api/test/`, `client/src/**/*.test.*`, `api/postman/` | Testing across every row |
 | Final security review (threats, controls, evidence, residual risks) | [Section 9](#9-final-security-review) | Security review |
 | This README, rewritten to match the final system | `README.md`, `docs/*/README.md` | README update |
 
@@ -2514,7 +2517,7 @@ The two billing lock images are shown in
 |---|---|---|---|
 | 1 | Full-stack MERN | `client/`, `api/src/`, MongoDB through Mongoose | Every test run uses the real stack |
 | 2 | Freelancers manage only their **own** gigs | `gigController.js`, `ownership.js`, `gigValidators.js` | Newman Gigs folder (`403` for others, `400` for a `freelancer` field) |
-| 3 | React frontend: register, log in, browse, book; invalid input handled; nothing sensitive shown | `client/src/pages/`, `client/src/utils/validation.js`, `text.js` | Vitest (110 tests), screenshots 1 to 3 |
+| 3 | React frontend: register, log in, browse, book; invalid input handled; nothing sensitive shown | `client/src/pages/`, `client/src/utils/validation.js`, `text.js` | Vitest (116 tests), screenshots 1 to 3 |
 | 4 | Every booking creates a transaction linked to both users | `bookingController.js` (one database transaction), unique index | Newman Bookings folder; screenshots 6 to 8 and 10 |
 | 5 | Freelancers see their bookings; income per freelancer | `/api/bookings/mine`, `/api/income`, `FreelancerBookings.jsx`, `Income.jsx` | Newman Income folder; screenshot 9 |
 | 6 | JWT on protected routes, RBAC, input sanitised | `authMiddleware.js`, `ownership.js`, validators, `sanitize.js` | Newman Auth, RBAC and Security folders; route audit |

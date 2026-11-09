@@ -21,7 +21,7 @@ locked for a billing issue, so every job was run locally on 9 November
 
 The test jobs' outputs are in [`../test-evidence/`](../test-evidence/README.md):
 
-- **Backend and frontend jobs:** 191 unit tests, 110 Vitest tests, lint,
+- **Backend and frontend jobs:** 191 unit tests, 116 Vitest tests, lint,
   the build (with the CSP meta tag) and both production audits pass.
 - **Stack job:** all images build and the stack is healthy; smoke test 15
   checks; the rate limit collection 20 requests and 26 assertions; the
