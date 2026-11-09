@@ -35,8 +35,10 @@ function setContextUser(user) {
  */
 function routeOf(req) {
   const base = typeof req.baseUrl === 'string' ? req.baseUrl : '';
-  if (req.route && typeof req.route.path === 'string') return `${base}${req.route.path}`;
-  return `${base}${req.path || ''}`;
+  const tail = req.route && typeof req.route.path === 'string' ? req.route.path : req.path || '';
+  const route = `${base}${tail}`;
+  // A router's own "/" route reads as "/api/income/"; drop that slash.
+  return route.length > 1 && route.endsWith('/') ? route.slice(0, -1) : route;
 }
 
 module.exports = { getContext, runWithContext, setContextUser, routeOf };
