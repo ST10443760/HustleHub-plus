@@ -404,7 +404,7 @@ cp .env.example .env      # PowerShell: Copy-Item .env.example .env
 # edit api/.env: MONGO_URI, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
 npm run certs             # creates api/certs/key.pem and cert.pem (git-ignored)
 npm run seed:admin        # creates the admin account; safe to run again
-npm run dev               # https://localhost:5000 (nodemon)
+npm run dev               # https://localhost:5000, restarts when a file in src/ changes
 ```
 
 - `npm run certs` works the same in Git Bash, PowerShell, macOS and
@@ -437,7 +437,7 @@ matches).
 
 | Script | What it does |
 |---|---|
-| `npm start` | Starts the API without nodemon |
+| `npm start` | Starts the API once, without watching for changes. `npm run dev` uses Node's built-in `node --watch-path=src`, so it restarts only when a file in `src/` changes (not for tests, scripts or logs) |
 | `npm run start:test` | Relaxed rate limits for the main Newman run. Refuses to run in production. Never ships logs to the cloud |
 | `npm run start:test:strict` | The real (strict) limits, marked as a test run, for the rate limit collection |
 | `npm run clean:test` | Removes the throwaway test users (`test-...@example.com`, `role-...@example.com`) with their gigs, bookings and transactions. Never deletes an admin. Refuses to run in production |
@@ -1076,21 +1076,18 @@ needed.
 
 ### Dependency audit
 
-`npm audit` on 9 November 2026, after `npm audit fix` in both packages:
+`npm audit` on 9 November 2026:
 
 | Project | `npm audit --omit=dev` (what ships) | `npm audit` (including dev tools) |
 |---|---|---|
-| `api/` | **0 vulnerabilities** | 2 moderate: `minimatch` (a denial of service in glob matching), only through `nodemon` |
+| `api/` | **0 vulnerabilities** | **0 vulnerabilities** |
 | `client/` | **0 vulnerabilities** | **0 vulnerabilities** |
 
-`npm audit fix` cleared the client finding (`undici`, used by `jsdom`
-in the tests, updated within its version range). The api finding
-can't be fixed the same way: the fix is in `minimatch` 11, but even the
-newest `nodemon` (3.1.14) asks for `minimatch` 10, so the only fix would
-force a major version under nodemon. It stays, accepted: nodemon only
-restarts the server during development and never runs in the deployed
-API or handles requests. It is listed under
-[residual risks](#residual-risks-and-accepted-limitations). The pipeline
+Two dev-only findings were cleared at the end of Part 3. `npm audit fix`
+updated `undici` (used by `jsdom` in the client tests) within its version
+range. The api finding came from `minimatch` inside `nodemon`, and could
+only be fixed with a major version that nodemon doesn't support, so
+nodemon was removed: `npm run dev` now uses Node's own `--watch-path`. The pipeline
 runs `npm audit --omit=dev --audit-level=high`, which passes. Newman is run
 with `npx` instead of being a dependency, so its own tree adds nothing.
 
@@ -1375,7 +1372,7 @@ OWASP Top 10 2021. Test names are quoted exactly; Newman requests are in
 | **CSRF and cross-origin abuse** (A01) | A malicious site makes the user's browser call the API | No cookies: the JWT is in the `Authorization` header, which browsers never attach on their own; CORS accepts only `CLIENT_ORIGIN`, with limited methods and headers and no credentials | `api/src/config/security.js` | Newman Security: "CORS - Disallowed Origin" (`403`, no `Access-Control-Allow-Origin`), "CORS - Allowed Origin"; event `ACCESS_DENIED` (`cors_origin`) | None known while the token stays out of cookies |
 | **Security misconfiguration** (A05 Security Misconfiguration) | Missing headers, verbose errors, a debug endpoint, or a container running as root with write access | Explicit Helmet config; nginx headers from one shared file and `server_tokens off`; generic error handler; health check returns only `ok`; `X-Powered-By` off; containers non-root, read-only, `cap_drop: ALL`, `no-new-privileges`; API and MongoDB not published; startup checks for required settings | `api/src/config/security.js`, `api/src/middleware/errorHandler.js`, `client/nginx.conf`, `client/securityHeaders.js`, `docker-compose.yml`, `api/src/config/env.js` | Newman: "Security Headers", "Malformed JSON (should fail)"; unit: "GET /api/health says ok and nothing else"; `docker-compose-ps.txt` (uids 1000, 101, 999); hadolint and Trivy config: 0; ZAP: 0 FAIL | The self-signed certificate; the client is served over plain HTTP on localhost in Compose |
 | **Sensitive data exposure** (A02, A04) | Read password hashes, tokens or secrets from responses, logs, the repository or images | Hashes and lockout fields never selected or returned; one scrubber redacts secrets in every log record; no stack traces in responses or logs; secrets only in git-ignored `.env` files, excluded by `.dockerignore`; ingest-only Axiom token | `api/src/models/User.js`, `api/src/utils/redact.js`, `api/src/middleware/errorHandler.js`, `.gitignore`, `api/.dockerignore` | Newman: "No password hash leaked"; `redact.test.js` (18 tests); smoke test: "no password hashes or stack traces in the responses"; gitleaks: no leaks in 543 commits; image filesystems searched for the secrets: 0 hits | The JWT in `localStorage` (see the trade-off); logs leave the system for Axiom |
-| **Vulnerable and outdated components** (A06 Vulnerable and Outdated Components) | Exploit a known bug in a dependency or base image | Lock files with `npm ci`; `npm audit --omit=dev --audit-level=high` in the pipeline; Trivy fails on fixable HIGH and CRITICAL image vulnerabilities; base images pinned by version and digest; Dependabot weekly with a 7-day cooldown | `api/package-lock.json`, `client/package-lock.json`, `.github/workflows/ci.yml`, `.github/dependabot.yml`, the Dockerfiles | `npm audit --omit=dev`: 0 in both; Trivy: 0 fixable HIGH or CRITICAL in the api, client and certs images | One dev-only finding (`minimatch` via nodemon, which needs a major version to fix); Dependabot ignores major versions, so those are manual |
+| **Vulnerable and outdated components** (A06 Vulnerable and Outdated Components) | Exploit a known bug in a dependency or base image | Lock files with `npm ci`; `npm audit --omit=dev --audit-level=high` in the pipeline; Trivy fails on fixable HIGH and CRITICAL image vulnerabilities; base images pinned by version and digest; Dependabot weekly with a 7-day cooldown | `api/package-lock.json`, `client/package-lock.json`, `.github/workflows/ci.yml`, `.github/dependabot.yml`, the Dockerfiles | `npm audit --omit=dev`: 0 in both; Trivy: 0 fixable HIGH or CRITICAL in the api, client and certs images | Dependabot ignores major versions, so those are manual decisions; a future advisory may need a major upgrade |
 | **Logging and monitoring failures** (A09 Security Logging and Monitoring Failures) | An attack goes unnoticed because nothing is recorded, or logs are lost or leak secrets | A structured event for every security action with request ids; redaction; shipping to Axiom with batching, retries and drop counts; ready-made queries and monitors; an append-only audit log in the app | `api/src/utils/logger.js`, `logShipper.js`, `logEvents.js`, `audit.js`, `api/src/models/AuditLog.js` | `logger.test.js`, `logShipper.test.js`, `auditLog.test.js`; `docs/logging-evidence/` (all 25 event names, live run accepted by Axiom with 0 failed); Newman (with admin credentials): "Audit Log - Admin Sees The Lockout (skipped without admin credentials)" | Shipping is best effort; monitors must be created in Axiom; audit log append-only at application level only |
 | **Denial of service and ReDoS** (no single 2021 id) | Flood the API, send huge bodies or pages, or a string that makes a regex backtrack for seconds | General limit 100 per 15 min per IP plus the route limits; 10kb body limit (16k in nginx); `limit` at most 50, `page` at most 1000, search at most 50 characters; regexes without nested quantifiers (`security/detect-unsafe-regex`); the log scrubber cuts strings before matching | `api/src/app.js`, `api/src/middleware/rateLimiters.js`, `gigValidators.js`, `client/nginx.conf`, `api/src/utils/redact.js` | Newman: "Oversized Body (should fail)" (`413`); rate limit collection: "Booking 11 (rate limited)"; unit: "the decimals check is fast even on a long input" | The in-memory limiter is per API instance; no CDN or WAF in front |
 | **Business logic and data integrity** (A04 Insecure Design) | Pay less than the price, book an inactive gig, leave a booking without a payment record, or create rounding drift | Price and parties taken from the database; booking and transaction in one MongoDB transaction; one transaction per booking (unique index); inactive gigs refused; money rounded to 2 decimals, tax worked out in whole cents | `api/src/controllers/bookingController.js`, `api/src/models/Transaction.js`, `api/src/utils/money.js`, `api/src/utils/taxCalculator.js` | Newman Bookings: "Book Gig - Price in Body (should fail)", "Book Gig - Inactive Gig (should fail)", "Get Booking - Price Unchanged After Gig Edit"; unit: "roundMoney removes floating point noise", `taxCalculator.test.js` | Payments are simulated; there is no refund flow |
@@ -1448,10 +1445,6 @@ The raw outputs are in [`docs/test-evidence/`](docs/test-evidence/README.md),
 - **Logs are sent to a third party.** Axiom (hosted in the US) receives
   user ids, masked emails, IP addresses and paths for 30 days. See the
   POPIA note in [Logging and monitoring](#14-logging-and-monitoring).
-- **Accepted dev-only npm audit finding:** `minimatch` (moderate) through
-  `nodemon` in the api. nodemon never runs in the deployed system, and the
-  fix needs a major version that nodemon doesn't support yet. The client
-  has no findings.
 - **Dependabot ignores major versions** for npm and Docker images, so
   major upgrades are a manual decision.
 - **The remote CI pipeline can't run.** GitHub refuses to start any job
