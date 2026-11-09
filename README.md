@@ -864,6 +864,469 @@ folder covers the endpoint (200 with values, 403 for client and admin,
 401 without a token, 400 for a bad `taxYear` or an unknown parameter).
 `Income.test.jsx` and `MonthlyIncomeChart.test.jsx` cover the dashboard.
 
+## 8. Security implementation
+
+Security is layered: every request passes several independent checks, so
+a gap in one is caught by another. **Every authentication, authorisation
+and ownership rule is enforced by the API.** Hiding a button in React is
+a convenience, not security: calling the API directly with Postman or
+curl gets exactly the same `401`, `403` and `400` responses. Section 9
+maps each threat to these controls and to the evidence that they work.
+
+### Authentication and passwords
+
+- **Hashing:** passwords are hashed with **bcryptjs** (10 salt rounds,
+  `api/src/utils/password.js`) before they are stored, and are never
+  logged or returned. The hash field is `select: false` and removed by
+  `toJSON`. bcryptjs was chosen over the native `bcrypt` package to avoid
+  its native build chain, which pulled in high and critical npm audit
+  findings, and to make setup the same on every team member's OS.
+- **Password rules:** at least 8 characters with a number, and at most
+  **72 bytes** (bcrypt ignores everything after 72 bytes), counted in
+  bytes so an emoji counts as 4. The seed script asks for at least 12
+  characters for the admin password.
+- **No enumeration:** a wrong password, an unknown email and a locked
+  account all return the same `401 Invalid email or password`. Login
+  always runs a bcrypt compare (against a dummy hash for an unknown email
+  or a locked account), so response times don't reveal valid accounts. A
+  duplicate registration gets a generic `409`.
+- **Account lockout, change password and session revocation:** see
+  [Extra security features](#extra-security-features).
+
+### JWT and sessions
+
+- The token carries only the user's `id`, `role` and token version
+  (`tv`), never the password hash: a JWT payload is signed, not
+  encrypted.
+- `JWT_SECRET` comes only from the environment. The API refuses to start
+  without it, and in production unless it is at least 32 characters.
+  Tokens expire after `JWT_EXPIRES_IN` (default 1 hour).
+- `protect` verifies the signature, then **loads the user from the
+  database** on every request: the role comes from the database, not the
+  token; a deleted user's token stops working at once; and a token whose
+  version no longer matches (after a password change or "sign out of all
+  devices") is rejected.
+- Missing, expired, tampered and revoked tokens all get the same generic
+  `401`. The logs keep the difference (`ACCESS_DENIED` with a reason).
+
+### RBAC and ownership
+
+| Action | Anyone | Client | Freelancer | Admin |
+|---|---|---|---|---|
+| Register (as client or freelancer only), log in | Yes | Yes | Yes | Yes (log in) |
+| Change own password, sign out everywhere | | Yes | Yes | Yes |
+| Browse active gigs, view a gig | | Yes | Yes | Yes |
+| Create a gig | | | Yes | |
+| Update or delete a gig | | | **Own gigs only** | Delete any (admin route) |
+| Book a gig | | Yes | | |
+| See bookings and transactions | | Own | On own gigs | All transactions |
+| Income and tax estimate | | | Own | |
+| List users, read the audit log | | | | Yes |
+
+- `requireRole(...)` guards every role-restricted route. A wrong role gets
+  a generic `403` that doesn't say which role was needed.
+- `requireOwnership(...)` loads the record and compares its owner (a
+  gig's freelancer; a booking's client or freelancer) with the user from
+  the verified token and database, never with an id from the request.
+  Missing records are `404`, someone else's are `403`.
+- The whole `/api/admin` router is behind `protect` and
+  `requireRole('admin')` at router level, so a new admin route can't be
+  added without the guard.
+- The owner, the client, the freelancer, the price and the status of a
+  booking always come from the token and the database. Admins can't
+  self-register; the admin account is created by the seed script.
+
+### Validation and sanitisation
+
+- **express-validator on every route that takes input.** Types are checked
+  with `typeof` (so an array can't pass as a string), lengths and ranges
+  are enforced, categories and roles come from fixed lists, and ids must
+  be exactly 24 hex characters (`validateObjectId`).
+- **Unknown fields are rejected** with `checkExact` on the gig, booking,
+  change-password, logout-all, pagination, gig list, audit log and tax
+  estimate routes, so a request can't set `freelancer`, `price`, `role` or
+  `isActive` by adding them. Registration and login use only the fields
+  they name and ignore anything else.
+- **HTML escaping:** every free-text field other users see (gig title,
+  description and category, and the user's name) is trimmed and
+  HTML-escaped before it's saved.
+- **NoSQL operator stripping:** express-mongo-sanitize removes any key that
+  starts with `$` or contains `.` from the body, query and params before
+  any route runs, and logs `INPUT_SANITIZED`. This is defence in depth on
+  top of the validators.
+- **Search** text is regex-escaped and capped at 50 characters.
+- **Body limits:** 10kb on the API (`413`), 16k in nginx. Malformed JSON
+  gets a clear `400`.
+
+### Error handling
+
+All errors pass through one central handler
+(`api/src/middleware/errorHandler.js`). It logs server errors as
+`ERROR_UNHANDLED` with the error's name, message and status only (no
+stack trace, no file paths), returns a generic message for any unexpected
+error, and never puts a stack trace, file path or config value in a
+response. Schema and body parser errors get fixed, safe messages.
+
+| Situation | Status | `error` message |
+|---|---|---|
+| Unknown route (`GET /api/nope?token=abc`) | `404` | `Route not found: GET /api/nope` (the query string is never echoed) |
+| Malformed id | `400` | `Invalid id` |
+| No token / tampered or revoked token | `401` | `Not authenticated - no token provided` / `Not authenticated - invalid or expired token` |
+| Wrong password, unknown email or locked account | `401` | `Invalid email or password` (identical) |
+| Wrong role, or not the owner | `403` | `You do not have permission to perform this action` |
+| Malformed JSON / body over 10kb | `400` / `413` | `Request body is not valid JSON` / `Request body is too large` |
+| Request from another origin | `403` | `Origin not allowed` |
+| 6th failed login in 15 minutes from one IP | `429` | `Too many requests, please try again in 899 seconds.` |
+| Any unexpected server error | `500` | `Something went wrong. Please try again later.` |
+
+### Rate limits
+
+| Limiter | Applies to | Limit | Counted per |
+|---|---|---|---|
+| Login | `POST /api/auth/login` | 5 **failed** attempts per 15 minutes (successful logins don't count) | IP |
+| Register | `POST /api/auth/register` | 10 per hour | IP |
+| Booking | `POST /api/bookings` | 10 per 10 minutes | Logged-in user |
+| Password change | `POST /api/auth/change-password` | 5 per 15 minutes | Logged-in user |
+| General | Everything under `/api` except the health check | 100 per 15 minutes | IP |
+
+Going over a limit returns `429`, a `Retry-After` header, the standard
+`RateLimit` and `RateLimit-Policy` headers, and
+`{ "success": false, "error": "Too many requests, please try again in N seconds." }`.
+Every hit is logged as `RATE_LIMIT_EXCEEDED` with the limiter name, IP and
+route. The `RATE_LIMIT_*_MAX` overrides used for testing are **ignored
+when `NODE_ENV=production`**. Behind nginx, `TRUST_PROXY=1` makes the
+per-IP limits see the real client (see [Docker](#13-docker)).
+
+### Security headers and the Content-Security-Policy
+
+**API** (Helmet, configured explicitly in `api/src/config/security.js`),
+with no `unsafe-inline` or `unsafe-eval` anywhere:
+
+| Directive | Value |
+|---|---|
+| `default-src`, `script-src`, `style-src` | `'self'` |
+| `img-src` | `'self' data:` |
+| `connect-src` | `'self'` and `CLIENT_ORIGIN` |
+| `object-src`, `frame-ancestors` | `'none'` |
+| `base-uri`, `form-action` | `'self'` |
+
+Also `Strict-Transport-Security` (1 year, including subdomains),
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
+`X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`,
+`Cross-Origin-Resource-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`. `X-Powered-By` is removed.
+
+**Client.** The client's policy is defined once, in
+[`client/securityHeaders.js`](client/securityHeaders.js):
+
+```text
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'
+```
+
+- **In Docker**, nginx sends it as a header plus `frame-ancestors 'none'`,
+  `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options: DENY`,
+  `Permissions-Policy` (camera, microphone, geolocation, payment and USB
+  off) and the three cross-origin isolation headers. The nginx lines are
+  generated from the same file at image build time, and `server_tokens`
+  is off.
+- **The built app** also carries the policy as a `<meta>` tag, added by a
+  small Vite plugin; `npm run preview` sends the same headers as nginx.
+  The build has no inline scripts, inline styles or event handler
+  attributes, so nothing had to be loosened.
+- A Vitest test (`client/src/test/securityHeaders.test.js`) fails if
+  nginx, the preview server and the shared file ever disagree.
+- `npm run dev` has no CSP on purpose: Vite's dev server injects inline
+  scripts for hot reloading, which this policy would block.
+
+### CORS and CSRF
+
+CORS accepts only the origin in `CLIENT_ORIGIN`, never a wildcard, with
+only `GET`, `POST`, `PUT` and `DELETE` and only the `Authorization` and
+`Content-Type` headers. Credentials are off. A request or preflight from
+any other origin gets `403 Origin not allowed` with no
+`Access-Control-Allow-Origin` header, and is logged as `ACCESS_DENIED`
+with the reason `cors_origin`.
+
+There are no cookies: the JWT is sent in the `Authorization` header,
+which a browser never adds by itself to a request from another site. So
+a forged cross-site request has no credentials, and CSRF tokens aren't
+needed.
+
+### HTTPS and TLS
+
+- The API serves HTTPS with a self-signed certificate (`npm run certs`
+  locally; the one-shot `certs` container in Docker). Key and certificate
+  are git-ignored and never in an image.
+- In Docker, nginx proxies `/api` to the API over HTTPS with
+  `proxy_ssl_verify on`, trusting only that certificate (whose SAN
+  includes `api`), and always sends `Host: api` instead of the browser's
+  own Host header.
+- Logs go to Axiom over HTTPS only; the shipper refuses a plain `http`
+  URL except to localhost in a test run.
+- MongoDB Atlas connections use TLS. Inside Compose, MongoDB is on the
+  internal network only (see [residual risks](#residual-risks-and-accepted-limitations)).
+
+### Dependency audit
+
+`npm audit` on 9 November 2026:
+
+| Project | `npm audit --omit=dev` (what ships) | `npm audit` (including dev tools) |
+|---|---|---|
+| `api/` | **0 vulnerabilities** | 2 moderate: `minimatch` (a denial of service in glob matching), only through `nodemon` |
+| `client/` | **0 vulnerabilities** | 1 high: `undici`, only through `jsdom`, which Vitest uses to run the tests |
+
+Both findings are in development tools that never run in the deployed API
+or in the browser, and both have a fix available (`npm audit fix`). They
+are accepted for this submission and listed under
+[residual risks](#residual-risks-and-accepted-limitations). The pipeline
+runs `npm audit --omit=dev --audit-level=high`, which passes. Newman is run
+with `npx` instead of being a dependency, so its own tree adds nothing.
+
+### JWT in localStorage: the trade-off
+
+The client keeps the JWT in `localStorage`, which is acceptable for the
+POE but has a known risk: **any script running on the page can read
+`localStorage`**, so a single XSS bug would let an attacker steal the
+token and act as the user. An `httpOnly` cookie would hide the token from
+scripts, but would bring back CSRF and cookie configuration. The risk is
+reduced by:
+
+- **escaping on the way in:** user text is HTML-escaped before it is
+  stored
+- **React's escaping on the way out:** no `dangerouslySetInnerHTML` (the
+  ESLint rule `react/no-danger` is on) and no HTML built from strings
+- **a strict CSP** on the client and the API: `script-src 'self'` with no
+  `unsafe-inline` or `unsafe-eval`
+- **short-lived tokens** (1 hour) and **revocation**: "Sign out of all
+  devices" or a password change ends a stolen token at once
+- **the role isn't trusted from the token**, so a stolen token gives no
+  more rights than the user has
+
+### Extra security features
+
+Three features added on top of the core security controls above. Each one
+can be seen in the app and is covered by unit, Newman and (where there is a
+UI) Vitest tests.
+
+#### A. Account lockout
+
+**Threat.** Slow password guessing against **one** account from **many** IP
+addresses (a botnet, or credential stuffing spread out over time). The
+per-IP login limiter can't see this, because every IP only tries a few
+times.
+
+**How it works.**
+- **Policy:** 5 failed attempts within 15 minutes lock the account for 15
+  minutes. Failures older than the window don't count, and a successful
+  login resets everything. The policy lives in
+  [`api/src/config/lockout.js`](api/src/config/lockout.js).
+  `LOCKOUT_MAX_ATTEMPTS`, `LOCKOUT_WINDOW_MINUTES` and
+  `LOCKOUT_DURATION_MINUTES` can change it for local testing only; they are
+  ignored when `NODE_ENV=production`, like the rate limit overrides.
+- **State:** `failedLoginAttempts`, `firstFailedLoginAt` (the start of the
+  window), `lastFailedLoginAt` and `lockUntil` on the user. They are
+  `select: false`, removed by `toJSON` from every response, and never put
+  in the JWT. Accounts created before this feature simply don't have them,
+  which counts as "no failures", so no migration is needed.
+- **Atomic counting:** every attempt on an existing account first *claims*
+  an attempt with one `findOneAndUpdate`. It only matches an unlocked
+  account and uses an update pipeline to count the attempt (or start a new
+  window) and set `lockUntil` on the attempt that reaches the limit, all
+  inside the database. The password is only checked after a successful
+  claim. With 10 wrong passwords sent in parallel against a fresh account,
+  exactly 5 were checked, 5 were refused unchecked, and the account locked
+  once.
+- **No enumeration, by message or by timing:** a locked account never has
+  its real password checked. A bcrypt compare against a dummy hash runs
+  instead, exactly as it does for an unknown email. A wrong password, an
+  unknown email and a locked account all return the **same** `401`
+  `{"success":false,"error":"Invalid email or password"}`, byte for byte,
+  and take about the same time.
+- **Logging:** the lockout is logged as an `AUTH_LOCKOUT` event with the
+  user id only (never the email or password) and written to the audit log.
+  Later attempts on the locked account are `AUTH_LOGIN_FAILURE` with the
+  internal reason `locked`.
+
+**Two layers, two different threats.**
+
+| Layer | Protects against | Limit |
+|---|---|---|
+| Per-IP login rate limiter | One IP bursting through passwords (one account or many) | 5 failed logins per 15 min per IP, then `429` |
+| Account lockout | Many IPs slowly guessing one account | 5 failed attempts per 15 min per account, then locked 15 min |
+
+Both are kept. They trip at the same count, so from a single IP with the
+strict limits the 6th attempt gets the limiter's `429` before the lock
+would show. To demonstrate the lock, run the API with
+`npm run start:test`, which relaxes the per-IP limiter but keeps the
+lockout strict (and ships no logs to the cloud unless
+`LOG_SHIPPING_IN_TEST=1`). The Newman lockout requests run that way.
+
+**The trade-off.** Anyone who knows an email address can lock that account
+on purpose for 15 minutes by typing wrong passwords (a small denial of
+service). That is why the lock is short and lifts by itself, with no admin
+needed: it makes online guessing roughly 5 tries per 15 minutes per account
+(about 480 a day instead of thousands a second), while a deliberately
+locked-out user only waits 15 minutes. A permanent lock or a manual unlock
+would hand that attacker a much stronger weapon.
+
+**Files:** `api/src/config/lockout.js`, `api/src/utils/lockout.js` (pure
+decision logic and the atomic update), `api/src/utils/accountLockout.js`
+(the password check used by login and change-password),
+`api/src/controllers/authController.js`, `api/src/models/User.js`.
+
+**Tests:**
+- `api/test/lockout.test.js`: 15 unit tests with a fixed clock, covering
+  the window, expiry, reset on success, slow guessing and policy overrides.
+- `api/test/userModel.test.js`: the fields never reach JSON.
+- Newman **Account security**: a throwaway user, five wrong passwords, then
+  the **correct** password is still rejected with exactly the same body as
+  an unknown email.
+
+**Limitations.** Counters live on the user document, so they are shared by
+every API instance (unlike the in-memory rate limits). There is no
+CAPTCHA or "unlock by email" step; the lock simply expires.
+
+#### B. Change password and session revocation
+
+**Threat.** A stolen or leaked token stays valid until it expires, and
+before this feature nobody could change a password at all. A user who
+suspected their account was compromised had no way to lock the attacker
+out.
+
+**How it works.**
+- **Token versions:** every user has a `tokenVersion` (default 0), and
+  every JWT carries it as `tv`. `protect` loads the user's current version
+  on each request and rejects any token whose version doesn't match with
+  the usual `401`. Tokens issued before this feature have no `tv`, and
+  that counts as 0, so existing sessions and existing accounts (including
+  the seeded admin) keep working with no migration.
+- **`POST /api/auth/change-password`** with `{ currentPassword,
+  newPassword }`:
+  - `checkExact`, so any other field is a `400`, plus strict `typeof`
+    checks.
+  - The new password follows the registration rules (8+ characters, a
+    number) and must differ from the current one.
+  - **At most 72 bytes:** bcrypt silently ignores everything after 72
+    bytes. Registration now enforces this too, in bytes, so an emoji counts
+    as 4.
+  - The current password is checked through the same lockout as login, so
+    wrong current passwords count towards locking the account.
+  - The new hash is saved with the shared helper and `tokenVersion` is
+    incremented in the same update. The response carries a fresh token, so
+    this session continues and every other session ends.
+  - Rate limited to 5 per 15 minutes per user.
+- **Wrong current password is a `400`, not a `401`.** The client treats a
+  `401` as "session gone" and logs the user out, so a typo here must not
+  return one. A locked account gets the same `400` and the same message.
+- **`POST /api/auth/logout-all`** increments `tokenVersion`, so every token,
+  the current one included, stops working at once.
+- Both routes use `protect` and only ever act on the logged-in user. Both
+  are logged (`AUTH_PASSWORD_CHANGED`, `AUTH_LOGOUT_ALL`) and written to
+  the audit log.
+- **The Account page** (`/account`, in the nav for every role) has the
+  change-password form:
+  - inline validation and `autocomplete="current-password"` /
+    `"new-password"`
+  - the stored token is replaced on success
+  - clear success and generic error messages
+  - the inputs are uncontrolled, so passwords never sit in React state, and
+    the form is cleared after a change.
+
+  It also has a **Sign out of all devices** button with a confirmation step;
+  afterwards the login page says so.
+- This also removes an old limitation: the seeded admin password could
+  only be changed by editing the database. Now an admin changes it on the
+  Account page like anyone else.
+
+While building this, the login validator also got a `typeof` check. An
+array sent as the password used to reach bcrypt and fail with a `500`; it
+is now a `400`.
+
+**Files:** `api/src/utils/generateToken.js` (`tv` in the token),
+`api/src/middleware/authMiddleware.js`, `api/src/controllers/authController.js`,
+`api/src/routes/authRoutes.js`, `api/src/middleware/validators.js`,
+`client/src/pages/Account.jsx`, `client/src/context/AuthProvider.jsx`.
+
+**Tests:**
+- Unit: `tokenVersion.test.js` (token payload, missing `tv` counts as 0)
+  and `authValidators.test.js` (field rules, unknown fields, the 72-byte
+  limit counted in bytes).
+- Newman **Account security**:
+  - every validation failure is a `400`, and no token is a `401`
+  - a wrong current password is a `400` and the session survives it
+  - after a change, the **old** token gets `401` and the **new** one works
+  - the old password no longer logs in and the new one does
+  - after logout-all, the current and the earlier tokens are both `401`.
+- The smoke test checks the change through the Docker stack.
+- Vitest `Account.test.jsx` covers validation, success, the `400` error
+  (no logout), the generic `500` message and the confirmation step.
+
+**Limitations.** Every protected request already reads the user from the
+database (for the role), so checking the version costs nothing extra. There
+is no list of individual sessions, so you can sign out everywhere but not
+one specific device. Changing a password doesn't email the user.
+
+#### C. Admin audit log
+
+**Threat.** Without a record, an admin's destructive actions and the
+security events on accounts (lockouts, password changes, sign-outs) can't
+be reviewed afterwards, so abuse or an account takeover goes unnoticed.
+Logs alone are easy to lose and not visible in the app.
+
+**How it works.**
+- **Model:** a new `AuditLog` model ([`api/src/models/AuditLog.js`](api/src/models/AuditLog.js))
+  stores `actorId`, `actorRole`, `action` (an enum), `targetType`,
+  `targetId`, `outcome`, `ip`, `createdAt` and a small whitelisted `meta`
+  object (`failedAttempts`, `lockMinutes`, `hadBookings`).
+  - `strict: 'throw'` refuses any other field.
+  - It never stores passwords, tokens, emails or request bodies.
+  - Indexes: `createdAt` descending, and `action` + `createdAt`.
+- **Append-only:** there is no route that updates or deletes entries, and
+  the model throws on every update, replace and delete operation
+  (`updateOne`, `findOneAndUpdate`, `deleteMany`, `bulkWrite`, re-saving a
+  loaded entry, ...) before anything reaches the database.
+- **What is recorded:** admin gig deletion and deactivation, password
+  changed, sign out of all devices, and account locked.
+- **Failure handling** ([`api/src/utils/audit.js`](api/src/utils/audit.js)):
+  if an audit record can't be written, the failure is logged as an
+  `AUDIT_WRITE_FAILED` event (action and error type only, never the entry
+  or the raw error message) and the request carries on. It isn't failed or undone, and
+  nothing leaks to the client. The admin gig removal doesn't use a
+  database transaction, so its audit entry is written straight after the
+  removal succeeds.
+- **`GET /api/admin/audit-logs`** (admin only, through the existing
+  router-level guard):
+  - paginated like the transactions list (default 20, max 50)
+  - optional `action` filter, validated against the enum
+  - `checkExact`, so any other query parameter is a `400`
+  - actors shown by name and id only.
+- **The admin "Audit log" page** (`/admin/audit-log`) has a table, an
+  action filter and paging, in the same style as Users and Transactions.
+
+**Files:** `api/src/models/AuditLog.js`, `api/src/utils/audit.js`,
+`api/src/controllers/adminController.js`, `api/src/middleware/adminValidators.js`,
+`api/src/routes/adminRoutes.js`, `client/src/pages/AdminAuditLog.jsx`.
+
+**Tests:**
+- Unit: `auditLog.test.js` (every append-only guard, the whitelist and the
+  indexes), `audit.test.js` (a failed write is logged and never throws,
+  without the raw error) and `adminValidators.test.js`.
+- Newman, with admin credentials, finds each entry:
+  - after the password change, the logout-all and the lockout (with
+    `{ failedAttempts: 5, lockMinutes: 15 }`)
+  - after the admin gig deletion.
+- Newman also checks `403` for clients and freelancers, `401` with no token,
+  and `400` for a bad `action` or an unknown parameter.
+- Vitest: `AdminAuditLog.test.jsx` and `Layout.test.jsx` (who sees which
+  link).
+
+**Limitations.** Append-only is enforced by the application. Someone with
+direct database access could still change entries; a real deployment
+would add a database user without update and delete rights, or ship the
+entries to write-once storage. Entries are kept forever, with no retention
+policy.
+
 ## 13. Docker
 
 How to start the stack is in [Getting started, B](#b-docker-compose). This
@@ -1004,293 +1467,10 @@ backtick instead of `\`). If port 5000 is already taken, for example by
 | The browser shows an old version after a rebuild | Hard refresh (Ctrl+F5). `index.html` is never cached, but the browser may keep an old tab |
 | `429 Too many requests` from the smoke test | It registers a user each run (limit 10 per hour per IP). Wait, run `docker compose restart api` (limits are in memory), or use the test override |
 
-## 7. Troubleshooting
+## 14. Logging and monitoring
 
-The problems below all came up while building and testing this project.
-
-| Problem | Cause | Fix |
-|---|---|---|
-| The API exits with `MongoDB connection failed {"errorName":"Error","code":"ECONNREFUSED"}`, and the SRV lookup (`querySrv ECONNREFUSED`) fails, although Atlas is reachable | On some Windows networks Node can't resolve the DNS SRV record that a `mongodb+srv://` string needs | Use the **standard, non-SRV** connection string: in Atlas, Connect → Drivers, choose the older driver version / "Legacy URI String" option, which gives `mongodb://host1:27017,host2:27017,host3:27017/hustlehub?replicaSet=...&ssl=true&authSource=admin`. Add `/hustlehub` as the database name and put it in `MONGO_URI` |
-| The API exits with `MongoDB connection failed` (other codes) | Wrong user or password, or your IP isn't allowed | Check the database user and password, and add your current IP under Atlas **Network Access** |
-| The API logs `No SSL certificate found in api/certs - falling back to plain HTTP`; the client shows errors and Vite logs `EPROTO ... wrong version number` (`502`); Newman fails | `api/certs/key.pem` and `cert.pem` don't exist, so the API runs on HTTP while the proxy and Postman expect HTTPS | Run `npm run certs` in `api/` and restart the API |
-| Every save, login or booking in the browser fails with **"Origin not allowed"** (`403`) | The client isn't on `http://localhost:5173`, the only origin `CLIENT_ORIGIN` allows (for example, preview or dev ended up on another port) | Run the client on port 5173 (both `npm run dev` and `npm run preview` use it), keep `CLIENT_ORIGIN=http://localhost:5173` with no trailing slash, and use `http://localhost:5173`, not `127.0.0.1` |
-| `Port 5173 is already in use` (Vite) | Another dev or preview server is running. Both refuse to switch ports, because any other port would fail CORS | Stop the other one (Ctrl+C in its terminal) and start again |
-| `EADDRINUSE: address already in use :::5000` (API) | Another copy of the API is still running | Stop it. To find it: Windows `netstat -ano \| findstr :5000` then `taskkill /PID <pid> /F`; macOS/Linux `lsof -i :5000`. Don't just change `PORT`: the client proxy and the Postman collections expect 5000 |
-| `429 Too many requests, please try again in N seconds` while testing repeatedly | The strict limits are working (5 failed logins per 15 min, 10 registrations per hour, 10 bookings per 10 min) | Start the API with `npm run start:test` (relaxed limits, refused in production) for repeated manual or Newman testing. The counters live in memory, so restarting the API also clears them |
-| Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the transaction that writes the booking and its transaction record together | Use Atlas, or run the local MongoDB as a single-node replica set (see **Getting a MONGO_URI**) |
-
-## 10. Security
-
-Security is layered: every request passes through several independent
-checks, so a gap in one is caught by another.
-
-**All authentication, authorisation and ownership checks are enforced by the
-API.** Every rule (who is logged in, which role may call a route, who owns a
-gig or a booking, which fields a request may set) is checked by the server on
-every request. The React client only hides what a user can't use: hiding a
-button or a page is a convenience, not security, and calling the API
-directly with Postman or curl gets exactly the same `401`/`403`/`400`
-responses.
-
-### Route audit
-
-Every route and its middleware, read from the running Express app. Every
-request also passes the global pipeline first (Helmet, CORS, the general
-rate limit, body parsing with a 10kb cap, the NoSQL sanitiser).
-
-| Method | Route | Middleware, in order | Who |
-|---|---|---|---|
-| GET | `/api/health` | - | Anyone |
-| POST | `/api/auth/register` | registerLimiter → validators (role only client/freelancer) | Anyone |
-| POST | `/api/auth/login` | loginLimiter → validators | Anyone |
-| GET | `/api/auth/me` | protect | Logged in |
-| POST | `/api/auth/change-password` | protect → passwordChangeLimiter (per user) → validators (exact fields) | Logged in (own account only) |
-| POST | `/api/auth/logout-all` | protect → validators (empty body) | Logged in (own account only) |
-| GET | `/api/admin/users` | protect → requireRole(admin) | Admin |
-| GET | `/api/admin/transactions` | protect → requireRole(admin) → pagination validators | Admin |
-| DELETE | `/api/admin/gigs/:id` | protect → requireRole(admin) → validateObjectId | Admin |
-| GET | `/api/admin/audit-logs` | protect → requireRole(admin) → query validators (exact params) | Admin |
-| GET | `/api/gigs` | protect → query validators (exact params) | Logged in |
-| GET | `/api/gigs/mine` | protect → requireRole(freelancer) | Freelancer (own gigs only, by query) |
-| GET | `/api/gigs/:id` | protect → validateObjectId (+ inactive gigs only for the owner, in the controller) | Logged in |
-| POST | `/api/gigs` | protect → requireRole(freelancer) → body validators (exact fields) | Freelancer (owner = token user) |
-| PUT | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** → body validators | Owner only |
-| DELETE | `/api/gigs/:id` | protect → requireRole(freelancer) → validateObjectId → **requireOwnership** | Owner only |
-| POST | `/api/bookings` | protect → requireRole(client) → bookingLimiter (per user) → validators (gigId only) | Client |
-| GET | `/api/bookings/mine` | protect → requireRole(client, freelancer) | Own bookings only, by query |
-| GET | `/api/bookings/:id` | protect → validateObjectId → **requireOwnership** (client or freelancer) | The booking's two parties |
-| GET | `/api/transactions/mine` | protect → requireRole(client, freelancer) | Own transactions only, by query |
-| GET | `/api/income` | protect → requireRole(freelancer) | Own income only, by query |
-| GET | `/api/income/tax-estimate` | protect → requireRole(freelancer) → validators (`taxYear` only, checkExact) | Own income only, by query |
-
-Every route except health, register and login requires a valid JWT; every
-role-restricted route uses `requireRole`; every route that reads or changes
-one specific gig or booking validates the id and checks ownership (or, for
-reading a gig, that it is active or yours). The "mine" routes never take an
-id from the request: they filter by `req.user.id`.
-
-### Authentication and passwords
-
-Registration (`POST /api/auth/register`) accepts a name, email, and
-password. Before anything is stored, the password is hashed using
-**bcryptjs** with a salt round factor of 10, so the plain-text password is
-never written to storage, logged, or included in any API response. Login
-(`POST /api/auth/login`) re-hashes the submitted password using the same
-algorithm and compares it against the stored hash; the two are never
-compared as plain text.
-
-We chose `bcryptjs` (a pure JavaScript implementation) over the native
-`bcrypt` package specifically to avoid `bcrypt`'s native-compilation
-dependency chain, which pulled in several high/critical npm audit
-vulnerabilities in build tooling unrelated to our own code. `bcryptjs`
-exposes an identical API (`hash()`, `compare()`) with no native build step,
-which also simplifies setup for every team member regardless of OS.
-
-Duplicate registrations are rejected with a generic `409` response, and
-failed logins (wrong password or unknown email) both return the same
-generic `"Invalid email or password"` message and status code. This is
-deliberate: distinguishing between "wrong password" and "no such account"
-would let an attacker enumerate valid registered emails.
-
-Passwords are hashed with **bcryptjs** (10 salt rounds) and never stored,
-logged or returned. The hash field is excluded from every query by default.
-Login always runs a bcrypt comparison, against a dummy hash when the email
-doesn't exist, so an unknown email takes as long as a wrong password and
-response times can't be used to find valid accounts. Both cases return the
-same `401 Invalid email or password`.
-
-### JWT and roles
-
-On successful registration or login, the API issues a JSON Web Token
-containing only the user's `id` and `role` in its payload, never the
-password hash or other sensitive fields, since a JWT payload is signed but
-not encrypted and can be decoded by anyone holding the token.
-
-Every route except the health check, register and login is wrapped in a
-`protect` middleware that:
-
-1. Reads the token from the `Authorization: Bearer <token>` header
-2. Verifies its signature against `JWT_SECRET`
-3. Loads the user from the database, confirming they still exist and
-   taking their role from the database rather than the token
-4. Attaches the authenticated user to `req.user` for the controller to use
-
-Missing, expired, or tampered tokens all return the same generic `401`
-response. The JWT secret is read from an environment variable
-(`process.env.JWT_SECRET`) and is never hard-coded in source or committed
-to the repository.
-
-A deleted user's token stops working straight away, because `protect` loads the user on every request.
-
-### RBAC and ownership
-
-- `requireRole(...)` restricts each route to the roles in the API table.
-  A wrong role gets a generic `403` that doesn't say which role was needed.
-- `requireOwnership(...)` loads the record and checks the logged-in user
-  owns it (a gig's freelancer; a booking's client or freelancer), comparing
-  against the user from the token and database, never an id from the request.
-  Missing records are `404`, someone else's are `403`.
-- Price, freelancer, client and status on a booking always come from the
-  database and the token, never the request.
-- Admins can't self-register; the one admin account is created by
-  `npm run seed:admin`.
-
-### Validation and sanitising
-
-- **Validation (express-validator).** Every route that accepts input has a
-  rule set. Types are checked with `typeof` (so an array or object can't
-  slip through as a string), lengths and ranges are enforced, categories and
-  roles come from fixed lists, and ids must be exactly 24 hex characters.
-  Unknown fields are rejected with a `400` rather than ignored, so a
-  request can't set `freelancer`, `price`, `role` or `isActive` by adding
-  them to the body.
-- **HTML escaping.** Every free-text field that other users see (gig title,
-  description and category, and the user's name) is trimmed and
-  HTML-escaped before it's saved, so `<script>` is stored as
-  `&lt;script&gt;` and can't run in a browser.
-- **NoSQL operator stripping.** A global middleware (express-mongo-sanitize)
-  removes any key starting with `$` or containing `.` from the body, query
-  string and route params before any route runs, so `{ "$gt": "" }` can
-  never reach a Mongoose query. This is defence in depth on top of the
-  validators, which already reject such input.
-- **Search** text is escaped before it's used in a regex, so `.*` matches
-  only the literal text `.*`.
-- **Body limits.** Request bodies are capped at 10kb (`413`), and malformed
-  JSON gets a clear `400`.
-
-### Error handling
-
-Invalid input is rejected with a `400` that lists the validation failures,
-before any controller or database code runs.
-
-All errors (validation failures, authentication failures, or unexpected
-exceptions) pass through a single centralised error handler
-(`middleware/errorHandler.js`). This handler:
-
-- Logs the error to the server console only (stack traces only for
-  unexpected errors, and never in production)
-- Returns a generic, safe message to the client for any non-operational
-  (unexpected) error
-- Never includes a stack trace, file path, or configuration value in any
-  client-facing response
-
-Every error has the same shape, `{ "success": false, "error": "<message>" }`.
-Real responses from the running API:
-
-| Situation | Status | `error` message |
-|---|---|---|
-| Unknown route (`GET /api/nope?token=abc`) | `404` | `Route not found: GET /api/nope` (the query string is never echoed back) |
-| Malformed id (`GET /api/gigs/not-an-id`) | `400` | `Invalid id` |
-| Gig that doesn't exist | `404` | `Gig not found` |
-| No token / tampered token | `401` | `Not authenticated - no token provided` / `Not authenticated - invalid or expired token` |
-| Wrong password **or** unknown email | `401` | `Invalid email or password` (identical for both) |
-| Client calling an admin route | `403` | `You do not have permission to perform this action` (doesn't say which role is needed) |
-| Malformed JSON body | `400` | `Request body is not valid JSON` |
-| Body over 10kb | `413` | `Request body is too large` |
-| Request from another origin | `403` | `Origin not allowed` |
-| Operator object in the login email | `400` | `Must be a valid email address` |
-| 6th failed login in 15 minutes | `429` | `Too many requests, please try again in 899 seconds.` |
-| Any unexpected server error | `500` | `Something went wrong. Please try again later.` |
-
-The full error, with its stack trace in development only, goes to the
-server log, never to the client.
-
-### Rate limiting
-
-| Limiter | Applies to | Limit | Counted per |
-|---|---|---|---|
-| Login | `POST /api/auth/login` | 5 **failed** attempts per 15 minutes (successful logins don't count) | IP |
-| Register | `POST /api/auth/register` | 10 per hour | IP |
-| Booking | `POST /api/bookings` | 10 per 10 minutes | Logged-in user (IP if none) |
-| General | Everything under `/api` | 100 per 15 minutes | IP |
-
-Going over a limit returns `429` with a `Retry-After` header and
-`{ "success": false, "error": "Too many requests, please try again in N seconds." }`.
-The standard `RateLimit` and `RateLimit-Policy` headers are sent; the legacy
-`X-RateLimit-*` headers are off. Every hit is logged with the limiter name
-and IP.
-
-For local testing, each limit's max can be raised with `RATE_LIMIT_LOGIN_MAX`,
-`RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_BOOKING_MAX` and
-`RATE_LIMIT_GENERAL_MAX` (`npm run start:test` does this). These overrides are
-**ignored when `NODE_ENV` is `production`**, so the strict values above
-always apply in a deployed API.
-
-### Security headers (Helmet)
-
-Helmet is configured explicitly. The API's Content-Security-Policy is built
-from scratch, with no `unsafe-inline` or `unsafe-eval` anywhere:
-
-| Directive | Value |
-|---|---|
-| `default-src` | `'self'` |
-| `script-src` | `'self'` |
-| `style-src` | `'self'` |
-| `img-src` | `'self' data:` |
-| `connect-src` | `'self'` and `CLIENT_ORIGIN` |
-| `object-src` | `'none'` |
-| `frame-ancestors` | `'none'` |
-| `base-uri` | `'self'` |
-| `form-action` | `'self'` |
-
-Also set: `Strict-Transport-Security` (1 year, including subdomains),
-`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
-`X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`,
-`Cross-Origin-Resource-Policy: same-origin` and
-`Cross-Origin-Embedder-Policy: require-corp`. `X-Powered-By` is removed.
-
-### Client Content-Security-Policy
-
-The built React app has its own CSP, again with no `unsafe-inline` or
-`unsafe-eval`:
-
-```
-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
-connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'
-```
-
-- **Built app:** a small Vite plugin (`client/vite.config.js`) adds it to
-  `dist/index.html` as a `<meta http-equiv="Content-Security-Policy">` tag at
-  build time. The build produces one script file and one stylesheet, both
-  same-origin, with no inline scripts, inline styles or event handler
-  attributes, so nothing has to be loosened. The app also never uses inline
-  `style` attributes, and all API calls go to the same origin (`/api`).
-- **`npm run preview`:** serves the same policy as a real response header,
-  plus `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`,
-  `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY`.
-  `frame-ancestors` only works as a header - browsers ignore it in a meta
-  tag - which is why it's only in the preview headers. A production host
-  should send the same headers.
-- **`npm run dev` has no CSP on purpose.** The Vite dev server injects inline
-  scripts for hot module reloading, which this policy would (correctly) block.
-  Use `npm run build` + `npm run preview` to see the app under the real policy.
-
-### CORS
-
-CORS is locked to the single origin in `CLIENT_ORIGIN`, never a wildcard.
-Only `GET`, `POST`, `PUT` and `DELETE` and only the `Authorization` and
-`Content-Type` headers are allowed. A request or preflight from any other
-origin gets a generic `403 Origin not allowed` with no
-`Access-Control-Allow-Origin` header, and is logged. Requests with no
-`Origin` header (Postman, curl, server-to-server) aren't cross-origin
-browser requests, so CORS doesn't apply to them.
-
-### HTTPS
-
-The API is served over HTTPS using a locally generated, self-signed SSL
-certificate (`api/certs/cert.pem`, `api/certs/key.pem`). `server.js` reads these
-files and starts an `https` server rather than plain `http`. See
-`api/certs/README.md` for exact instructions to regenerate the certificate,
-since certificate/key files are excluded from git via `.gitignore` and must
-be generated locally by anyone cloning the repository. HTTPS matters even
-in local development because it's the same code path that will run in
-production; testing over plain HTTP would hide any issues specific to a
-TLS connection.
-
-### Logging and monitoring
-
-**Why we log.** The security controls in this section (the lockout, rate
-limits, RBAC, ownership checks, validation) block attacks one request at a
+**Why we log.** The security controls in [section 8](#8-security-implementation)
+(the lockout, rate limits, RBAC, ownership checks, validation) block attacks one request at a
 time. Logging lets us see the pattern behind those requests: one IP
 guessing passwords, one account under attack, a user trying other people's
 records, a spike in errors. It also shows whether each control actually
@@ -1299,7 +1479,7 @@ business event and one access line for every request. It then ships them
 to a cloud logging platform (**Axiom**), where they can be searched,
 charted and turned into email alerts.
 
-#### How it works
+### How it works
 
 - **One logger.** Every log line goes through `api/src/utils/logger.js`
   (`logger.info/warn/error`, and `logger.event(NAME, message, fields)` for
@@ -1328,7 +1508,7 @@ charted and turned into email alerts.
   first. The shipper then prints its own counts (`Cloud log shipping
   summary`), to the console only.
 
-#### Event catalogue
+### Event catalogue
 
 The names are stable (`api/src/utils/logEvents.js`), because the saved
 queries and monitors search for them. A unit test checks that every
@@ -1362,7 +1542,7 @@ queries and monitors search for them. A unit test checks that every
 Real examples of every one, as they arrived at the receiver, are in
 [`docs/logging-evidence/sample-events.jsonl`](docs/logging-evidence/sample-events.jsonl).
 
-#### Request-id correlation
+### Request-id correlation
 
 Every request gets a new id from `crypto.randomUUID()`. It is returned in
 the `X-Request-Id` response header and stored in an `AsyncLocalStorage`
@@ -1380,7 +1560,7 @@ tab, pasted into Axiom (query 7 in
 [`axiom-queries.md`](docs/logging-evidence/axiom-queries.md)), shows
 everything that happened in that request, in order.
 
-#### Redaction rules
+### Redaction rules
 
 One scrubber (`api/src/utils/redact.js`) cleans every record **before**
 it is printed and **before** it is shipped:
@@ -1407,7 +1587,7 @@ On top of that, the code never passes passwords, tokens, request bodies,
 headers or query strings to the logger in the first place.
 `api/test/redact.test.js` has a unit test for each rule.
 
-#### How logs reach Axiom
+### How logs reach Axiom
 
 ```mermaid
 flowchart LR
@@ -1445,7 +1625,7 @@ so it adds no new dependencies:
 - **Accounting.** It tracks the records `sent`, `ingested` and `failed`
   (from Axiom's reply), and `dropped` and `lost`.
 
-#### Configuration
+### Configuration
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -1474,7 +1654,7 @@ and `failed` counts, never the URL or the token. A 401 or 403 means the
 token is wrong or can't write to the dataset. A 404 means the dataset
 name or the domain is wrong.
 
-#### Setting up Axiom (free Personal plan)
+### Setting up Axiom (free Personal plan)
 
 1. Sign up at axiom.co on the free **Personal** plan. It keeps data for
    30 days and allows 3 monitors and email notifiers.
@@ -1501,7 +1681,7 @@ name or the domain is wrong.
 If the token is ever exposed, regenerate it in Settings > API tokens and
 update both `.env` files.
 
-#### Personal data, retention and POPIA
+### Personal data, retention and POPIA
 
 What reaches Axiom, and why:
 
@@ -1542,7 +1722,7 @@ would also need:
   Africa (section 72), because the dataset is hosted in the US
 - a process for reporting a security compromise (section 22)
 
-#### Do the controls work? What the logs show
+### Do the controls work? What the logs show
 
 | Control | Evidence in the logs | Axiom query |
 |---|---|---|
@@ -1574,288 +1754,20 @@ and a smaller set was shipped to the real Axiom dataset
 - **Thresholds.** The monitor thresholds are guesses for a small project.
   They should be tuned against real traffic.
 
-### Dependency audit
+## 7. Troubleshooting
 
-Results of `npm audit` at submission time:
+The problems below all came up while building and testing this project.
 
-| Project | `npm audit --omit=dev` (what ships) | `npm audit` (including dev tools) |
+| Problem | Cause | Fix |
 |---|---|---|
-| `api/` | **0 vulnerabilities** | 3 high - all `braces`, dev-only (see below) |
-| `client/` | **0 vulnerabilities** | **0 vulnerabilities** |
-
-**Known and accepted:** the three `api/` findings are one issue in `braces`,
-reached only through `nodemon` → `chokidar` → `braces`. nodemon is a
-development tool that watches files and restarts the server; it never runs
-in a deployed API and never handles requests. The only available fix
-(`npm audit fix --force`) downgrades nodemon to 1.x, which is a breaking
-change, so this is accepted for now. Newman is run with `npx` instead of
-being a dependency, because its own dependency tree adds about 19 more
-dev-only findings.
-
-### JWT in localStorage: the trade-off
-
-The React client keeps the JWT in `localStorage`, which is acceptable
-for this POE but has a known risk: **any script running on the page can read
-`localStorage`**, so a single XSS bug would let an attacker steal the token
-and act as the user until it expires. An `httpOnly` cookie would hide the
-token from scripts, but brings CSRF protection and cookie configuration
-with it.
-
-The risk is reduced by:
-
-- **Escaping on the way in:** all user-supplied text is HTML-escaped
-  before it's stored.
-- **React's default escaping on the way out:** JSX escapes values when it
-  renders them, and the client never uses `dangerouslySetInnerHTML` or builds
-  HTML strings (checked by a test with an `<img onerror>` title).
-- **A strict CSP on the client and the API:** `script-src 'self'` with no
-  `unsafe-inline` or `unsafe-eval` blocks injected inline scripts and scripts
-  from other origins, even if markup did get in.
-- **Short-lived tokens:** tokens expire after 1 hour (`JWT_EXPIRES_IN`).
-- **The role isn't trusted from the token:** a stolen token can't be used to
-  gain more rights than the user already has.
-
-### Security review summary
-
-| Concern | How it's addressed |
-|---|---|
-| Plain-text password storage | Never stored: hashed with bcryptjs before persisting |
-| Credential stuffing / enumeration | Identical generic error and timing for wrong password, unknown email and locked account; failed logins rate limited (5 per 15 min per IP) and accounts locked after 5 failures in 15 min (see **Extra security features**) |
-| Unauthorised access to protected routes | JWT required and verified on every protected request |
-| Token tampering | Signature verification via `JWT_SECRET`; invalid signatures rejected |
-| Stolen or leaked session token | Token versions: changing the password or signing out of all devices ends every older token |
-| Unreviewable admin and security actions | Append-only audit log of admin gig removals, password changes, sign-outs and lockouts, visible to admins |
-| Injection / malformed input | express-validator rejects invalid input and unknown fields; global middleware strips `$` and `.` keys |
-| Cross-site scripting | Text fields HTML-escaped before saving; strict CSP with no `unsafe-inline` |
-| Privilege escalation / IDOR | Role read from the database on every request; RBAC on every route; ownership checks on gigs and bookings |
-| Brute force and abuse | Rate limits on login, register and booking, plus a general limit across the API |
-| Cross-origin abuse | CORS locked to `CLIENT_ORIGIN`; other origins get a `403` and no CORS headers |
-| Clickjacking and MIME sniffing | `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` |
-| Information leakage via errors | Centralised error handler strips stack traces/internals from all client responses |
-| Data interception in transit | API served over HTTPS, even in local development |
-
-### Extra security features
-
-Three features added on top of the core security controls above. Each one
-can be seen in the app and is covered by unit, Newman and (where there is a
-UI) Vitest tests.
-
-#### A. Account lockout
-
-**Threat.** Slow password guessing against **one** account from **many** IP
-addresses (a botnet, or credential stuffing spread out over time). The
-per-IP login limiter can't see this, because every IP only tries a few
-times.
-
-**How it works.**
-- **Policy:** 5 failed attempts within 15 minutes lock the account for 15
-  minutes. Failures older than the window don't count, and a successful
-  login resets everything. The policy lives in
-  [`api/src/config/lockout.js`](api/src/config/lockout.js).
-  `LOCKOUT_MAX_ATTEMPTS`, `LOCKOUT_WINDOW_MINUTES` and
-  `LOCKOUT_DURATION_MINUTES` can change it for local testing only; they are
-  ignored when `NODE_ENV=production`, like the rate limit overrides.
-- **State:** `failedLoginAttempts`, `firstFailedLoginAt` (the start of the
-  window), `lastFailedLoginAt` and `lockUntil` on the user. They are
-  `select: false`, removed by `toJSON` from every response, and never put
-  in the JWT. Accounts created before this feature simply don't have them,
-  which counts as "no failures", so no migration is needed.
-- **Atomic counting:** every attempt on an existing account first *claims*
-  an attempt with one `findOneAndUpdate`. It only matches an unlocked
-  account and uses an update pipeline to count the attempt (or start a new
-  window) and set `lockUntil` on the attempt that reaches the limit, all
-  inside the database. The password is only checked after a successful
-  claim. With 10 wrong passwords sent in parallel against a fresh account,
-  exactly 5 were checked, 5 were refused unchecked, and the account locked
-  once.
-- **No enumeration, by message or by timing:** a locked account never has
-  its real password checked. A bcrypt compare against a dummy hash runs
-  instead, exactly as it does for an unknown email. A wrong password, an
-  unknown email and a locked account all return the **same** `401`
-  `{"success":false,"error":"Invalid email or password"}`, byte for byte,
-  and take about the same time.
-- **Logging:** the lockout is logged as an `AUTH_LOCKOUT` event with the
-  user id only (never the email or password) and written to the audit log.
-  Later attempts on the locked account are `AUTH_LOGIN_FAILURE` with the
-  internal reason `locked`.
-
-**Two layers, two different threats.**
-
-| Layer | Protects against | Limit |
-|---|---|---|
-| Per-IP login rate limiter | One IP bursting through passwords (one account or many) | 5 failed logins per 15 min per IP, then `429` |
-| Account lockout | Many IPs slowly guessing one account | 5 failed attempts per 15 min per account, then locked 15 min |
-
-Both are kept. They trip at the same count, so from a single IP with the
-strict limits the 6th attempt gets the limiter's `429` before the lock
-would show. To demonstrate the lock, run the API with
-`npm run start:test`, which relaxes the per-IP limiter but keeps the
-lockout strict. The Newman lockout requests run that way.
-
-**The trade-off.** Anyone who knows an email address can lock that account
-on purpose for 15 minutes by typing wrong passwords (a small denial of
-service). That is why the lock is short and lifts by itself, with no admin
-needed: it makes online guessing roughly 5 tries per 15 minutes per account
-(about 480 a day instead of thousands a second), while a deliberately
-locked-out user only waits 15 minutes. A permanent lock or a manual unlock
-would hand that attacker a much stronger weapon.
-
-**Files:** `api/src/config/lockout.js`, `api/src/utils/lockout.js` (pure
-decision logic and the atomic update), `api/src/utils/accountLockout.js`
-(the password check used by login and change-password),
-`api/src/controllers/authController.js`, `api/src/models/User.js`.
-
-**Tests:**
-- `api/test/lockout.test.js`: 15 unit tests with a fixed clock, covering
-  the window, expiry, reset on success, slow guessing and policy overrides.
-- `api/test/userModel.test.js`: the fields never reach JSON.
-- Newman **Account security**: a throwaway user, five wrong passwords, then
-  the **correct** password is still rejected with exactly the same body as
-  an unknown email.
-
-**Limitations.** Counters live on the user document, so they are shared by
-every API instance (unlike the in-memory rate limits). There is no
-CAPTCHA or "unlock by email" step; the lock simply expires.
-
-#### B. Change password and session revocation
-
-**Threat.** A stolen or leaked token stays valid until it expires, and
-before this feature nobody could change a password at all. A user who
-suspected their account was compromised had no way to lock the attacker
-out.
-
-**How it works.**
-- **Token versions:** every user has a `tokenVersion` (default 0), and
-  every JWT carries it as `tv`. `protect` loads the user's current version
-  on each request and rejects any token whose version doesn't match with
-  the usual `401`. Tokens issued before this feature have no `tv`, and
-  that counts as 0, so existing sessions and existing accounts (including
-  the seeded admin) keep working with no migration.
-- **`POST /api/auth/change-password`** with `{ currentPassword,
-  newPassword }`:
-  - `checkExact`, so any other field is a `400`, plus strict `typeof`
-    checks.
-  - The new password follows the registration rules (8+ characters, a
-    number) and must differ from the current one.
-  - **At most 72 bytes:** bcrypt silently ignores everything after 72
-    bytes. Registration now enforces this too, in bytes, so an emoji counts
-    as 4.
-  - The current password is checked through the same lockout as login, so
-    wrong current passwords count towards locking the account.
-  - The new hash is saved with the shared helper and `tokenVersion` is
-    incremented in the same update. The response carries a fresh token, so
-    this session continues and every other session ends.
-  - Rate limited to 5 per 15 minutes per user.
-- **Wrong current password is a `400`, not a `401`.** The client treats a
-  `401` as "session gone" and logs the user out, so a typo here must not
-  return one. A locked account gets the same `400` and the same message.
-- **`POST /api/auth/logout-all`** increments `tokenVersion`, so every token,
-  the current one included, stops working at once.
-- Both routes use `protect` and only ever act on the logged-in user. Both
-  are logged (`AUTH_PASSWORD_CHANGED`, `AUTH_LOGOUT_ALL`) and written to
-  the audit log.
-- **The Account page** (`/account`, in the nav for every role) has the
-  change-password form:
-  - inline validation and `autocomplete="current-password"` /
-    `"new-password"`
-  - the stored token is replaced on success
-  - clear success and generic error messages
-  - the inputs are uncontrolled, so passwords never sit in React state, and
-    the form is cleared after a change.
-
-  It also has a **Sign out of all devices** button with a confirmation step;
-  afterwards the login page says so.
-- This also removes an old limitation: the seeded admin password could
-  only be changed by editing the database. Now an admin changes it on the
-  Account page like anyone else.
-
-While building this, the login validator also got a `typeof` check. An
-array sent as the password used to reach bcrypt and fail with a `500`; it
-is now a `400`.
-
-**Files:** `api/src/utils/generateToken.js` (`tv` in the token),
-`api/src/middleware/authMiddleware.js`, `api/src/controllers/authController.js`,
-`api/src/routes/authRoutes.js`, `api/src/middleware/validators.js`,
-`client/src/pages/Account.jsx`, `client/src/context/AuthProvider.jsx`.
-
-**Tests:**
-- Unit: `tokenVersion.test.js` (token payload, missing `tv` counts as 0)
-  and `authValidators.test.js` (field rules, unknown fields, the 72-byte
-  limit counted in bytes).
-- Newman **Account security**:
-  - every validation failure is a `400`, and no token is a `401`
-  - a wrong current password is a `400` and the session survives it
-  - after a change, the **old** token gets `401` and the **new** one works
-  - the old password no longer logs in and the new one does
-  - after logout-all, the current and the earlier tokens are both `401`.
-- The smoke test checks the change through the Docker stack.
-- Vitest `Account.test.jsx` covers validation, success, the `400` error
-  (no logout), the generic `500` message and the confirmation step.
-
-**Limitations.** Every protected request already reads the user from the
-database (for the role), so checking the version costs nothing extra. There
-is no list of individual sessions, so you can sign out everywhere but not
-one specific device. Changing a password doesn't email the user.
-
-#### C. Admin audit log
-
-**Threat.** Without a record, an admin's destructive actions and the
-security events on accounts (lockouts, password changes, sign-outs) can't
-be reviewed afterwards, so abuse or an account takeover goes unnoticed.
-Logs alone are easy to lose and not visible in the app.
-
-**How it works.**
-- **Model:** a new `AuditLog` model ([`api/src/models/AuditLog.js`](api/src/models/AuditLog.js))
-  stores `actorId`, `actorRole`, `action` (an enum), `targetType`,
-  `targetId`, `outcome`, `ip`, `createdAt` and a small whitelisted `meta`
-  object (`failedAttempts`, `lockMinutes`, `hadBookings`).
-  - `strict: 'throw'` refuses any other field.
-  - It never stores passwords, tokens, emails or request bodies.
-  - Indexes: `createdAt` descending, and `action` + `createdAt`.
-- **Append-only:** there is no route that updates or deletes entries, and
-  the model throws on every update, replace and delete operation
-  (`updateOne`, `findOneAndUpdate`, `deleteMany`, `bulkWrite`, re-saving a
-  loaded entry, ...) before anything reaches the database.
-- **What is recorded:** admin gig deletion and deactivation, password
-  changed, sign out of all devices, and account locked.
-- **Failure handling** ([`api/src/utils/audit.js`](api/src/utils/audit.js)):
-  if an audit record can't be written, the failure is logged as an `ERROR`
-  event (action and error type only, never the entry or the raw error
-  message) and the request carries on. It isn't failed or undone, and
-  nothing leaks to the client. The admin gig removal doesn't use a
-  database transaction, so its audit entry is written straight after the
-  removal succeeds.
-- **`GET /api/admin/audit-logs`** (admin only, through the existing
-  router-level guard):
-  - paginated like the transactions list (default 20, max 50)
-  - optional `action` filter, validated against the enum
-  - `checkExact`, so any other query parameter is a `400`
-  - actors shown by name and id only.
-- **The admin "Audit log" page** (`/admin/audit-log`) has a table, an
-  action filter and paging, in the same style as Users and Transactions.
-
-**Files:** `api/src/models/AuditLog.js`, `api/src/utils/audit.js`,
-`api/src/controllers/adminController.js`, `api/src/middleware/adminValidators.js`,
-`api/src/routes/adminRoutes.js`, `client/src/pages/AdminAuditLog.jsx`.
-
-**Tests:**
-- Unit: `auditLog.test.js` (every append-only guard, the whitelist and the
-  indexes), `audit.test.js` (a failed write is logged and never throws,
-  without the raw error) and `adminValidators.test.js`.
-- Newman, with admin credentials, finds each entry:
-  - after the password change, the logout-all and the lockout (with
-    `{ failedAttempts: 5, lockMinutes: 15 }`)
-  - after the admin gig deletion.
-- Newman also checks `403` for clients and freelancers, `401` with no token,
-  and `400` for a bad `action` or an unknown parameter.
-- Vitest: `AdminAuditLog.test.jsx` and `Layout.test.jsx` (who sees which
-  link).
-
-**Limitations.** Append-only is enforced by the application. Someone with
-direct database access could still change entries; a real deployment
-would add a database user without update and delete rights, or ship the
-entries to write-once storage. Entries are kept forever, with no retention
-policy.
+| The API exits with `MongoDB connection failed {"errorName":"Error","code":"ECONNREFUSED"}`, and the SRV lookup (`querySrv ECONNREFUSED`) fails, although Atlas is reachable | On some Windows networks Node can't resolve the DNS SRV record that a `mongodb+srv://` string needs | Use the **standard, non-SRV** connection string: in Atlas, Connect → Drivers, choose the older driver version / "Legacy URI String" option, which gives `mongodb://host1:27017,host2:27017,host3:27017/hustlehub?replicaSet=...&ssl=true&authSource=admin`. Add `/hustlehub` as the database name and put it in `MONGO_URI` |
+| The API exits with `MongoDB connection failed` (other codes) | Wrong user or password, or your IP isn't allowed | Check the database user and password, and add your current IP under Atlas **Network Access** |
+| The API logs `No SSL certificate found in api/certs - falling back to plain HTTP`; the client shows errors and Vite logs `EPROTO ... wrong version number` (`502`); Newman fails | `api/certs/key.pem` and `cert.pem` don't exist, so the API runs on HTTP while the proxy and Postman expect HTTPS | Run `npm run certs` in `api/` and restart the API |
+| Every save, login or booking in the browser fails with **"Origin not allowed"** (`403`) | The client isn't on `http://localhost:5173`, the only origin `CLIENT_ORIGIN` allows (for example, preview or dev ended up on another port) | Run the client on port 5173 (both `npm run dev` and `npm run preview` use it), keep `CLIENT_ORIGIN=http://localhost:5173` with no trailing slash, and use `http://localhost:5173`, not `127.0.0.1` |
+| `Port 5173 is already in use` (Vite) | Another dev or preview server is running. Both refuse to switch ports, because any other port would fail CORS | Stop the other one (Ctrl+C in its terminal) and start again |
+| `EADDRINUSE: address already in use :::5000` (API) | Another copy of the API is still running | Stop it. To find it: Windows `netstat -ano \| findstr :5000` then `taskkill /PID <pid> /F`; macOS/Linux `lsof -i :5000`. Don't just change `PORT`: the client proxy and the Postman collections expect 5000 |
+| `429 Too many requests, please try again in N seconds` while testing repeatedly | The strict limits are working (5 failed logins per 15 min, 10 registrations per hour, 10 bookings per 10 min) | Start the API with `npm run start:test` (relaxed limits, refused in production) for repeated manual or Newman testing. The counters live in memory, so restarting the API also clears them |
+| Bookings fail with a `500` on a local MongoDB | A standalone MongoDB doesn't support the transaction that writes the booking and its transaction record together | Use Atlas, or run the local MongoDB as a single-node replica set (see **Getting a MONGO_URI**) |
 
 ## 11. Testing
 
