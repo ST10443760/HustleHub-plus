@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/EMKNDW/insy7314-g2-2026-insy7314-2026-poe-st10443760/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/EMKNDW/insy7314-g2-2026-insy7314-2026-poe-st10443760/actions/workflows/ci.yml)
 
+**Part 3 demonstration video:** https://youtu.be/rdra1YC_wak
+
 HustleHub+ is a secure freelance marketplace. Freelancers advertise gigs,
 clients browse and book them, every booking creates a transaction record,
 and freelancers track their income and an estimate of the income tax on
