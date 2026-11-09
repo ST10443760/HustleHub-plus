@@ -1,0 +1,30 @@
+Local mock check - 9 November 2026
+The real API (api/src/server.js) run in-process with NODE_ENV=test and LOG_SHIPPING_IN_TEST=1,
+shipping to a local mock receiver on 127.0.0.1 that answers like Axiom's ingest API.
+Each step was triggered through the HTTP API; the audit store outage and the database outage were simulated.
+
+API up on 5003 in mock mode
+login 200
+gig 201, booking 201
+client GET /api/income -> 403
+bad token -> 401
+register with bad input -> 400
+operator injection -> 400
+not the owner -> 403
+gig update -> 200
+gig delete -> 200
+booking the deleted gig -> 404
+404 -> 404
+change password -> 200
+change password with a wrong current one -> 400
+admin list users -> 200
+admin delete gig -> 200
+logout-all with the audit store down -> 200
+GET /api/gigs with the database down -> 500
+wrong-password logins: 401 401 401 401 401 401 401 429
+shipper stats: {"requests":5,"sent":89,"ingested":89,"failed":0,"dropped":0,"lost":0,"retries":0,"lastStatus":200,"queued":0}
+mock received 89 events; authorization header ok
+event names: ACCESS_DENIED ADMIN_ACTION APP_LOG AUDIT_WRITE_FAILED AUTH_LOCKOUT AUTH_LOGIN_FAILURE AUTH_LOGIN_SUCCESS AUTH_LOGOUT_ALL AUTH_PASSWORD_CHANGED AUTH_PASSWORD_CHANGE_FAILED AUTH_REGISTER BOOKING_CREATED BOOKING_FAILED ERROR_UNHANDLED GIG_CREATED GIG_DELETED GIG_UPDATED HTTP_REQUEST INPUT_SANITIZED RATE_LIMIT_EXCEEDED SERVER_START TRANSACTION_CREATED VALIDATION_FAILED
+
+Server log at shutdown (the shipper's own counts):
+{"timestamp":"2026-11-09T09:29:10.419Z","level":"info","event":"APP_LOG","message":"Cloud log shipping summary","service":"hustlehub-api","env":"test","sent":90,"ingested":90,"failed":0,"dropped":0,"lost":0,"unsent":0}

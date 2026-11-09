@@ -1,0 +1,20 @@
+Live check against Axiom - 9 November 2026
+
+1. npm run log:test (one labelled test event):
+   log:test - HTTP 200, ingested: 1, failed: 0
+
+2. The real API in development mode (strict limits, port 5004) shipping to the hustlehub-api dataset.
+   Events triggered through the HTTP API (about 40 records in all):
+   API up on 5004 in live mode
+   login 200
+   gig 201, booking 201
+   client GET /api/income -> 403
+   wrong-password logins: 401 401 401 401 401 429
+   shipper stats: {"requests":10,"sent":38,"ingested":38,"failed":0,"dropped":0,"lost":0,"retries":0,"lastStatus":200,"queued":0}
+
+   Server log lines (the URL and token are never printed):
+   [2026-11-09T09:04:43.387Z] [EVENT:SERVER_START] HustleHub+ API listening on https://localhost:5004 {"port":5004,"protocol":"https","nodeEnv":"development","logFormat":"pretty","cloudLogging":"on"}
+   [2026-11-09T09:04:50.233Z] [INFO] Cloud log shipping summary {"sent":39,"ingested":39,"failed":0,"dropped":0,"lost":0,"unsent":0}
+
+This proves Axiom ACCEPTED the records (HTTP 200 with failed: 0 on every request),
+not that anyone looked at them in Axiom's screens (screenshots of Axiom's Stream and Query tabs show that).
