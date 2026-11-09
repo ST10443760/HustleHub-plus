@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import FormField from '../components/FormField';
 import useAuth from '../context/useAuth';
@@ -14,7 +14,7 @@ function safeReturnPath(from) {
 }
 
 export default function Login() {
-  const { user, login } = useAuth();
+  const { user, login, notice, clearNotice } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -25,8 +25,16 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
 
   const returnTo = safeReturnPath(location.state && location.state.from);
-  const sessionExpired = Boolean(location.state && location.state.expired);
-  const signedOutEverywhere = Boolean(location.state && location.state.signedOutEverywhere);
+
+  // Why the last session ended, if it just did. Kept for as long as this
+  // page is open, and cleared in the auth context straight away, so it is
+  // shown once and not on a later visit.
+  const [shownNotice] = useState(notice);
+  useEffect(() => {
+    if (notice && clearNotice) clearNotice();
+  }, [notice, clearNotice]);
+  const sessionExpired = shownNotice === 'expired';
+  const signedOutEverywhere = shownNotice === 'signedOutEverywhere';
 
   if (user && !submitting) {
     return <Navigate to={returnTo || '/gigs'} replace />;
