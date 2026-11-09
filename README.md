@@ -859,7 +859,8 @@ figures are in a visually hidden table for screen readers.
 
 ![Income dashboard for the 2026/27 tax year: R 300 000,00 earned, R 40 572,00 estimated tax, R 259 428,00 take-home and a 13,52% effective rate, with the monthly chart, the tax by bracket table and the assumptions](docs/screenshots/part3-01-income-dashboard.png)
 
-The same R 300 000 example as the worked example above, on the real dashboard. The chart shows the value of a month on hover, and the page works at phone width:
+The same R 300 000 example as the worked example above, on the real dashboard. The chart shows the value of a month on hover. The phone-width view is
+[`part3-06-dashboard-phone.png`](docs/screenshots/part3-06-dashboard-phone.png).
 
 ![The monthly income chart with November hovered, showing R 300 000,00 from 3 bookings](docs/screenshots/part3-02-chart-hover.png)
 
