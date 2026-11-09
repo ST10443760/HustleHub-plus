@@ -2564,14 +2564,6 @@ Beyond those:
 - **The audit log** keeps entries forever, with no retention policy.
 - **Logs in Axiom** are kept for 30 days on the free plan, and monitors
   have to be created by hand in Axiom.
-- **The login page doesn't explain why it opened.** After a session ends
-  (another device changed the password, or "Sign out of all devices"),
-  the app correctly lands on Log in, but without the "Your session has
-  ended" or "You have been signed out of all devices" message that
-  `Login.jsx` has for this. The client sends the message along when it
-  navigates, but `ProtectedRoute` redirects at the same moment with its
-  own state and replaces it. The security behaviour (the old token is
-  refused with `401`) is not affected.
 
 ### Team and repository
 
