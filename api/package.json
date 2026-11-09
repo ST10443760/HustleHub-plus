@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "dev": "node --watch-path=src src/server.js",
     "start:test": "node scripts/startTest.js",
     "start:test:strict": "node scripts/startTest.js --strict",
     "certs": "node scripts/generateCerts.js",
@@ -38,7 +38,6 @@
     "@eslint/js": "^9.39.5",
     "eslint": "^9.39.5",
     "eslint-plugin-security": "^4.2.1",
-    "globals": "^17.14.0",
-    "nodemon": "^3.1.4"
+    "globals": "^17.14.0"
   }
 }
