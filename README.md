@@ -2465,7 +2465,7 @@ The two billing lock images are shown in
 
 ### Demonstration videos
 
-- **Part 3 demonstration video:** the link is added at submission.
+- **Part 3 demonstration video:** https://youtu.be/rdra1YC_wak
 - **Part 2:** https://youtu.be/H5GcOdMPQNw (registration and login, gig
   creation, booking creation and viewing, transaction recording,
   role-based access, the security headers, the tests and rate limiting)
@@ -2511,7 +2511,7 @@ The two billing lock images are shown in
 | At least two extra security features | Three: account lockout, change password with session revocation, and the admin audit log; [Extra security features](#extra-security-features) | `lockout.test.js`, `tokenVersion.test.js`, `auditLog.test.js`; Newman Account security folder (36 requests, 69 assertions); `Account.test.jsx`, `AdminAuditLog.test.jsx` |
 | A threat-to-control security review in the README | [Final security review](#9-final-security-review) | Each row names a test, scan or log event; the effectiveness table has the real results |
 | Final README | This document | Every count and command checked against a run on 9 November 2026 |
-| Demonstration video | [Demonstration videos](#demonstration-videos) | The Part 3 link is added at submission |
+| Demonstration video | [Demonstration videos](#demonstration-videos) | Part 3: https://youtu.be/rdra1YC_wak |
 
 ### Part 2 requirements (still met)
 
