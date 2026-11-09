@@ -1427,7 +1427,7 @@ assertions.
 | Newman main collection, with admin | **131 requests, 246 assertions, 0 failed**. Security folder 15 requests and 31 assertions, Account security 36 and 69, RBAC 8 and 16 | Every access control, validation, header, CORS, lockout, revocation and audit log rule holds when the API is called directly |
 | Newman rate limit collection, strict limits | **20 requests, 26 assertions, 0 failed** | The 6th failed login and the 11th booking get `429` with `Retry-After` and a message whose seconds match |
 | Smoke test through nginx | **15 checks passed** | The CSP header, TLS to the API, auth, RBAC and token revocation work in the containers |
-| Static analysis, before and after | Baseline **126 findings** (ESLint api 17, client 103, Semgrep 6) to **0**. Re-run now: ESLint 0, Semgrep 0 (152 rules, 216 files) | Two real configuration weaknesses (a forwarded Host header in nginx, Dependabot without a cooldown) and several unsafe patterns were fixed, not suppressed. See [Static code analysis](#12-static-code-analysis) |
+| Static analysis, before and after | Baseline **126 findings** (ESLint api 17, client 103, Semgrep 6) to **0**. Re-run now: ESLint 0, Semgrep 0 (152 rules, 217 files) | Two real configuration weaknesses (a forwarded Host header in nginx, Dependabot without a cooldown) and several unsafe patterns were fixed, not suppressed. See [Static code analysis](#12-static-code-analysis) |
 | Trivy | api, client and certs images: **0** fixable HIGH or CRITICAL vulnerabilities. Dockerfiles: **0** misconfigurations | No known fixable vulnerability ships in the images |
 | gitleaks | **No leaks** in 543 commits (full history, all branches) | No secret was ever committed |
 | OWASP ZAP baseline | **0 FAIL, 3 WARN, 65 PASS** | Headers and information leak rules all pass from the outside. The warnings are informational and don't fail the scan: "Suspicious Comments" (a word ZAP flags in the minified JavaScript bundle), "Storable and Cacheable Content" (public static files and pages with no private data) and "Modern Web Application" |
@@ -1941,7 +1941,7 @@ time: 74 api unit tests, 88 Vitest tests, Newman 94 requests and 173
 assertions, the rate limit collection and a 12-check smoke test). The
 later features were written under the same rules: on 9 November 2026
 ESLint reports 0 problems in both packages and Semgrep 0 findings over
-216 files. The current test counts are in [Testing](#10-testing).
+217 files. The current test counts are in [Testing](#10-testing).
 
 ### Running both tools locally
 
@@ -1963,7 +1963,7 @@ node .github/scripts/static-analysis-summary.mjs semgrep-results
 
 Clean output: `npm run lint` prints only the `> eslint . --max-warnings 0`
 line and returns to the prompt. Semgrep ends with
-`Ran 152 rules on 216 files: 0 findings.` The first Semgrep run downloads
+`Ran 152 rules on 217 files: 0 findings.` The first Semgrep run downloads
 the image, and on Windows a full scan takes a few minutes because Docker
 reads the files through the Windows file system.
 
