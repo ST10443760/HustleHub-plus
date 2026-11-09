@@ -1327,6 +1327,118 @@ would add a database user without update and delete rights, or ship the
 entries to write-once storage. Entries are kept forever, with no retention
 policy.
 
+## 9. Final security review
+
+This review maps each threat to the controls we built, where they live,
+and the evidence that they work. Every row was checked against the code
+and a test, scan or log event on 9 November 2026. OWASP ids are from the
+OWASP Top 10 2021. Test names are quoted exactly; Newman requests are in
+[`api/postman/`](api/postman/) and the results in
+[`docs/test-evidence/`](docs/test-evidence/README.md).
+
+### Threats and controls
+
+| Threat | How the attack would work | Controls implemented | Where it lives | Evidence | Residual risk |
+|---|---|---|---|---|---|
+| **NoSQL injection** (A03 Injection) | Send `{"email": {"$gt": ""}}` to login so the query matches any user | Global operator stripping (`$` and `.` keys); `typeof` and format checks on every field; strict 24-hex ids; Mongoose schemas with `strict: 'throw'` on the audit log | `api/src/middleware/sanitize.js`, `validators.js`, `gigValidators.js`, `validateObjectId.js` | Newman Security: "Login - Operator in Email (should fail)" and "Browse Gigs - Operator in Query (should fail)" (`400`); `INPUT_SANITIZED` event; Semgrep `p/nodejs` and `p/expressjs`: 0 findings | A new route without validators would rely on the sanitiser alone |
+| **Mass assignment** (A04 Insecure Design) | Add `freelancer`, `price`, `role` or `isActive` to a request body to take over a record or set a price | `checkExact` rejects unknown fields on gig, booking, account and query routes; registration and login read only named fields; owner, price and role come from the token and the database | `api/src/middleware/gigValidators.js`, `bookingValidators.js`, `validators.js`; `api/src/controllers/` | Newman: "Create Gig - Unknown Field freelancer (should fail)", "Book Gig - Price in Body (should fail)", "Book Gig - Freelancer in Body (should fail)", "Register - Admin Role (should fail)", "Change Password - Unknown Field (should fail)" | Registration ignores (rather than rejects) unknown fields; harmless, because only named fields are used |
+| **Stored XSS** (A03 Injection) | Save a gig title like `<img src=x onerror=...>` so it runs in every visitor's browser | Text fields trimmed and HTML-escaped before saving; React renders text only; no `dangerouslySetInnerHTML` (`react/no-danger` on); strict CSP with `script-src 'self'` | `api/src/middleware/gigValidators.js`, `validators.js`; `client/src/utils/text.js`; `client/securityHeaders.js` | Vitest: "renders an escaped malicious title as text, with no img element" (GigCard) and "renders an escaped malicious title as plain text, with no img element" (GigDetail) | A future component that renders HTML would need review |
+| **Reflected XSS** (A03 Injection) | Put a script in a URL or query so the server echoes it into a page | The API only returns JSON with `nosniff`; the 404 handler uses the path, never the query string; API CSP `default-src 'self'` | `api/src/middleware/errorHandler.js`, `api/src/config/security.js` | Newman Security: "Security Headers"; ZAP baseline: 0 FAIL | None known |
+| **DOM XSS** (A03 Injection) | Client JavaScript writes attacker data into the DOM or `eval` | No HTML sinks or `eval` in the client; client CSP without `unsafe-inline` or `unsafe-eval` in nginx, preview and the meta tag | `client/src/`, `client/securityHeaders.js`, `client/nginx.conf` | Vitest: "has a strict CSP with frame-ancestors in the header version", "generates one nginx add_header line per header, with the same values"; Semgrep `p/react` and ESLint: 0 findings | The token in `localStorage` would be readable if XSS ever got in (see below) |
+| **Password cracking and weak passwords** (A02 Cryptographic Failures, A07) | Steal the database and crack the hashes, or guess weak passwords | bcryptjs with 10 rounds; at least 8 characters with a number, at most 72 bytes; hashes never selected or returned | `api/src/utils/password.js`, `api/src/middleware/validators.js`, `api/src/models/User.js` | Unit: `authValidators.test.js` (72-byte limit counted in bytes), "toJSON never includes the hash, lockout or session fields"; Newman: "No password hash leaked" | 10 rounds is the bcryptjs default, not the strongest setting; no breached-password check |
+| **Brute force, credential stuffing and account enumeration** (A07 Identification and Authentication Failures) | Try many passwords against one account or many, or tell real emails apart by the error or the timing | Login limiter (5 failed per 15 min per IP); account lockout (5 failures in 15 min lock for 15 min, counted atomically); one generic `401` and a dummy bcrypt compare for unknown and locked accounts | `api/src/middleware/rateLimiters.js`, `api/src/utils/accountLockout.js`, `api/src/utils/lockout.js`, `api/src/controllers/authController.js` | Rate limit collection: "Failed Login 6 (rate limited)"; Newman: "Lockout - Correct Password Is Still Rejected (account locked)"; `lockout.test.js` (15 tests); events `AUTH_LOGIN_FAILURE`, `AUTH_LOCKOUT` | Anyone who knows an email can lock that account for 15 minutes; no CAPTCHA or second factor |
+| **Token theft, forgery and reuse** (A07) | Forge a token, reuse an old one, or keep using a stolen one after the owner reacts | HS256 signature with `JWT_SECRET` (required, 32+ characters in production); 1 hour expiry; role and token version checked against the database on every request; change password and "sign out of all devices" end older tokens | `api/src/middleware/authMiddleware.js`, `api/src/utils/generateToken.js`, `api/src/config/env.js` | Newman: "Change Password - Old Token Rejected", "Logout All - Other Session Token No Longer Works"; unit: "needs a long JWT_SECRET in production only", `tokenVersion.test.js`; event `ACCESS_DENIED` (`revoked_token`) | A stolen token works until it expires or the user signs out everywhere |
+| **Broken access control and IDOR** (A01 Broken Access Control) | A client calls freelancer or admin routes, or a user changes the id in a URL to reach someone else's gig or booking | `protect` on every route except health, register and login; `requireRole`; `requireOwnership` on gig update and delete and on reading a booking; "mine" routes filter by the token's user; admin router guarded at router level; price and role from the database | `api/src/middleware/authMiddleware.js`, `ownership.js`, `api/src/routes/` | Newman RBAC and Gigs: "Admin Users - Client Token (should fail)", "Update Gig - Other Freelancer (should fail)", "Delete Gig - Other Freelancer (should fail)", "Get Booking - Other Freelancer (should fail)", "Income - Client (should fail)"; event `ACCESS_DENIED` (`wrong_role`, `not_owner`) | A new route has to remember its guards; the route audit table makes that reviewable |
+| **CSRF and cross-origin abuse** (A01) | A malicious site makes the user's browser call the API | No cookies: the JWT is in the `Authorization` header, which browsers never attach on their own; CORS accepts only `CLIENT_ORIGIN`, with limited methods and headers and no credentials | `api/src/config/security.js` | Newman Security: "CORS - Disallowed Origin" (`403`, no `Access-Control-Allow-Origin`), "CORS - Allowed Origin"; event `ACCESS_DENIED` (`cors_origin`) | None known while the token stays out of cookies |
+| **Security misconfiguration** (A05 Security Misconfiguration) | Missing headers, verbose errors, a debug endpoint, or a container running as root with write access | Explicit Helmet config; nginx headers from one shared file and `server_tokens off`; generic error handler; health check returns only `ok`; `X-Powered-By` off; containers non-root, read-only, `cap_drop: ALL`, `no-new-privileges`; API and MongoDB not published; startup checks for required settings | `api/src/config/security.js`, `api/src/middleware/errorHandler.js`, `client/nginx.conf`, `client/securityHeaders.js`, `docker-compose.yml`, `api/src/config/env.js` | Newman: "Security Headers", "Malformed JSON (should fail)"; unit: "GET /api/health says ok and nothing else"; `docker-compose-ps.txt` (uids 1000, 101, 999); hadolint and Trivy config: 0; ZAP: 0 FAIL | The self-signed certificate; the client is served over plain HTTP on localhost in Compose |
+| **Sensitive data exposure** (A02, A04) | Read password hashes, tokens or secrets from responses, logs, the repository or images | Hashes and lockout fields never selected or returned; one scrubber redacts secrets in every log record; no stack traces in responses or logs; secrets only in git-ignored `.env` files, excluded by `.dockerignore`; ingest-only Axiom token | `api/src/models/User.js`, `api/src/utils/redact.js`, `api/src/middleware/errorHandler.js`, `.gitignore`, `api/.dockerignore` | Newman: "No password hash leaked"; `redact.test.js` (18 tests); smoke test: "no password hashes or stack traces in the responses"; gitleaks: no leaks in 543 commits; image filesystems searched for the secrets: 0 hits | The JWT in `localStorage` (see the trade-off); logs leave the system for Axiom |
+| **Vulnerable and outdated components** (A06 Vulnerable and Outdated Components) | Exploit a known bug in a dependency or base image | Lock files with `npm ci`; `npm audit --omit=dev --audit-level=high` in the pipeline; Trivy fails on fixable HIGH and CRITICAL image vulnerabilities; base images pinned by version and digest; Dependabot weekly with a 7-day cooldown | `api/package-lock.json`, `client/package-lock.json`, `.github/workflows/ci.yml`, `.github/dependabot.yml`, the Dockerfiles | `npm audit --omit=dev`: 0 in both; Trivy: 0 fixable HIGH or CRITICAL in the api, client and certs images | Dev-only findings (`minimatch` via nodemon, `undici` via jsdom); Dependabot ignores major versions, so those are manual |
+| **Logging and monitoring failures** (A09 Security Logging and Monitoring Failures) | An attack goes unnoticed because nothing is recorded, or logs are lost or leak secrets | A structured event for every security action with request ids; redaction; shipping to Axiom with batching, retries and drop counts; ready-made queries and monitors; an append-only audit log in the app | `api/src/utils/logger.js`, `logShipper.js`, `logEvents.js`, `audit.js`, `api/src/models/AuditLog.js` | `logger.test.js`, `logShipper.test.js`, `auditLog.test.js`; `docs/logging-evidence/` (all 25 event names, live run accepted by Axiom with 0 failed); Newman (with admin credentials): "Audit Log - Admin Sees The Lockout (skipped without admin credentials)" | Shipping is best effort; monitors must be created in Axiom; audit log append-only at application level only |
+| **Denial of service and ReDoS** (no single 2021 id) | Flood the API, send huge bodies or pages, or a string that makes a regex backtrack for seconds | General limit 100 per 15 min per IP plus the route limits; 10kb body limit (16k in nginx); `limit` at most 50, `page` at most 1000, search at most 50 characters; regexes without nested quantifiers (`security/detect-unsafe-regex`); the log scrubber cuts strings before matching | `api/src/app.js`, `api/src/middleware/rateLimiters.js`, `gigValidators.js`, `client/nginx.conf`, `api/src/utils/redact.js` | Newman: "Oversized Body (should fail)" (`413`); rate limit collection: "Booking 11 (rate limited)"; unit: "the decimals check is fast even on a long input" | The in-memory limiter is per API instance; no CDN or WAF in front |
+| **Business logic and data integrity** (A04 Insecure Design) | Pay less than the price, book an inactive gig, leave a booking without a payment record, or create rounding drift | Price and parties taken from the database; booking and transaction in one MongoDB transaction; one transaction per booking (unique index); inactive gigs refused; money rounded to 2 decimals, tax worked out in whole cents | `api/src/controllers/bookingController.js`, `api/src/models/Transaction.js`, `api/src/utils/money.js`, `api/src/utils/taxCalculator.js` | Newman Bookings: "Book Gig - Price in Body (should fail)", "Book Gig - Inactive Gig (should fail)", "Get Booking - Price Unchanged After Gig Edit"; unit: "roundMoney removes floating point noise", `taxCalculator.test.js` | Payments are simulated; there is no refund flow |
+| **Supply chain and CI** (A08 Software and Data Integrity Failures) | A compromised action, tool image or package release changes what the pipeline runs, or a secret leaks into the repository | Every action pinned to a full commit SHA; tool images pinned by digest; `permissions: contents: read`; `persist-credentials: false`; no `pull_request_target`; no repository secrets (generated per job and masked); gitleaks over the full history; actionlint and zizmor; Dependabot cooldown | `.github/workflows/ci.yml`, `.github/scripts/make-ci-env.sh`, `.github/dependabot.yml` | [`local-checks.txt`](docs/pipeline-evidence/local-checks.txt): actionlint 0, zizmor (auditor persona) 0; gitleaks: no leaks | The remote pipeline can't run while the account is billing locked, so it was verified locally |
+| **Transport security** (A02 Cryptographic Failures) | Read or change traffic between the components | API over HTTPS with HSTS; nginx verifies the API certificate (`proxy_ssl_verify on`) and sends a fixed `Host`; Axiom over HTTPS only; Atlas over TLS | `api/src/server.js`, `client/nginx.conf`, `api/src/utils/logShipper.js` | Smoke test through nginx (fails if verification fails); unit: "https is required; plain http only to loopback in a test run" | Self-signed certificate; browser to nginx is plain HTTP on localhost; MongoDB in Compose has no TLS or authentication (internal network only) |
+
+### Detection scenarios
+
+What each attack leaves behind in the logs (all searchable in Axiom with
+the queries in [`axiom-queries.md`](docs/logging-evidence/axiom-queries.md))
+and in the in-app audit log:
+
+| Attack | Log events (in order) | Audit log entry | Alert |
+|---|---|---|---|
+| Brute force on one account | `AUTH_LOGIN_FAILURE` (`reason: bad_credentials`, masked email, user id, IP) for each of the 5 failures, and `AUTH_LOCKOUT` (`failedAttempts: 5`, `lockMinutes: 15`) with the 5th; later tries give `AUTH_LOGIN_FAILURE` (`reason: locked`) or, from one IP, `RATE_LIMIT_EXCEEDED` (`limiter: login`) | `account_locked` with `{ failedAttempts: 5, lockMinutes: 15 }` | Monitor "Brute force on login" (more than 20 failures in 5 minutes) |
+| Privilege escalation attempt | Registering as admin: `VALIDATION_FAILED` (`fields: ["role"]`). A client calling `/api/admin/users`: `ACCESS_DENIED` (`reason: wrong_role`, `status: 403`, `role: client`, route). Editing another freelancer's gig: `ACCESS_DENIED` (`reason: not_owner`, `route: /api/gigs/:id`, resource id) | None (nothing was changed) | Query 3 (403s by route) |
+| Rate limit abuse (booking spam) | `BOOKING_CREATED` and `TRANSACTION_CREATED` for the first 10, then `RATE_LIMIT_EXCEEDED` (`limiter: booking`, route `/api/bookings`, user id) and an `HTTP_REQUEST` with status 429 | None | Monitor "Lockouts or rate limiting" |
+| Token reuse after a password change | `AUTH_PASSWORD_CHANGED` (user id, IP), then each use of an old token gives `ACCESS_DENIED` (`reason: revoked_token`, `status: 401`, route, IP). The user id isn't on that event, because the token is not trusted at that point | `password_changed` (actor, IP) | Query 3 without the 403 filter |
+
+The brute force and access denial events were triggered in the local mock
+check and appear in
+[`sample-events.jsonl`](docs/logging-evidence/sample-events.jsonl). The
+booking limit and token revocation are exercised by the Newman runs (the
+rate limit collection and the Account security folder), which log to the
+console only, because test runs never ship to Axiom.
+
+### Effectiveness of the controls
+
+These are the real results of the runs on 9 November 2026. The Newman run
+against the Docker stack is from earlier the same day, before this
+documentation-only update, and also passed with 131 requests and 246
+assertions.
+
+| Check | Result | What it shows |
+|---|---|---|
+| Newman main collection, with admin | **131 requests, 246 assertions, 0 failed**. Security folder 15 requests and 31 assertions, Account security 36 and 69, RBAC 8 and 16 | Every access control, validation, header, CORS, lockout, revocation and audit log rule holds when the API is called directly |
+| Newman rate limit collection, strict limits | **20 requests, 26 assertions, 0 failed** | The 6th failed login and the 11th booking get `429` with `Retry-After` and a message whose seconds match |
+| Smoke test through nginx | **15 checks passed** | The CSP header, TLS to the API, auth, RBAC and token revocation work in the containers |
+| Static analysis, before and after | Baseline **126 findings** (ESLint api 17, client 103, Semgrep 6) to **0**. Re-run now: ESLint 0, Semgrep 0 (152 rules, 213 files) | Two real configuration weaknesses (a forwarded Host header in nginx, Dependabot without a cooldown) and several unsafe patterns were fixed, not suppressed. See [Static code analysis](#12-static-code-analysis) |
+| Trivy | api, client and certs images: **0** fixable HIGH or CRITICAL vulnerabilities. Dockerfiles: **0** misconfigurations | No known fixable vulnerability ships in the images |
+| gitleaks | **No leaks** in 543 commits (full history, all branches) | No secret was ever committed |
+| OWASP ZAP baseline | **0 FAIL, 3 WARN, 65 PASS** | Headers and information leak rules all pass from the outside. The warnings are informational and don't fail the scan: "Suspicious Comments" (a word ZAP flags in the minified JavaScript bundle), "Storable and Cacheable Content" (public static files and pages with no private data) and "Modern Web Application" |
+| npm audit (what ships) | **0** vulnerabilities in the api and the client | No known vulnerable production dependency |
+| Logging checks | Mock check: all 25 event names arrived, 90 records, 0 dropped. Live check: Axiom accepted 39 records (HTTP 200, 0 failed) | The detection scenarios above are actually recorded and shipped |
+
+The raw outputs are in [`docs/test-evidence/`](docs/test-evidence/README.md),
+[`docs/pipeline-evidence/`](docs/pipeline-evidence/README.md),
+[`docs/static-analysis/`](docs/static-analysis/README.md) and
+[`docs/logging-evidence/`](docs/logging-evidence/README.md).
+
+### Residual risks and accepted limitations
+
+- **JWT in `localStorage`.** Any successful XSS could read the token. The
+  CSP, escaping, short expiry and revocation reduce the risk; an
+  `httpOnly` cookie with CSRF protection would be the stronger choice for
+  a real deployment.
+- **In-memory rate limiter.** Counters live in each API process. They
+  reset on restart and are not shared between several API instances; a
+  shared store such as Redis would be needed to scale out. (The lockout
+  counters are on the user document, so they are shared.)
+- **MongoDB without authentication inside Compose.** It is reachable only
+  on the internal Compose network and never published. A real deployment
+  would enable authentication and TLS, or use Atlas.
+- **Self-signed certificate and plain HTTP on localhost.** The API
+  certificate is self-signed, and the browser talks to nginx over HTTP on
+  `localhost:5173`. A deployment needs a real certificate on nginx and
+  HTTPS for the browser.
+- **No two-factor authentication**, no CAPTCHA and no email to the user
+  after a password change or lockout.
+- **Logs are sent to a third party.** Axiom (hosted in the US) receives
+  user ids, masked emails, IP addresses and paths for 30 days. See the
+  POPIA note in [Logging and monitoring](#14-logging-and-monitoring).
+- **Accepted dev-only npm audit findings:** `minimatch` (moderate) through
+  `nodemon` in the api, and `undici` (high) through `jsdom` in the client.
+  Neither runs in the deployed system; both have a fix available.
+- **Dependabot ignores major versions** for npm and Docker images, so
+  major upgrades are a manual decision.
+- **The remote CI pipeline can't run.** GitHub refuses to start any job
+  while the account is locked for a billing issue, so every job was run
+  locally with the same commands instead (see
+  [Pipeline status and the billing lock](#pipeline-status-and-the-billing-lock)).
+- **Audit log append-only at application level.** Someone with direct
+  database access could still change entries.
+- **Payments are simulated.** No payment provider is involved and no money
+  moves.
+
 ## 13. Docker
 
 How to start the stack is in [Getting started, B](#b-docker-compose). This
