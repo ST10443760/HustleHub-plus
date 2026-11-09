@@ -21,16 +21,12 @@ with docker-compose.test.yml: valid
 error while interpolating services.api.environment.JWT_SECRET: required variable JWT_SECRET is missing a value: JWT_SECRET is not set. Copy .env.example to .env in the repo root and set JWT_SECRET to a long random value.
 (exit 1: Compose refuses to run without JWT_SECRET)
 
-$ npm audit --omit=dev --audit-level=high (api, then client; re-run after npm audit fix)
+$ npm audit --omit=dev --audit-level=high (api, then client)
 found 0 vulnerabilities
 found 0 vulnerabilities
 
 $ npm audit (including dev tools; not run by the pipeline, for the record)
-api:
-minimatch  7.0.0 - 11.0.0
-Severity: moderate
-  node_modules/nodemon
-2 moderate severity vulnerabilities
-(the fix is minimatch 11; nodemon 3.1.14, the newest, requires minimatch ^10.2.1, so npm audit fix can't apply it without a major version)
+api (nodemon replaced by node --watch):
+found 0 vulnerabilities
 client:
 found 0 vulnerabilities
