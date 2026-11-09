@@ -857,6 +857,12 @@ SVG attributes and CSS classes, no inline styles and no
 `dangerouslySetInnerHTML`. It has an `aria-label` summary, and the same
 figures are in a visually hidden table for screen readers.
 
+![Income dashboard for the 2026/27 tax year: R 300 000,00 earned, R 40 572,00 estimated tax, R 259 428,00 take-home and a 13,52% effective rate, with the monthly chart, the tax by bracket table and the assumptions](docs/screenshots/part3-01-income-dashboard.png)
+
+The same R 300 000 example as the worked example above, on the real dashboard. The chart shows the value of a month on hover, and the page works at phone width:
+
+![The monthly income chart with November hovered, showing R 300 000,00 from 3 bookings](docs/screenshots/part3-02-chart-hover.png)
+
 **Tests:** `api/test/` (run with `npm test` in `api/`, Node's built-in test
 runner, no database or secrets needed) covers the calculator, tax-year
 dates, config consistency and the response builder. The Newman **Income**
@@ -1170,6 +1176,8 @@ needed: it makes online guessing roughly 5 tries per 15 minutes per account
 locked-out user only waits 15 minutes. A permanent lock or a manual unlock
 would hand that attacker a much stronger weapon.
 
+![After 5 wrong passwords the correct password is still refused with the same "Invalid email or password" message](docs/screenshots/part3-10-lockout-correct-password-rejected.png)
+
 **Files:** `api/src/config/lockout.js`, `api/src/utils/lockout.js` (pure
 decision logic and the atomic update), `api/src/utils/accountLockout.js`
 (the password check used by login and change-password),
@@ -1243,6 +1251,14 @@ While building this, the login validator also got a `typeof` check. An
 array sent as the password used to reach bcrypt and fail with a `500`; it
 is now a `400`.
 
+![The Account page with inline errors under each field after an empty submit](docs/screenshots/part3-07-account-validation.png)
+
+![A wrong current password shows a message and the user stays logged in](docs/screenshots/part3-08-account-wrong-current.png)
+
+![A successful password change: "Password changed. You have been signed out everywhere else."](docs/screenshots/part3-09-account-success.png)
+
+![The Sign out of all devices confirmation box](docs/screenshots/part3-12-sign-out-confirm.png)
+
 **Files:** `api/src/utils/generateToken.js` (`tv` in the token),
 `api/src/middleware/authMiddleware.js`, `api/src/controllers/authController.js`,
 `api/src/routes/authRoutes.js`, `api/src/middleware/validators.js`,
@@ -1303,6 +1319,8 @@ Logs alone are easy to lose and not visible in the app.
   - actors shown by name and id only.
 - **The admin "Audit log" page** (`/admin/audit-log`) has a table, an
   action filter and paging, in the same style as Users and Transactions.
+
+![The admin Audit log with Account locked, Signed out of all devices, Password changed and Admin deleted a gig](docs/screenshots/part3-14-audit-log.png)
 
 **Files:** `api/src/models/AuditLog.js`, `api/src/utils/audit.js`,
 `api/src/controllers/adminController.js`, `api/src/middleware/adminValidators.js`,
