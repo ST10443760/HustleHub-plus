@@ -1,7 +1,7 @@
 # Test evidence
 
 Raw, unedited output of the test suites, saved as plain text from fresh
-runs on **8 November 2026** (Windows 11, Docker Desktop, Node 24.18.1 on the
+runs on **9 November 2026** (Windows 11, Docker Desktop, Node 24.18.1 on the
 host, Newman 6.2.3, Vitest 5.0.3). Every run passed with 0 failures.
 
 **Local (npm) runs**, against MongoDB Atlas:
@@ -9,9 +9,9 @@ host, Newman 6.2.3, Vitest 5.0.3). Every run passed with 0 failures.
 | File | What it is | Command (run from the folder shown) | Result |
 |---|---|---|---|
 | [`newman-main-results.txt`](newman-main-results.txt) | Main Postman collection: Health, Auth, RBAC, Gigs, Bookings, Income (including the tax estimate), Account security (lockout, change password, sign out everywhere, audit log) and Security folders, **including the admin tests** | `api/`: API started with `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure --reporters cli --color off --env-var admin_email=<ADMIN_EMAIL> --env-var admin_password=<ADMIN_PASSWORD>` | **131 requests, 246 assertions, 0 failed** |
-| [`newman-rate-limits-results.txt`](newman-rate-limits-results.txt) | Rate limit collection against the **strict** limits: the 6th failed login and the 11th booking are refused with `429` + `Retry-After` | `api/`: API freshly started with `npm run dev`, then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure --reporters cli --color off` | **20 requests, 26 assertions, 0 failed** |
+| [`newman-rate-limits-results.txt`](newman-rate-limits-results.txt) | Rate limit collection against the **strict** limits: the 6th failed login and the 11th booking are refused with `429` + `Retry-After` | `api/`: API freshly started with `npm run start:test:strict` (the real limits, no cloud logging), then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure --reporters cli --color off` | **20 requests, 26 assertions, 0 failed** |
 | [`vitest-results.txt`](vitest-results.txt) | Frontend tests (Vitest + React Testing Library), one line per test | `client/`: `npm run test:run -- --reporter=verbose` | **21 test files, 110 tests passed** |
-| [`api-unit-results.txt`](api-unit-results.txt) | Backend unit tests (Node test runner): tax calculator and tax years, health check, startup settings check, trust proxy and rate limit buckets, account lockout logic, token versions, auth and audit log validators, audit log append-only guards, money rounding, rate limit config. No database or secrets needed | `api/`: `npm test` | **132 tests passed** |
+| [`api-unit-results.txt`](api-unit-results.txt) | Backend unit tests (Node test runner): tax calculator and tax years, health check, startup settings check, trust proxy and rate limit buckets, account lockout logic, token versions, auth and audit log validators, audit log append-only guards, money rounding, rate limit config, the log scrubber (redaction), the structured logger and event catalogue, request ids and the access log, and the cloud log shipper against a local mock server (it never reaches the real service). No database or secrets needed | `api/`: `npm test` | **191 tests passed** |
 
 **Docker runs**, against the Compose stack and its own MongoDB replica set:
 
@@ -29,10 +29,15 @@ Notes:
   main collection skips the admin-only requests cleanly.
 - `--insecure` is needed because the local HTTPS certificate is
   self-signed. `--color off` keeps the files plain text.
+- None of these runs shipped logs to the cloud: `start:test`, `start:test:strict`,
+  `npm test` and the Compose test override are test runs, where shipping is
+  off, and the plain stack for the smoke test was started with the
+  `LOG_SHIPPING_*` values blanked. The logging evidence (sample records, the
+  mock and live shipping checks) is in [`../logging-evidence/`](../logging-evidence/).
 - Every file was checked before it was committed for JWTs (`eyJ...`),
   `Bearer` tokens, MongoDB connection strings with credentials, the JWT
-  secrets and the admin emails and passwords: 0 hits. (The only "Bearer"
-  is the name of a Vitest test.)
+  secrets, the admin emails and passwords, and the Axiom token and URL:
+  0 hits. (The only two "Bearer"s are test names.)
 - The test users these runs created (`test-...@example.com`) were removed
   afterwards with `npm run clean:test` (and its Docker equivalent).
 - Screenshots of the same kind of runs: `docs/screenshots/11-newman-pass.png`,
