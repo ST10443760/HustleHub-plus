@@ -1241,17 +1241,292 @@ in local development because it's the same code path that will run in
 production; testing over plain HTTP would hide any issues specific to a
 TLS connection.
 
-### Logging
+### Logging and monitoring
 
-All logging goes through `utils/logger.js`. Security events are logged with
-`logger.event`: registrations, successful and failed logins, bookings,
-transactions and failed bookings, gig changes, admin actions, denied role
-and ownership checks, rate limit hits, blocked CORS origins and stripped
-NoSQL operators. Failed logins are logged identically whether or not the
-email exists, with a masked email (`j***@example.com`) and the IP. Logs
-never contain passwords, tokens, the database connection string or the JWT
-secret. Stack traces are logged only for unexpected errors and never in
-production, and they never appear in an API response.
+**Why we log.** The security controls in this section (the lockout, rate
+limits, RBAC, ownership checks, validation) block attacks one request at a
+time. Logging lets us see the pattern behind those requests: one IP
+guessing passwords, one account under attack, a user trying other people's
+records, a spike in errors. It also shows whether each control actually
+fires. So the API writes one structured record for every security and
+business event and one access line for every request. It then ships them
+to a cloud logging platform (**Axiom**), where they can be searched,
+charted and turned into email alerts.
+
+#### How it works
+
+- **One logger.** Every log line goes through `api/src/utils/logger.js`
+  (`logger.info/warn/error`, and `logger.event(NAME, message, fields)` for
+  catalogue events). Nothing calls `console.log` directly.
+- **Every record has the same fields:**
+  - always: `timestamp`, `level`, `event`, `message`,
+    `service` (`hustlehub-api`) and `env`
+  - during a request: `requestId`, `ip`, `method`, `path` (never the query
+    string), plus `userId` and `role` once the token is verified
+  - the event's own safe fields, for example `reason`, `limiter`, `route`,
+    `status`, `durationMs`, `amount`
+- **Two console formats** (`LOG_FORMAT`). `pretty` is the readable line
+  used in development, for example
+  `[time] [EVENT:AUTH_LOCKOUT] Account locked after too many failed attempts {...} (req 3f2a9c1b)`.
+  `json` is one JSON record per line, the default when
+  `NODE_ENV=production` and in Docker.
+- **Access log.** One `HTTP_REQUEST` line per request when the response
+  finishes. It records the method, path, status, duration and user, and
+  never headers, bodies or query strings. Levels: 5xx is `error`, 4xx is
+  `warn`, everything else `info`. The health check (polled by Docker every
+  few seconds) and CORS preflights are skipped.
+- **Crashes and shutdown.** An unhandled promise rejection is logged and
+  the server carries on. An uncaught exception is logged, the queue is
+  flushed (at most 2 seconds), and the process exits with code 1. On
+  `SIGTERM` (Docker stop) or `SIGINT` (Ctrl+C), queued records are sent
+  first. The shipper then prints its own counts (`Cloud log shipping
+  summary`), to the console only.
+
+#### Event catalogue
+
+The names are stable (`api/src/utils/logEvents.js`), because the saved
+queries and monitors search for them. A unit test checks that every
+`logger.event()` call in the code uses a catalogue name.
+
+| Event | When it fires | Key fields | Why it matters / what it helps detect |
+|---|---|---|---|
+| `AUTH_REGISTER` | An account is created, or refused because the email exists (`warn`) | `outcome`, `reason`, `userId`, `role`, masked `email`, `ip` | Mass sign-ups (bots), email enumeration attempts |
+| `AUTH_LOGIN_SUCCESS` | A correct login | `userId`, `role`, `ip` | Account takeover: a login from an unusual IP right after many failures |
+| `AUTH_LOGIN_FAILURE` | Any failed login | `reason` (`bad_credentials` or `locked`, internal only), masked `email`, `userId` if the account exists, `ip` | **Brute force** and **password spraying** (many failures per IP, or one IP against many accounts). The response is always the same generic 401 |
+| `AUTH_LOCKOUT` | The 5th wrong password in 15 minutes locks the account | `userId`, `failedAttempts`, `lockMinutes`, `ip` | A targeted attack on one account. Also proves the lockout works |
+| `AUTH_PASSWORD_CHANGED` | A password change succeeds (every other session ends) | `userId`, `ip` | Account takeover: an unexpected change is a red flag |
+| `AUTH_PASSWORD_CHANGE_FAILED` | Wrong current password, or a locked account | `reason`, `userId`, `ip` | Someone with a stolen session trying to take over the account |
+| `AUTH_LOGOUT_ALL` | "Sign out of all devices" | `userId`, `ip` | A user reacting to a suspected stolen session |
+| `ACCESS_DENIED` | A 401 from `protect` (no, invalid, expired or revoked token, user gone), a 403 for the wrong role or not the owner, or a blocked CORS origin | `reason`, `status`, `route` (the route pattern, for example `/api/gigs/:id`), `userId`/`role` when known | **Privilege abuse** (a client calling freelancer or admin routes), **IDOR probing** (`not_owner`), stolen or forged tokens, use of a token after a password change |
+| `RATE_LIMIT_EXCEEDED` | Any limiter answers 429 | `limiter` (`login`, `register`, `booking`, `passwordChange`, `general`), `ip`, `route`, `retryAfterSeconds` | Brute force, **booking spam or fraud**, scraping, denial-of-service attempts |
+| `VALIDATION_FAILED` | A request fails validation, schema checks or body parsing | `source`, **field names only** (never values), `reason` | Fuzzing and injection attempts, broken clients |
+| `INPUT_SANITIZED` | `$` or `.` operator keys were stripped from the input | `location` (body/query/params), `ip` | **NoSQL injection** attempts. Normal clients never send these |
+| `GIG_CREATED` / `GIG_UPDATED` / `GIG_DELETED` | A freelancer changes their own gig | `gigId`, `price`, `fields`, `deactivated` | Who changed what and when (for example a price hiked after bookings) |
+| `BOOKING_CREATED` | A booking is saved | `bookingId`, `gigId`, `clientId`, `freelancerId`, `price` | **Booking fraud** (bursts from one client), business volume |
+| `BOOKING_FAILED` | A booking was refused or rolled back (nothing saved) | `gigId`, `reason` | Attempts to book hidden or deleted gigs, database trouble |
+| `TRANSACTION_CREATED` | The (simulated) payment record for a booking | `reference`, `amount`, `transactionId`, `bookingId`, `clientId`, `freelancerId` | Income tracking. The count must match `BOOKING_CREATED` |
+| `ADMIN_ACTION` | An admin lists users or transactions, views the audit log, or removes a gig, and when the admin is seeded | `action`, `gigId`, `count` | **Privilege abuse by an admin**: admins are powerful, so every admin read is logged too |
+| `AUDIT_WRITE_FAILED` | An audit log entry could not be saved (the action still succeeded) | `action`, `errorName` | A gap in the audit trail. Should never happen |
+| `ERROR_UNHANDLED` | A 5xx, an unhandled rejection or an uncaught exception | `errorName`, `errorMessage`, `status`, `source` | **Outages** and bugs: database down, crashes. Never includes a stack trace |
+| `SERVER_START` / `SERVER_STOP` | The API starts listening / receives SIGTERM or SIGINT | `port`, `nodeEnv`, `logFormat`, `cloudLogging` (on, or why it is off) | Restarts and crash loops, and confirms the settings in use |
+| `HTTP_REQUEST` | Every request (the access log) | `status`, `durationMs`, `method`, `path` | Error rates, slow routes, traffic spikes |
+| `APP_LOG` | Plain `logger.info/warn/error` lines (startup settings, 4xx messages, database connection changes) | varies | Context around the events above |
+| `LOG_TEST` | Only from `npm run log:test` | `source`, `test` | Confirms the connection to Axiom |
+
+Real examples of every one, as they arrived at the receiver, are in
+[`docs/logging-evidence/sample-events.jsonl`](docs/logging-evidence/sample-events.jsonl).
+
+#### Request-id correlation
+
+Every request gets a new id from `crypto.randomUUID()`. It is returned in
+the `X-Request-Id` response header and stored in an `AsyncLocalStorage`
+context, so **every** record written while that request is handled
+carries the same `requestId`. That includes records from controllers,
+middleware, the lockout code and the audit log helper. The middleware is
+in `api/src/middleware/requestLogging.js`.
+
+An `X-Request-Id` sent by the client is ignored. Otherwise a caller could
+make its requests look like someone else's in the logs. Response bodies
+are unchanged.
+
+In practice, if a user reports an error, the id from the browser's network
+tab, pasted into Axiom (query 7 in
+[`axiom-queries.md`](docs/logging-evidence/axiom-queries.md)), shows
+everything that happened in that request, in order.
+
+#### Redaction rules
+
+One scrubber (`api/src/utils/redact.js`) cleans every record **before**
+it is printed and **before** it is shipped:
+
+- **Sensitive keys.** The value under any key containing `password`,
+  `token`, `secret`, `authorization`, `cookie`, `jwt`, `mongo_uri`,
+  `api key`, `credential` and similar is replaced with `[REDACTED]`, at any
+  depth and in any letter case.
+- **Secrets inside text.** In any string, these become `[REDACTED_...]`:
+  JWTs (`eyJ...`), Axiom tokens (`xaat-...`), `Bearer ...` values, and the
+  `user:password@` part of connection strings such as `mongodb://`.
+- **Emails** are masked in the existing style (`jane@example.com` becomes
+  `j***@example.com`).
+- **No stack traces.** An `Error` becomes `{ name, message }`, with no
+  stack trace and no file paths.
+- **Log injection.** CR, LF and other control characters become spaces, so
+  input can't forge a fake log line.
+- **Limits.** Strings are cut at 512 characters, nesting at 6 levels, and
+  objects and arrays at 50 entries. Circular references are marked. A
+  record over 16 KB keeps only its headline fields.
+- **Never throws.** Anything the scrubber can't read becomes a placeholder.
+
+On top of that, the code never passes passwords, tokens, request bodies,
+headers or query strings to the logger in the first place.
+`api/test/redact.test.js` has a unit test for each rule.
+
+#### How logs reach Axiom
+
+```mermaid
+flowchart LR
+  subgraph API["Express API (Node 22)"]
+    RID["requestId middleware<br/>AsyncLocalStorage"] --> CODE["controllers and middleware<br/>logger.event(...)"]
+    RID --> ACC["access log<br/>HTTP_REQUEST"]
+    CODE --> LOG["utils/logger.js<br/>structured record"]
+    ACC --> LOG
+    LOG --> SCRUB["utils/redact.js<br/>scrubber"]
+    SCRUB --> CON["console<br/>pretty or JSON lines"]
+    SCRUB --> Q["utils/logShipper.js<br/>queue, max 1000"]
+  end
+  CON --> DOCKER["terminal or<br/>docker compose logs api"]
+  Q -- "HTTPS POST /v1/ingest/hustlehub-api<br/>Bearer ingest-only token<br/>batches of up to 500, every 5 s" --> AX[("Axiom dataset<br/>hustlehub-api<br/>30 day retention")]
+  AX --> STREAM["Stream and Query tabs<br/>APL queries"]
+  AX --> MON["Monitors<br/>email alerts"]
+  AX --> DASH["Dashboard"]
+```
+
+The shipper (`api/src/utils/logShipper.js`) uses Node's built-in `fetch`,
+so it adds no new dependencies:
+
+- **Batching.** It sends every 5 seconds, or as soon as 100 records are
+  waiting, at most 500 per request, with a 5 second timeout.
+- **Retries.** Network errors, timeouts, 5xx and 429 are retried with
+  exponential backoff (0.5 s, then 1 s; 3 tries in all). Other 4xx are
+  never retried, because a bad token won't fix itself.
+- **A bounded queue.** It holds at most 1000 records. When full, the
+  oldest are dropped and counted.
+- **Never in the way.** Queuing is synchronous and cheap, the timers don't
+  keep the process alive, and a failure never blocks or breaks a request.
+- **Its own problems stay local.** Shipping problems are printed to the
+  console at most once a minute, without the URL or token, and are never
+  shipped, so a failing shipper can't feed itself.
+- **Accounting.** It tracks the records `sent`, `ingested` and `failed`
+  (from Axiom's reply), and `dropped` and `lost`.
+
+#### Configuration
+
+| Setting | Default | What it does |
+|---|---|---|
+| `LOG_FORMAT` | `pretty` in development, `json` when `NODE_ENV=production` and in Docker | Console format |
+| `LOG_SHIPPING_URL` | empty (off) | `https://<edge-domain>/v1/ingest/<dataset>`. Must be `https` (plain `http` is accepted only to `localhost` in a test run) |
+| `LOG_SHIPPING_TOKEN` | empty (off) | The Axiom API token. Secret: `.env` only, never committed, never logged |
+| `LOG_SHIPPING_IN_TEST` | off | Set to `1` to ship from a test run anyway (for a demo) |
+
+When shipping is on:
+
+| Run | Ships to Axiom? |
+|---|---|
+| `npm run dev`, `npm start`, `docker compose up` with both `LOG_SHIPPING_*` set | **Yes** |
+| Either setting empty (the default in both `.env.example` files, and in CI) | No: console only |
+| `npm test`, `npm run start:test`, `npm run start:test:strict`, `NODE_ENV=test`, the Compose test override | No, unless `LOG_SHIPPING_IN_TEST=1` (the Compose test override forces it empty) |
+
+So the Newman runs, the Vitest run, the unit tests and the CI pipeline
+never fill the dataset with test data, and CI needs no new secrets. The
+values reach the `api` container as **runtime** environment variables
+only, never as build arguments. The token is never in an image layer, and
+`.env` is in `.dockerignore`.
+
+**Check the connection:** `cd api; npm run log:test` sends one labelled
+`LOG_TEST` event. It prints only the HTTP status and Axiom's `ingested`
+and `failed` counts, never the URL or the token. A 401 or 403 means the
+token is wrong or can't write to the dataset. A 404 means the dataset
+name or the domain is wrong.
+
+#### Setting up Axiom (free Personal plan)
+
+1. Sign up at axiom.co on the free **Personal** plan. It keeps data for
+   30 days and allows 3 monitors and email notifiers.
+2. Create a dataset named **`hustlehub-api`**.
+3. Create the token in **Settings > API tokens > New API token**:
+   - choose **Basic** (the type that can only ingest)
+   - under **Dataset access**, select **only `hustlehub-api`**
+   - click **Create** and copy the token (it is shown once)
+
+   Never use a personal access token or a token with wider rights. If
+   this token leaks, the worst anyone can do is write noise into one
+   dataset: they can't read, query or delete anything.
+4. Put the values in the gitignored `api/.env` (for `npm run dev`) and the
+   root `.env` (for Docker):
+   - `LOG_SHIPPING_URL=https://<edge-domain>/v1/ingest/hustlehub-api`,
+     where the edge domain (for example US East 1) is shown under
+     Settings > General
+   - `LOG_SHIPPING_TOKEN=<the token>`
+5. Run `npm run log:test` and expect `HTTP 200, ingested: 1, failed: 0`.
+6. Paste the queries from
+   [`docs/logging-evidence/axiom-queries.md`](docs/logging-evidence/axiom-queries.md)
+   into the **Query** tab, and create the three suggested monitors.
+
+If the token is ever exposed, regenerate it in Settings > API tokens and
+update both `.env` files.
+
+#### Personal data, retention and POPIA
+
+What reaches Axiom, and why:
+
+| Data | Why |
+|---|---|
+| User id (an opaque database id) and role | To tell which account a security event concerns without storing who the person is |
+| Masked email (`j***@example.com`), only on failed logins and duplicate registrations | To spot attacks on an address that has no account yet (so no user id) without storing the address itself |
+| IP address | The main signal for brute force, spraying and rate limit abuse |
+| Method, path (no query string), status, timing | To see which routes are attacked, failing or slow |
+| Booking and transaction ids, references and amounts | To trace income and spot booking fraud |
+
+What never reaches it: names, full emails, passwords or hashes, tokens,
+request and response bodies, headers, query strings and stack traces.
+
+**Retention:** Axiom's free plan keeps data for **30 days** and then
+deletes it. Console logs last as long as the terminal or the Docker
+container.
+
+**POPIA** (South Africa's Protection of Personal Information Act). IP
+addresses and user ids linked to an account can identify a person, so
+they count as personal information. The design follows these POPIA
+conditions:
+
+- **Purpose specification:** logs are used for security and operations
+  only.
+- **Minimality (section 10):** only the fields in the table above, with
+  emails masked.
+- **Retention:** 30 days.
+- **Security safeguards (section 19):** an ingest-only token, HTTPS and
+  redaction.
+
+This is a student project, not a legal assessment. A real deployment
+would also need:
+
+- a privacy notice that tells users about this logging
+- a written operator agreement with Axiom (sections 20 and 21)
+- a check of the rules for sending personal information outside South
+  Africa (section 72), because the dataset is hosted in the US
+- a process for reporting a security compromise (section 22)
+
+#### Do the controls work? What the logs show
+
+| Control | Evidence in the logs | Axiom query |
+|---|---|---|
+| Account lockout | `AUTH_LOCKOUT` after the 5th wrong password, then `AUTH_LOGIN_FAILURE` with `reason: locked` for the correct password | 2 |
+| Login and booking rate limits | `RATE_LIMIT_EXCEEDED` with the `limiter` name, and `HTTP_REQUEST` with status 429 | 4 |
+| RBAC | `ACCESS_DENIED` `wrong_role` 403 (for example a client opening `/api/income`) | 3 |
+| Ownership (no IDOR) | `ACCESS_DENIED` `not_owner` 403 on `/api/gigs/:id` | 3 |
+| Session revocation | `AUTH_PASSWORD_CHANGED` or `AUTH_LOGOUT_ALL`, then `ACCESS_DENIED` `revoked_token` 401 for the old token | 3 (without the 403 filter) |
+| Validation and NoSQL sanitising | `VALIDATION_FAILED` (field names) and `INPUT_SANITIZED` | add `where event == "INPUT_SANITIZED"` |
+| CORS | `ACCESS_DENIED` `cors_origin` | 3 (without the 403 filter) |
+| Booking integrity | `BOOKING_CREATED` and `TRANSACTION_CREATED` counts always match | 5 |
+| Audit log | `AUDIT_WRITE_FAILED` count stays at 0 | 6 |
+| Safe error handling | `ERROR_UNHANDLED` with the error name only (no stack trace), while the client gets a generic message | 6 |
+
+Each of these was triggered and seen in the local mock check
+([`mock-shipping-check.txt`](docs/logging-evidence/mock-shipping-check.txt)),
+and a smaller set was shipped to the real Axiom dataset
+([`live-shipping-check.txt`](docs/logging-evidence/live-shipping-check.txt)).
+
+**Limitations:**
+
+- **Best effort.** Shipping is best effort: during a long outage,
+  records beyond the queue cap are dropped (and counted), and records
+  still queued when the process is killed hard are lost. The console copy
+  is always complete.
+- **Trust.** The logs are only as trustworthy as the server that writes
+  them. A compromised server could stop logging, which is why monitors
+  that alert on *missing* data are worth adding.
+- **Thresholds.** The monitor thresholds are guesses for a small project.
+  They should be tuned against real traffic.
 
 ### Dependency audit
 
@@ -1353,8 +1628,10 @@ times.
   unknown email and a locked account all return the **same** `401`
   `{"success":false,"error":"Invalid email or password"}`, byte for byte,
   and take about the same time.
-- **Logging:** the lockout is logged as an `AUTH` event with the user id
-  only (never the email or password) and written to the audit log.
+- **Logging:** the lockout is logged as an `AUTH_LOCKOUT` event with the
+  user id only (never the email or password) and written to the audit log.
+  Later attempts on the locked account are `AUTH_LOGIN_FAILURE` with the
+  internal reason `locked`.
 
 **Two layers, two different threats.**
 
@@ -1429,7 +1706,8 @@ out.
 - **`POST /api/auth/logout-all`** increments `tokenVersion`, so every token,
   the current one included, stops working at once.
 - Both routes use `protect` and only ever act on the logged-in user. Both
-  are logged as `AUTH` events and written to the audit log.
+  are logged (`AUTH_PASSWORD_CHANGED`, `AUTH_LOGOUT_ALL`) and written to
+  the audit log.
 - **The Account page** (`/account`, in the nav for every role) has the
   change-password form:
   - inline validation and `autocomplete="current-password"` /
@@ -1764,7 +2042,7 @@ the Dockerfiles have passed lint.
 
 | Job | What it does | Why |
 |---|---|---|
-| **Backend - unit tests and npm audit** | `npm ci`, `npm test` (132 unit tests: tax calculator, startup settings check, trust proxy and rate limit buckets, health check, gig price validation, account lockout, token versions, audit log guards), `npm audit --omit=dev --audit-level=high` | Proves the money and security logic behaves, and that no known high or critical vulnerability ships in a production dependency |
+| **Backend - unit tests and npm audit** | `npm ci`, `npm test` (191 unit tests: tax calculator, startup settings check, trust proxy and rate limit buckets, health check, gig price validation, account lockout, token versions, audit log guards, log redaction, the structured logger, request ids and the cloud log shipper), `npm audit --omit=dev --audit-level=high` | Proves the money and security logic behaves, and that no known high or critical vulnerability ships in a production dependency |
 | **Frontend - tests, build and npm audit** | `npm ci`, `npm run test:run` (110 Vitest tests, including the CSP and security header consistency test), `npm run lint`, `npm run build` (and checks the CSP meta tag is in the build), `npm audit --omit=dev --audit-level=high` | Same for the React app; a build without its CSP fails |
 | **Secret scan - gitleaks (full history)** | gitleaks over **every commit** (`fetch-depth: 0`), not just the latest | A secret committed and later deleted is still in history; this catches it. No allowlist: the history scans clean |
 | **Lint - Dockerfiles, Compose and workflows** | hadolint on all three Dockerfiles; `docker compose config` on both Compose files, plus a check that Compose **refuses** to run without `JWT_SECRET`; actionlint and zizmor on this workflow | Catches insecure or broken container and pipeline configuration before anything runs. zizmor is a security audit of the workflow itself (injection, credential persistence, unpinned actions) |
