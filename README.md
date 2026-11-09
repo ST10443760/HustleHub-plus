@@ -1764,10 +1764,6 @@ GitHub. It is not a failure of the code or of the workflow: no step of
 the workflow ever ran. The status badge at the top of this README shows a
 failing or empty state for the same reason.
 
-![GitHub Actions run with every job not started and GitHub's message that the account is locked due to a billing issue](docs/pipeline-evidence/billing-lock-actions-run.png)
-
-![GitHub billing notice saying the account is locked](docs/pipeline-evidence/billing-lock-account.png)
-
 **How the pipeline was verified instead.** Every job was run locally with
 the exact same commands the workflow runs (listed in
 [Running every job locally](#running-every-job-locally)), on 9 November
@@ -2459,9 +2455,6 @@ dashboard.
 | [`13b-security-headers-continued.png`](docs/screenshots/13b-security-headers-continued.png) | The rest of the Helmet headers, including `X-Frame-Options: DENY` |
 | [`14-rate-limit-429.png`](docs/screenshots/14-rate-limit-429.png) | The 6th failed login refused with "Too many requests, please try again in 896 seconds." |
 | [`part1/`](docs/screenshots/part1/) | Part 1 Postman screenshots: health check, registration (success, duplicate, invalid), login (success, wrong password), protected route (no token, valid token) |
-
-The two billing lock images are shown in
-[Pipeline status and the billing lock](#pipeline-status-and-the-billing-lock).
 
 ### Demonstration videos
 
