@@ -1712,6 +1712,79 @@ that mount a folder. The rate limit collection runs through the client
 (`http://localhost:5173`), exactly like the pipeline. It needs freshly
 started counters, so run it before anything else after `up`.
 
+<!-- BEGIN: Pipeline status and the billing lock. Remove or edit this whole block once the pipeline runs on GitHub. -->
+
+### Pipeline status and the billing lock
+
+**What happens on GitHub.** GitHub refuses to start any job for this
+repository, because the account is locked due to a billing issue. Every
+job shows GitHub's own message:
+
+> The job was not started because your account is locked due to a billing issue.
+
+So every run shows **0 steps**, and every job is marked failed (the jobs
+that should have started) or skipped (the jobs that wait for them). This is an account setting on
+GitHub. It is not a failure of the code or of the workflow: no step of
+the workflow ever ran. The status badge at the top of this README shows a
+failing or empty state for the same reason.
+
+![GitHub Actions run with every job not started and GitHub's message that the account is locked due to a billing issue](docs/pipeline-evidence/billing-lock-actions-run.png)
+
+![GitHub billing notice saying the account is locked](docs/pipeline-evidence/billing-lock-account.png)
+
+**How the pipeline was verified instead.** Every job was run locally with
+the exact same commands the workflow runs (listed in
+[Running every job locally](#running-every-job-locally)), on 9 November
+2026:
+
+| Job | Local result |
+|---|---|
+| Backend: unit tests and npm audit | 191 tests passed; `npm audit --omit=dev --audit-level=high`: 0 vulnerabilities |
+| Frontend: tests, build and npm audit | 110 tests passed; lint clean; build passes with the CSP meta tag; npm audit: 0 vulnerabilities |
+| Secret scan: gitleaks | No leaks, full history |
+| Lint: Dockerfiles, Compose and workflows | hadolint clean on all three Dockerfiles; both Compose files valid, and Compose refuses to run without `JWT_SECRET`; actionlint and zizmor (strictest auditor persona): no findings |
+| Stack: build, smoke test and Newman | All images build and the stack is healthy; smoke test 15 checks; rate limit collection 20 requests and 26 assertions; main collection against the test override 131 requests and 246 assertions; 0 failed |
+| Image scan: Trivy | 0 fixable HIGH or CRITICAL in the api, client and certs images; 0 Dockerfile misconfigurations |
+| Dynamic scan: OWASP ZAP baseline | 0 FAIL, 3 WARN (informational), 65 PASS |
+| Static analysis: ESLint and Semgrep | 0 problems, 0 findings (152 rules) |
+
+The results are saved in [`docs/pipeline-evidence/`](docs/pipeline-evidence/README.md)
+(lint, config, audit, gitleaks, Trivy and ZAP output) and
+[`docs/test-evidence/`](docs/test-evidence/README.md) (every test run).
+
+**The workflow itself was checked** with actionlint (syntax, expressions
+and shell scripts in `run:` steps) and zizmor (a security audit of the
+workflow: script injection, credential persistence, unpinned actions,
+over-broad permissions), both with no findings.
+
+**It was proven to fail closed.** Each of these was broken on purpose,
+run with the job's command, shown to exit 1 (which fails the step and
+therefore the job and Pipeline OK), and then restored without being
+committed:
+
+- a unit test assertion (`npm test` exits 1)
+- the api lock file, rolled back to a version with a known body-parser
+  advisory (`npm audit --omit=dev --audit-level=high` exits 1)
+- the health check response (a Newman assertion fails, so Newman exits 1)
+- ZAP pointed at a page without the security headers (FAIL rules, exit 1)
+- an `eval` of `req.query` and a hard-coded JWT secret added to
+  `api/src/app.js` (`npm run lint` exits 1; Semgrep exits 1 with 3
+  findings)
+
+On top of that, every `run:` step uses `bash -e -o pipefail`, there is no
+`continue-on-error` and no `|| true`, and Pipeline OK checks every job's
+result explicitly, so a failed, cancelled or skipped job fails it.
+
+**How a reviewer can check it.**
+
+1. Run the commands in [Running every job locally](#running-every-job-locally)
+   and compare with the evidence files.
+2. Once the billing lock is cleared: **Actions**, then **CI**, then **Run
+   workflow** on `main`. Each job writes its results to the run's
+   **Summary**, and Pipeline OK adds a table of every job's result.
+
+<!-- END: Pipeline status and the billing lock -->
+
 ## 12. Static code analysis
 
 Two static analysis tools read the source code (without running it) and
