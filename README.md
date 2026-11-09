@@ -2372,12 +2372,39 @@ and a smaller set was shipped to the real Axiom dataset
 | [`docs/logging-evidence/`](docs/logging-evidence/README.md) | Real sample log records for every event, JSON lines from the API container, the mock and live Axiom checks, and ready-to-paste Axiom queries |
 | [`docs/screenshots/`](docs/screenshots/README.md) | The screenshots below |
 
-### Screenshots
+### Part 3 screenshots
 
-These screenshots were taken for Part 2. The pages look the same today
-apart from the new Account and Audit log links and the income page,
-which is now the tax dashboard. The Part 3 screens (tax dashboard,
-Account page, audit log, Axiom) are not in this list yet.
+Taken from the running Docker stack on 9 November 2026 with throwaway
+accounts. The admin's email is greyed out on the Users page.
+
+| File | What it shows |
+|---|---|
+| [`part3-01-income-dashboard.png`](docs/screenshots/part3-01-income-dashboard.png) | The freelancer's Income dashboard for 2026/27: R 300 000,00 earned from 3 bookings, R 40 572,00 estimated tax, R 259 428,00 take-home, 13,52% effective rate, the chart, the bracket table, the assumptions and the income per booking |
+| [`part3-02-chart-hover.png`](docs/screenshots/part3-02-chart-hover.png) | The monthly chart with November hovered: "R 300 000,00 · 3 bookings" |
+| [`part3-03-tax-by-bracket.png`](docs/screenshots/part3-03-tax-by-bracket.png) | The tax by bracket table, matching the worked example in [Tax estimation](#7-tax-estimation) |
+| [`part3-04-assumptions-disclaimer.png`](docs/screenshots/part3-04-assumptions-disclaimer.png) | How the estimate works: the assumptions, the disclaimer and the SARS source |
+| [`part3-05-empty-tax-year.png`](docs/screenshots/part3-05-empty-tax-year.png) | The 2025/26 tax year with no income, with that year's brackets and rebate |
+| [`part3-06-dashboard-phone.png`](docs/screenshots/part3-06-dashboard-phone.png) | The dashboard at phone width (390 px) |
+| [`part3-07-account-validation.png`](docs/screenshots/part3-07-account-validation.png) | The Account page after an empty submit: an inline error under each field |
+| [`part3-08-account-wrong-current.png`](docs/screenshots/part3-08-account-wrong-current.png) | A wrong current password: a `400` message, and the user stays logged in |
+| [`part3-09-account-success.png`](docs/screenshots/part3-09-account-success.png) | "Password changed. You have been signed out everywhere else." |
+| [`part3-10-lockout-correct-password-rejected.png`](docs/screenshots/part3-10-lockout-correct-password-rejected.png) | After 5 wrong passwords the correct password is still refused with "Invalid email or password" |
+| [`part3-12-sign-out-confirm.png`](docs/screenshots/part3-12-sign-out-confirm.png) | The "Sign out of all devices?" confirmation |
+| [`part3-14-audit-log.png`](docs/screenshots/part3-14-audit-log.png) | The admin Audit log: account locked, signed out of all devices, password changed, admin deleted a gig |
+| [`part3-15-audit-log-filtered.png`](docs/screenshots/part3-15-audit-log-filtered.png) | The Audit log filtered to "Password changed" |
+| [`part3-16-admin-users.png`](docs/screenshots/part3-16-admin-users.png) | The admin Users page |
+| [`part3-17-admin-transactions.png`](docs/screenshots/part3-17-admin-transactions.png) | The admin All transactions page: each transaction linked to its client and freelancer |
+| [`part3-18-client-transactions.png`](docs/screenshots/part3-18-client-transactions.png) | The client's My transactions with each `TXN-...` reference |
+
+Numbers 11 and 13 are not used: the login page doesn't show its "session
+ended" and "signed out of all devices" messages (see
+[Known limitations](#known-limitations)).
+
+### Part 2 screenshots
+
+These were taken for Part 2. The pages look the same today apart from the
+new Account and Audit log links and the income page, which is now the tax
+dashboard.
 
 | File | What it shows |
 |---|---|
