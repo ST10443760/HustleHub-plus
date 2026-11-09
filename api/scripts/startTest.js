@@ -5,7 +5,12 @@
  * Only for local testing. It refuses to run with NODE_ENV=production, and
  * the API ignores these overrides in production anyway.
  *
- * Usage (from api/): npm run start:test
+ * Usage (from api/):
+ *   npm run start:test          relaxed limits, for the main collection
+ *   npm run start:test:strict   the real (strict) limits, for the rate
+ *                               limit collection
+ *
+ * Both are test runs: cloud log shipping stays off (see below).
  */
 const logger = require('../src/utils/logger');
 
@@ -23,13 +28,19 @@ if (process.env.NODE_ENV === 'production') {
   process.exit(1);
 }
 
+const strict = process.argv.includes('--strict');
+
 // Set before the server loads .env - dotenv never overwrites a variable
 // that's already set, so these win over anything in the file.
-for (const key of OVERRIDES) {
-  // eslint-disable-next-line security/detect-object-injection -- key is one of the fixed OVERRIDES names above
-  process.env[key] = RELAXED_MAX;
+if (strict) {
+  logger.info('Starting with the STRICT rate limits - for the rate limit tests');
+} else {
+  for (const key of OVERRIDES) {
+    // eslint-disable-next-line security/detect-object-injection -- key is one of the fixed OVERRIDES names above
+    process.env[key] = RELAXED_MAX;
+  }
+  logger.warn('Starting with RELAXED rate limits - for local testing only');
 }
-logger.warn('Starting with RELAXED rate limits - for local testing only');
 
 // Marks this as a test run, so cloud log shipping stays OFF even though
 // api/.env has the Axiom settings: the Newman runs must not fill the real
