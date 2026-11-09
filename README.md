@@ -338,112 +338,87 @@ Versions are the ones installed from the lock files.
 | Containers | Docker and Docker Compose. Images: `node:22.23.4-alpine3.24`, `nginxinc/nginx-unprivileged:1.31.7-alpine3.24`, `alpine:3.24.4` (the Dockerfile base images are pinned by version and digest) and `mongo:8.0.34-noble` (pinned by version in Compose) |
 | CI/CD and scanning | GitHub Actions, Dependabot, gitleaks, hadolint, actionlint, zizmor, Trivy, OWASP ZAP |
 
-## 6. How to Run
+## 4. Getting started
 
-Every command below was run, in this order, on a fresh clone of the
-repository (Windows 11 with Git Bash and PowerShell, plus a Linux container
-for the certificate and Node 22 checks).
+There are two ways to run HustleHub+. They don't share data: Docker uses
+its own MongoDB unless you point it at Atlas.
 
-### Requirements
+- **A. Local development with npm**: the API and the client run on your
+  machine, with MongoDB Atlas (or a local replica set).
+- **B. Docker Compose**: the whole stack in containers with one command.
 
-| Dependency | Version | Used for |
+### Prerequisites
+
+| Dependency | Version | Needed for |
 |---|---|---|
-| Node.js | **22 or newer** (22.22+ or 24.15+; the client's test tools don't support odd-numbered releases) | Running the API, building the client and all tests. `engines` is set in both `package.json` files |
-| npm | comes with Node | Installing packages (`npm ci`) and running the scripts |
-| Git | any recent | Cloning the repository. On Windows, Git for Windows also provides OpenSSL |
-| A MongoDB database | MongoDB Atlas (free tier) or a local MongoDB running as a replica set | Storing all data. Bookings use multi-document transactions, which need a replica set (every Atlas cluster is one). See **Getting a MONGO_URI** |
-| OpenSSL | any recent, used through `npm run certs` | Creating the local self-signed HTTPS certificate |
-| Newman | 6, used through `npx` (nothing to install) | Running the Postman collections from the command line |
+| Node.js | **22 or newer** (22.22+ or 24.15+; the client's test tools don't support odd-numbered releases) | A, and running the tests and the smoke test. `engines` is set in both `package.json` files |
+| npm | comes with Node | A: `npm ci` and the scripts |
+| Git | any recent | Cloning. On Windows, Git for Windows also provides OpenSSL |
+| MongoDB | MongoDB Atlas (free tier) or a local MongoDB running as a **replica set** | A. Bookings use multi-document transactions, which need a replica set (every Atlas cluster is one). See [Getting a MONGO_URI](#getting-a-mongo_uri) |
+| OpenSSL | any recent, used through `npm run certs` | A: the local HTTPS certificate |
+| Docker Desktop, or Docker Engine with the Compose plugin | recent | B, and the Semgrep, Trivy, gitleaks and ZAP scans |
+| Newman | 6, run through `npx` (nothing to install) | Running the Postman collections |
 
-All other dependencies are installed by `npm ci` from the lock files.
+### Environment variables
 
-The backend and frontend are separate projects; run each in its own terminal.
+Secrets live only in the git-ignored `.env` files: `api/.env` for option A
+and the root `.env` (next to `docker-compose.yml`) for option B. Copy them
+from `api/.env.example` and `.env.example`, which hold placeholders only.
+The client needs **no** env file: it only calls relative `/api/...` URLs.
 
-### Backend (`api/`)
+Every variable the API reads:
+
+| Variable | Required? | What it does | Where |
+|---|---|---|---|
+| `MONGO_URI` | **Required** (Docker defaults to its own mongo container) | MongoDB connection string | `api/.env`; optional in the root `.env` |
+| `JWT_SECRET` | **Required** | Signs the login tokens. Use a long random string; at least 32 characters when `NODE_ENV=production`, or the API refuses to start | both |
+| `JWT_EXPIRES_IN` | Optional (default `1h`) | How long a token stays valid | both |
+| `CLIENT_ORIGIN` | Optional in development (default `http://localhost:5173`), **required in production** | The only browser origin the API accepts (CORS) and allows in its CSP. Exact origin, no trailing slash. Compose sets it | `api/.env` |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | Required for the admin seed (`ADMIN_NAME` defaults to `Administrator`) | The admin account the seed script creates. Password at least 12 characters | both |
+| `PORT` | Optional (default `5000`) | API port. The Vite proxy and the Postman collections expect 5000 | `api/.env` |
+| `NODE_ENV` | Optional (default `development`) | `production` forces the strict rate limits and lockout, requires `CLIENT_ORIGIN`, checks the `JWT_SECRET` length and makes JSON the default log format. Compose sets `production` | `api/.env` |
+| `TRUST_PROXY` | Optional (default off) | Number of reverse proxies in front of the API (1 in Compose), so rate limits see the real client IP. Only a whole number from 1 to 5 is accepted; `true` is refused | set by Compose |
+| `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_BOOKING_MAX`, `RATE_LIMIT_PASSWORD_CHANGE_MAX`, `RATE_LIMIT_GENERAL_MAX` | Optional, local testing only | Raise a limiter's maximum. **Ignored when `NODE_ENV=production`**. `npm run start:test` and the Compose test override set them | `api/.env` (commented out) |
+| `LOCKOUT_MAX_ATTEMPTS`, `LOCKOUT_WINDOW_MINUTES`, `LOCKOUT_DURATION_MINUTES` | Optional, local testing only | Change the account lockout policy (default 5 failures in 15 minutes lock for 15 minutes). **Ignored when `NODE_ENV=production`** | `api/.env` (commented out) |
+| `LOG_FORMAT` | Optional | `pretty` (readable lines, the default in development) or `json` (the default in production and Docker) | both |
+| `LOG_SHIPPING_URL`, `LOG_SHIPPING_TOKEN` | Optional (empty means off) | Cloud logging to Axiom: `https://<edge-domain>/v1/ingest/<dataset>` and an ingest-only API token. See [Logging and monitoring](#14-logging-and-monitoring) | both |
+| `LOG_SHIPPING_IN_TEST` | Optional | Set to `1` to ship logs from a test run anyway (for a demo) | `api/.env` |
+
+Two more are read but never set by hand: `HUSTLEHUB_TEST_RUN` is set by
+`npm run start:test` to mark a test run, and `NODE_TEST_CONTEXT` is set by
+Node's own test runner. Both keep cloud log shipping off. Docker Compose
+also reads `API_TEST_PORT` from your shell for the test override (see
+[Docker](#13-docker)).
+
+### A. Local development with npm
+
+The API and the client are separate projects; run each in its own
+terminal.
+
+**1. API** (`api/`):
 
 ```bash
 cd api
 npm ci                    # exact versions from package-lock.json
 cp .env.example .env      # PowerShell: Copy-Item .env.example .env
-```
-
-Then edit `api/.env`. It is git-ignored and never committed; the values below
-are the **placeholders** from `.env.example`, never real ones. These are all
-the variables the code reads:
-
-| Variable | Required? | Purpose | Placeholder |
-|---|---|---|---|
-| `MONGO_URI` | **Required** | MongoDB connection string (see **Getting a MONGO_URI**) | `mongodb://localhost:27017/hustlehub` |
-| `JWT_SECRET` | **Required** | Secret that signs the login tokens. Use a long random string | `replace_with_a_long_random_secret` |
-| `JWT_EXPIRES_IN` | Optional (default `1h`) | How long a login token stays valid | `1h` |
-| `CLIENT_ORIGIN` | Optional in development (default `http://localhost:5173`), **required in production** | The only browser origin the API accepts (CORS) and allows in the CSP. Exact origin, no trailing slash | `http://localhost:5173` |
-| `ADMIN_EMAIL` | **Required for** `npm run seed:admin` | Email of the admin account the seed script creates | `admin@example.com` |
-| `ADMIN_PASSWORD` | **Required for** `npm run seed:admin` | Its password, at least 12 characters | `replace_with_a_strong_password` |
-| `ADMIN_NAME` | Optional (default `Administrator`) | Its display name | `HustleHub Admin` |
-| `PORT` | Optional (default `5000`) | API port. The client proxy and the Postman collections expect `5000` | `5000` |
-| `NODE_ENV` | Optional (default `development`) | `production` forces the strict rate limits, requires `CLIENT_ORIGIN` and leaves stack traces out of the logs | `development` |
-| `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_BOOKING_MAX`, `RATE_LIMIT_GENERAL_MAX` | Optional, local testing only | Raise a rate limit's maximum. **Ignored when `NODE_ENV` is `production`**. `npm run start:test` sets them for you, so leave them commented out | commented out |
-
-The **client needs no env file**: it only calls relative `/api/...` URLs, and
-the Vite proxy forwards them to the API.
-
-#### Getting a MONGO_URI
-
-**MongoDB Atlas (free, what this project was tested on):**
-
-1. Create a free account at <https://www.mongodb.com/cloud/atlas> and create a
-   free (M0) cluster.
-2. **Database Access** → Add New Database User. Give it a username and a
-   password made of **plain letters and numbers only** (symbols such as
-   `@`, `:` or `/` would have to be URL-encoded in the connection string),
-   with the "Read and write to any database" role.
-3. **Network Access** → Add IP Address → **Add Current IP Address**.
-4. **Connect** → Drivers, and copy the connection string. Put your database
-   user's password in place of `<password>`, and add the database name
-   `hustlehub` after the host, before the `?`:
-   `mongodb+srv://<user>:<password>@<your-cluster-host>/hustlehub?retryWrites=true&w=majority`
-5. Paste it into `api/.env` as `MONGO_URI`. If the `mongodb+srv://` string
-   fails with `querySrv ECONNREFUSED`, see **Troubleshooting**.
-
-**Local MongoDB:** `mongodb://localhost:27017/hustlehub`. A plain
-(standalone) local MongoDB starts the API and serves everything except
-bookings, because MongoDB only allows multi-document transactions on a
-replica set (checked: on a standalone MongoDB 8.0 the booking transaction
-is refused). To use a local database, run it as a single-node replica set as
-MongoDB documents it: start `mongod` with `--replSet rs0` (or set
-`replication.replSetName: rs0` in `mongod.cfg` and restart the service), then
-run `rs.initiate()` once in `mongosh`, and keep the same URI. This project was
-tested on Atlas; the local replica-set setup was not run here.
-
-Generate the local HTTPS certificate **before starting the API**, seed the
-admin, then start the server:
-
-```bash
+# edit api/.env: MONGO_URI, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
 npm run certs             # creates api/certs/key.pem and cert.pem (git-ignored)
 npm run seed:admin        # creates the admin account; safe to run again
 npm run dev               # https://localhost:5000 (nodemon)
 ```
 
-- `npm run certs` works the same in Git Bash, PowerShell, macOS and Linux.
-  To run OpenSSL by hand instead (and why the raw command fails in Git
-  Bash), see [`api/certs/README.md`](api/certs/README.md).
-- **If the certificate is missing**, the API still starts but on plain
-  **HTTP** and logs a warning. The client proxy and both Postman collections
-  expect HTTPS, so the client then gets `502` errors (Vite logs
-  `EPROTO ... wrong version number`) and Newman fails. Run `npm run certs`
-  and restart.
-- The server connects to MongoDB before it starts listening and exits with a
-  safe message (never the URI) if it can't.
-- Check it: `curl -k https://localhost:5000/api/health`. Browsers and Postman
-  warn about the self-signed certificate - that's expected locally (in
-  Postman, turn off "SSL certificate verification" under Settings → General).
-- Other API scripts: `npm start` (no nodemon), `npm run start:test` (relaxed
-  rate limits for the main Newman run - see **Testing**), `npm run clean:test`
-  (see below).
+- `npm run certs` works the same in Git Bash, PowerShell, macOS and
+  Linux. To run OpenSSL by hand, see [`api/certs/README.md`](api/certs/README.md).
+- **Without the certificate** the API starts on plain HTTP and logs a
+  warning. The client proxy and the Postman collections expect HTTPS, so
+  run `npm run certs` and restart.
+- The API checks `JWT_SECRET` and `MONGO_URI` before it starts, connects
+  to MongoDB before it listens, and exits with a safe message (never the
+  URI) if either fails.
+- Check it: `curl -k https://localhost:5000/api/health`. Browsers and
+  Postman warn about the self-signed certificate; that's expected locally.
 
-### Frontend (`client/`)
-
-With the API running, in a second terminal:
+**2. Client** (`client/`), with the API running:
 
 ```bash
 cd client
@@ -451,51 +426,111 @@ npm ci
 npm run dev               # http://localhost:5173
 ```
 
-Open `http://localhost:5173`. Vite proxies every `/api` request to
-`https://localhost:5000`, so the client only ever calls relative `/api/...`
-URLs and no API host or port is hard-coded. The proxy skips certificate
-checks (`secure: false`) only because the local certificate is self-signed;
-this setting is dev-only.
+Vite forwards every `/api` request to `https://localhost:5000`. It skips
+the certificate check (`secure: false`) only because the local
+certificate is self-signed; this setting is dev-only. To try the
+production build under the real CSP, stop the dev server and run
+`npm run build` then `npm run preview` (same port, so CORS still
+matches).
 
-### Built client (production build)
+**Other API scripts**
 
-Stop the dev server first (preview uses the same port), keep the API running:
+| Script | What it does |
+|---|---|
+| `npm start` | Starts the API without nodemon |
+| `npm run start:test` | Relaxed rate limits for the main Newman run. Refuses to run in production. Never ships logs to the cloud |
+| `npm run start:test:strict` | The real (strict) limits, marked as a test run, for the rate limit collection |
+| `npm run clean:test` | Removes the throwaway test users (`test-...@example.com`, `role-...@example.com`) with their gigs, bookings and transactions. Never deletes an admin. Refuses to run in production |
+| `npm run log:test` | Sends one labelled test event to Axiom and prints only the HTTP status and the ingested and failed counts |
+| `npm test`, `npm run lint` | Unit tests and ESLint (see [Testing](#10-testing)) |
 
-```bash
-cd client
-npm run build             # production build in client/dist/
-npm run preview           # serves dist/ at http://localhost:5173 with the CSP headers and the /api proxy
+#### Getting a MONGO_URI
+
+**MongoDB Atlas (free, what this project was tested on):**
+
+1. Create a free account at <https://www.mongodb.com/cloud/atlas> and a
+   free (M0) cluster.
+2. **Database Access**: add a database user. Use a password of **plain
+   letters and numbers only** (symbols such as `@`, `:` or `/` would have
+   to be URL-encoded in the connection string), with the "Read and write
+   to any database" role.
+3. **Network Access**: **Add Current IP Address**.
+4. **Connect**, then **Drivers**, and copy the connection string. Put your
+   database user's password in place of `<password>` and add the database
+   name `hustlehub` after the host, before the `?`:
+   `mongodb+srv://<user>:<password>@<your-cluster-host>/hustlehub?retryWrites=true&w=majority`
+5. Paste it into `api/.env` as `MONGO_URI`. If the `mongodb+srv://` string
+   fails with `querySrv ECONNREFUSED`, see [Troubleshooting](#troubleshooting).
+
+**Local MongoDB:** `mongodb://localhost:27017/hustlehub`. A standalone
+MongoDB serves everything except bookings, because MongoDB only allows
+multi-document transactions on a replica set. To use a local database,
+start `mongod` with `--replSet rs0`, run `rs.initiate()` once in
+`mongosh`, and keep the same URI. This project was tested on Atlas and in
+Docker, not on a local replica set.
+
+### B. Docker Compose
+
+Needs only Docker (no local Node, MongoDB or OpenSSL). Port **5173** must
+be free, so stop `npm run dev` first.
+
+```powershell
+# 1. Root .env (git-ignored). Compose refuses to start without JWT_SECRET.
+Copy-Item .env.example .env
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+notepad .env    # paste the value after JWT_SECRET=, set ADMIN_PASSWORD (12+ characters)
+
+# 2. Build and start; --wait returns once every service is healthy
+docker compose up -d --build --wait
+docker compose ps
+
+# 3. Create the admin account (once; running it again changes nothing)
+docker compose run --rm seed
+
+# 4. Optional: smoke test through the client container
+node docker/smoke-test.mjs
 ```
 
-Preview deliberately uses the same port as the dev server. Browsers send an
-`Origin` header on POST requests, the proxy passes it on, and the API's CORS
-only accepts `CLIENT_ORIGIN` (`http://localhost:5173`), so the built app has to
-be served from that origin too.
+In bash, use `cp .env.example .env` and
+`sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 48)/" .env`
+for step 1. `docker compose ps` should show `mongo`, `api` and `client` as
+`Up ... (healthy)` and `certs` as `Exited (0)`, which is correct for a
+one-shot step. If `LOG_SHIPPING_URL` and `LOG_SHIPPING_TOKEN` are set in
+the root `.env`, the API container ships its logs to Axiom.
 
-### Clearing test data
+Stop with `docker compose down` (keeps the data) or `docker compose down -v`
+(also deletes the database and the certificate). Container details,
+hardening and the test override are in [Docker](#13-docker).
 
-Newman runs and manual testing create throwaway users
-(`test-...@example.com`, `role-...@example.com`). To remove only those users
-and the gigs, bookings and transactions that belong to them:
+### The admin account
 
-```bash
-cd api
-npm run clean:test
-```
+Admins can't sign up through the app: registration only accepts `client`
+or `freelancer`, and `"role": "admin"` gets a `400`. The admin is created
+by the seed script from `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ characters)
+and `ADMIN_NAME`:
 
-It prints how much it removed, never deletes an admin, and refuses to run
-when `NODE_ENV` is `production`.
+- npm: `cd api; npm run seed:admin`
+- Docker: `docker compose run --rm seed` (the `ADMIN_*` values exist only
+  in that short-lived container, never in the running API)
 
-### Running with Docker
+If the account already exists, the script changes nothing. The admin can
+change the password later on the Account page.
 
-The whole stack (MongoDB, the API and the React client) can also run in
-containers with one command. The normal `npm run dev` workflow above is
-**unchanged** and doesn't need Docker. The two don't share data: Docker
-uses its own MongoDB unless you point it at Atlas.
+### URLs
 
-**Prerequisites:** Docker Desktop (Windows/macOS) or Docker Engine with the
-Compose plugin (Linux), running. Nothing else: no local Node, MongoDB or
-OpenSSL needed. Port **5173** must be free (stop `npm run dev` first).
+| What | npm (A) | Docker (B) |
+|---|---|---|
+| The app | <http://localhost:5173> | <http://localhost:5173> |
+| API | `https://localhost:5000/api/...` (also through the Vite proxy) | Not published; reached through `http://localhost:5173/api/...` |
+| Health check | `https://localhost:5000/api/health` | `http://localhost:5173/api/health` |
+| API for Newman in Docker | n/a | `https://localhost:5000` with the test override only |
+
+## 13. Docker
+
+How to start the stack is in [Getting started, B](#b-docker-compose). This
+section explains what runs and how it is hardened. Each of `api/` and
+`client/` has its own Dockerfile and `.dockerignore`, so they build on
+their own.
 
 ```mermaid
 flowchart LR
@@ -513,82 +548,25 @@ flowchart LR
     S["seed (on demand)<br/>creates the admin"] -.-> M
 ```
 
-**1. Create the root `.env`** (next to `docker-compose.yml`; it's
-gitignored). Compose refuses to start without `JWT_SECRET`.
-
-PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-notepad .env   # paste the value after JWT_SECRET=, set ADMIN_PASSWORD (12+ characters)
-```
-
-bash:
+### Logs, stopping and resetting
 
 ```bash
-cp .env.example .env
-sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 48)/" .env   # or paste one by hand
-nano .env   # set ADMIN_PASSWORD (12+ characters)
-```
-
-**2. Build and start** (same command in PowerShell and bash, from the repo
-root):
-
-```bash
-docker compose up -d --build --wait
-docker compose ps
-```
-
-`--wait` returns once everything is healthy. `docker compose ps` should
-show `mongo`, `api` and `client` as `Up ... (healthy)` and `certs` as
-`Exited (0)`, which is correct for a one-shot step. The first build takes a
-few minutes.
-
-**3. Create the admin account** (once; running it again changes nothing):
-
-```bash
-docker compose run --rm seed
-```
-
-**4. Open the app** at **http://localhost:5173**. Register, log in, create
-gigs and book them exactly as with `npm run dev`. The API and MongoDB are
-not reachable from the host on purpose. Everything goes through the
-client at port 5173.
-
-**5. Smoke test** (needs Node 22 on the host, no packages):
-
-```bash
-node docker/smoke-test.mjs
-```
-
-It checks that the page is served with a CSP header, that `/api/health`
-works through the proxy, and that register, login, a protected route (200
-with a token, 401 without) and an admin-only route (403 for a client) all
-behave. It exits non-zero on any failure. It creates one
-`test-smoke-...@example.com` user each run; registration is limited to 10
-per hour per IP, so don't run it more often than that against the normal
-stack.
-
-**Logs, stopping and resetting**
-
-```bash
-docker compose logs -f api      # follow the API log (login, booking, transaction events)
+docker compose logs -f api      # follow the API log: one JSON record per line (LOG_FORMAT=json)
 docker compose down             # stop and remove the containers, keep the data
 docker compose down -v          # also delete the database and the certificate (full reset)
 ```
 
-**What the containers do**
+### What the containers do
 
 | Service | Image | Notes |
 |---|---|---|
 | `certs` | `docker/certs` (Alpine 3.24.4 + OpenSSL) | Runs once and creates a self-signed cert (SAN `localhost`, `api`, `127.0.0.1`) in the `certs` volume. Keeps an existing cert unless it expires within a day |
 | `mongo` | `mongo:8.0.34-noble` | Single-member **replica set** `rs0`, because bookings and their transactions are saved in one MongoDB transaction, which a standalone server doesn't support. The healthcheck initiates the set the first time and only reports healthy once it is primary. Not published to the host; it has no authentication, so it must stay internal |
-| `api` | `api/Dockerfile` (Node 22.23.4 Alpine) | `NODE_ENV=production`, HTTPS with the shared cert, `CLIENT_ORIGIN=http://localhost:5173`, `TRUST_PROXY=1`. Not published to the host |
+| `api` | `api/Dockerfile` (Node 22.23.4 Alpine) | `NODE_ENV=production`, HTTPS with the shared cert, `CLIENT_ORIGIN=http://localhost:5173`, `TRUST_PROXY=1`, `LOG_FORMAT=json`, and the `LOG_SHIPPING_*` values from the root `.env` as runtime variables only. Not published to the host |
 | `client` | `client/Dockerfile` (Vite build, then `nginx-unprivileged` 1.31.7) | Serves the build on 8080 (published as 5173) with the same security headers as `npm run preview`, and proxies `/api` to the API |
 | `seed` | the API image | Only runs when you call `docker compose run --rm seed`. The `ADMIN_*` values exist only in this short-lived container |
 
-**Security measures in the Docker setup**
+### Security measures in the Docker setup
 
 - **Non-root everywhere.** The api runs as `node` (uid 1000), nginx as uid
   101, mongo as uid 999 and the cert step as uid 1000. Every service also
@@ -599,8 +577,10 @@ docker compose down -v          # also delete the database and the certificate (
 - **No secrets in images.** Both `.dockerignore` files are allowlists, so
   `.env`, `certs/*.pem`, keys, tests, Postman files and the host's
   `node_modules` never enter the build context. Secrets come from the root
-  `.env` at runtime, and the cert is mounted read-only. `docker history`
-  and a file listing of each image show no secret values and no key files.
+  `.env` at runtime, and the cert is mounted read-only. The Axiom token is
+  a runtime variable only, never a build argument. `docker history`, the
+  image metadata and a search of each image's exported file system show
+  no secret values and no key files.
 - **One CSP.** The client's CSP and security headers are defined once in
   `client/securityHeaders.js`. Vite uses it for the `<meta>` tag and
   `npm run preview`, and the Docker build generates nginx's `add_header`
@@ -633,20 +613,23 @@ docker compose down -v          # also delete the database and the certificate (
 - **Health check outside the limits.** `GET /api/health` returns
   `{ "success": true, "data": { "status": "ok" } }` and nothing else. It is
   registered before the rate limiters, so healthchecks can't use up a
-  limit, and it isn't written to the request log.
+  limit, and it isn't written to the access log.
 
-**Using MongoDB Atlas instead.** Set `MONGO_URI` in the root `.env` to your
+### Using MongoDB Atlas instead
+
+ Set `MONGO_URI` in the root `.env` to your
 Atlas connection string. The local mongo container still starts but isn't
 used.
 
-**Running Newman against the containers (test only).**
+### Running Newman against the containers (test only)
+
 `docker-compose.test.yml` is a test-only override. It publishes the API on
 `127.0.0.1:5000` (loopback only) and applies the same relaxed rate limits
 as `npm run start:test`. The API ignores the `RATE_LIMIT_*_MAX` overrides
 when `NODE_ENV=production`, so the override sets `NODE_ENV=test`. Other
-effects of that: stack traces of unexpected errors go to the server log,
-the `JWT_SECRET` length check is skipped and `clean:test` may run. Never use
-it for a real deployment.
+effects of that: the `JWT_SECRET` length check is skipped, `clean:test`
+may run, and cloud log shipping stays off (the override also forces
+`LOG_SHIPPING_IN_TEST` empty). Never use it for a real deployment.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build --wait
@@ -668,7 +651,7 @@ backtick instead of `\`). If port 5000 is already taken, for example by
 `export API_TEST_PORT=5001` (bash) before `up`, and use
 `base_url=https://localhost:5001`.
 
-**Docker troubleshooting**
+### Docker troubleshooting
 
 | Problem | Fix |
 |---|---|
