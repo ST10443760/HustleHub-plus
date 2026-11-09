@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const { routeOf } = require('../utils/requestContext');
 
 /**
  * Custom error class so controllers can throw errors with a specific
@@ -55,7 +56,8 @@ function errorHandler(err, req, res, next) {
   // under strict: 'throw'). That's bad input, not a server fault, but the
   // raw message names schema paths, so it's replaced with a generic one.
   if (['ValidationError', 'CastError', 'StrictModeError'].includes(err.name)) {
-    err = Object.assign(new AppError('Invalid input', 400), { stack: err.stack, cause: err.message });
+    logger.event('VALIDATION_FAILED', 'Request failed schema validation', { source: 'schema', errorName: err.name });
+    err = Object.assign(new AppError('Invalid input', 400), { cause: err.name });
   }
 
   // The body parser rejected the request before any route ran (bad JSON,
@@ -63,32 +65,36 @@ function errorHandler(err, req, res, next) {
   // body, so they're swapped for fixed ones.
   if (err.type && BODY_PARSER_MESSAGES[err.type]) {
     const [message, status] = BODY_PARSER_MESSAGES[err.type];
-    err = Object.assign(new AppError(message, status), { stack: err.stack, cause: err.type });
+    logger.event('VALIDATION_FAILED', 'Request body rejected', { source: 'body_parser', reason: err.type });
+    err = Object.assign(new AppError(message, status), { cause: err.type });
   }
 
   // CORS refused a disallowed browser origin (see config/security.js).
   if (err.blockedOrigin) {
-    logger.event('CORS', 'Blocked request from a disallowed origin', {
+    logger.event('ACCESS_DENIED', 'Blocked request from a disallowed origin', {
+      reason: 'cors_origin',
+      status: err.statusCode || 403,
       origin: err.blockedOrigin,
-      method: req.method,
-      path: req.originalUrl,
-      ip: req.ip,
+      route: routeOf(req),
     });
   }
 
   const statusCode = err.statusCode || 500;
 
-  // Full details go to the server log only - never to the client. Stack
-  // traces are only logged for unexpected errors (bugs), and never in
-  // production; expected ones (bad input, 401/403/404) don't need them.
-  const logStack = !err.isOperational && process.env.NODE_ENV !== 'production';
-  logger.error(err.message, {
-    statusCode,
-    path: req.originalUrl,
-    method: req.method,
-    cause: err.cause,
-    stack: logStack ? err.stack : undefined,
-  });
+  // Details go to the server log only - never to the client. Server faults
+  // are logged as ERROR_UNHANDLED with the error's name, message and status
+  // only: no stack trace, no file paths. Expected errors (bad input,
+  // 401/403/404/409) are a warning; the events above and in the
+  // middleware already say why.
+  if (statusCode >= 500) {
+    logger.event('ERROR_UNHANDLED', 'Request failed with a server error', {
+      errorName: err.name,
+      errorMessage: err.message,
+      status: statusCode,
+    });
+  } else {
+    logger.warn(err.message, { status: statusCode, cause: err.cause });
+  }
 
   const safeMessage =
     err.isOperational && err.message
