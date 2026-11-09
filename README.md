@@ -1244,7 +1244,16 @@ out.
     the form is cleared after a change.
 
   It also has a **Sign out of all devices** button with a confirmation step;
-  afterwards the app returns to the login page.
+  afterwards the login page says "You have been signed out of all devices."
+- **The login page says why a session ended.** Any other device whose
+  token was revoked lands on Log in with "Your session has ended. Please
+  log in again." on its next request or when it reloads. The reason is
+  kept as a one-shot notice in the auth context (`AuthProvider`), not in
+  the navigation state, because `ProtectedRoute` redirects at the same
+  moment with its own state and used to replace it. The login page reads
+  the notice once and clears it, so it never appears on a later visit, and
+  a normal login still returns the user to the page they came from. The
+  messages are fixed text with `role="status"`.
 - This also removes an old limitation: the seeded admin password could
   only be changed by editing the database. Now an admin changes it on the
   Account page like anyone else.
@@ -1260,6 +1269,13 @@ is now a `400`.
 ![A successful password change: "Password changed. You have been signed out everywhere else."](docs/screenshots/part3-09-account-success.png)
 
 ![The Sign out of all devices confirmation box](docs/screenshots/part3-12-sign-out-confirm.png)
+
+![The login page after Sign out of all devices, saying "You have been signed out of all devices"](docs/screenshots/part3-13-signed-out-all-devices.png)
+
+A second browser logged in as the same user, after the password was
+changed in the first one:
+
+![The second browser lands on Log in with "Your session has ended. Please log in again."](docs/screenshots/part3-11-session-ended.png)
 
 **Files:** `api/src/utils/generateToken.js` (`tv` in the token),
 `api/src/middleware/authMiddleware.js`, `api/src/controllers/authController.js`,
