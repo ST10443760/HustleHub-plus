@@ -1,12 +1,17 @@
 # Remote run status
 
-Run: https://github.com/ST10443760/HustleHub-plus/actions/runs/42386239043 (push to `main`, commit `6e64fbf`, 7 November 2026)
-
-**Result: no job ran.** GitHub did not start any job and gave this reason on each one:
+**Result: no job has ever run on GitHub.** GitHub doesn't start any job,
+because the account that owns the repository is locked due to a billing
+issue. Every job gives this reason:
 
 > The job was not started because your account is locked due to a billing issue.
 
-That is an account setting on GitHub, not a problem in the workflow. The jobs below show `failure` (never started) or `skipped` (their dependencies never ran). Nothing in this run says anything about the code: see `local-checks.txt` and the README for what was verified locally.
+That is an account setting on GitHub, not a problem in the workflow or the
+code: no step of the workflow ran. Jobs show `failure` (never started) or
+`skipped` (their dependencies never ran), with 0 steps each.
+
+The first run (push to `main`, commit `6e64fbf`, 7 November 2026) reported
+these jobs:
 
 | Job | Conclusion | Steps run |
 |---|---|---|
@@ -19,4 +24,11 @@ That is an account setting on GitHub, not a problem in the workflow. The jobs be
 | Stack - build, smoke test and Newman | skipped | 0 |
 | Dynamic scan - OWASP ZAP baseline | skipped | 0 |
 
-Once the billing lock is cleared, re-run the workflow (Actions → CI → Run workflow) and replace this file with the green run.
+(The static analysis job was added to the workflow later.) Every later run,
+up to the last one checked on 9 November 2026, also ran 0 steps for the
+same reason.
+
+What was verified locally instead is in [`README.md`](README.md) in this
+folder and in the main README section "Pipeline status and the billing
+lock". Once the billing lock is cleared, re-run the workflow (Actions, CI,
+Run workflow) and replace this file with the result of that run.
