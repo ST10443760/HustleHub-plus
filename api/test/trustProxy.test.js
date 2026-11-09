@@ -40,8 +40,9 @@ async function startLimitedApp(trustProxy) {
   return { call, close: () => new Promise((resolve) => server.close(resolve)) };
 }
 
-// Collects console.error / console.warn output while `fn` runs (the rate
-// limiter's own handler logs to console.log, which is left alone).
+// Collects console.error / console.warn output while `fn` runs. The app's
+// own warnings (RATE_LIMIT_EXCEEDED, the access log) go there too, so the
+// tests below only look for express-rate-limit's validation warnings.
 async function captureWarnings(fn) {
   const seen = [];
   const original = { error: console.error, warn: console.warn };
@@ -67,7 +68,11 @@ describe('rate limit buckets behind a proxy', () => {
         assert.equal(other.status, 200); // second client still has its own allowance
         assert.equal((await other.json()).ip, '203.0.113.2');
       });
-      assert.deepEqual(warnings, [], 'express-rate-limit should not log validation warnings');
+      assert.deepEqual(
+        warnings.filter((w) => /ERR_ERL|ValidationError/.test(w)),
+        [],
+        'express-rate-limit should not log validation warnings'
+      );
     } finally {
       await app.close();
     }

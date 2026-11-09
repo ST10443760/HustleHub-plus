@@ -1,6 +1,7 @@
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { resolveRateLimits } = require('../config/rateLimits');
 const logger = require('../utils/logger');
+const { routeOf } = require('../utils/requestContext');
 
 /**
  * Rate limiters for sensitive endpoints, plus a general safety net.
@@ -9,8 +10,9 @@ const logger = require('../utils/logger');
  *
  * Every limiter answers with 429, the standard error shape, a Retry-After
  * header and the standard RateLimit headers (legacy X-RateLimit-* off).
- * Each hit is logged with the limiter name and IP - nothing from the
- * request body, so no passwords or tokens end up in the log.
+ * Each hit is logged (RATE_LIMIT_EXCEEDED) with the limiter name, IP and
+ * route - nothing from the request body, so no passwords or tokens end up
+ * in the log.
  */
 const { limits, ignoredOverrides } = resolveRateLimits();
 
@@ -42,12 +44,11 @@ function createLimiter(name, { windowMs, max }, extra = {}) {
       const seconds = secondsUntilReset(req, res);
       res.set('Retry-After', String(seconds));
 
-      logger.event('RATE_LIMIT', 'Rate limit hit', {
+      logger.event('RATE_LIMIT_EXCEEDED', 'Rate limit hit', {
         limiter: name,
         ip: req.ip,
-        userId: req.user ? req.user.id : undefined,
-        method: req.method,
-        path: req.originalUrl,
+        route: routeOf(req),
+        retryAfterSeconds: seconds,
       });
 
       res.status(429).json({
