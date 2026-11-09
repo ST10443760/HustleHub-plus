@@ -101,7 +101,7 @@ async function createGig(req, res, next) {
       freelancer: req.user.id,
     });
 
-    logger.event('GIG', 'Gig created', { gigId: gig.id, freelancerId: req.user.id });
+    logger.event('GIG_CREATED', 'Gig created', { gigId: gig.id, price: gig.price });
 
     res.status(201).json({ success: true, data: { gig: gig.toJSON() } });
   } catch (err) {
@@ -119,11 +119,7 @@ async function updateGig(req, res, next) {
     Object.assign(gig, updates);
     await gig.save();
 
-    logger.event('GIG', 'Gig updated', {
-      gigId: gig.id,
-      freelancerId: req.user.id,
-      fields: Object.keys(updates),
-    });
+    logger.event('GIG_UPDATED', 'Gig updated', { gigId: gig.id, fields: Object.keys(updates) });
 
     res.status(200).json({ success: true, data: { gig: gig.toJSON() } });
   } catch (err) {
@@ -137,9 +133,9 @@ async function deleteGig(req, res, next) {
   try {
     const result = await removeOrDeactivateGig(req.resource);
 
-    logger.event('GIG', result.deleted ? 'Gig deleted' : 'Gig deactivated instead of deleted - it has bookings', {
+    logger.event('GIG_DELETED', result.deleted ? 'Gig deleted' : 'Gig deactivated instead of deleted - it has bookings', {
       gigId: result.id,
-      freelancerId: req.user.id,
+      deactivated: !result.deleted,
     });
 
     res.status(200).json({ success: true, data: result });
