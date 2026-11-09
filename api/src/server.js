@@ -20,6 +20,17 @@ if (envProblems.length > 0) {
 const shipping = logger.enableShipping();
 const SHUTDOWN_FLUSH_MS = 2000;
 
+// Sends what is queued (at most 2 s) and prints the shipper's own counts:
+// how many records the service accepted, rejected or never got. Console
+// only, never shipped.
+async function flushLogs() {
+  const stats = await logger.shutdown(SHUTDOWN_FLUSH_MS);
+  if (stats) {
+    const { sent, ingested, failed, dropped, lost, queued } = stats;
+    logger.local('info', 'Cloud log shipping summary', { sent, ingested, failed, dropped, lost, unsent: queued });
+  }
+}
+
 // Last-resort handlers: log the failure (name and message only), send what
 // is queued, and for an uncaught exception exit non-zero, because the
 // process is in an unknown state. A stray rejected promise is logged and
@@ -27,7 +38,7 @@ const SHUTDOWN_FLUSH_MS = 2000;
 process.on('unhandledRejection', (reason) => {
   const err = reason instanceof Error ? reason : new Error(String(reason));
   logger.event('ERROR_UNHANDLED', 'Unhandled promise rejection', { source: 'unhandledRejection', errorName: err.name, errorMessage: err.message });
-  logger.flush(SHUTDOWN_FLUSH_MS);
+  logger.flush(SHUTDOWN_FLUSH_MS); // keeps running, so shipping carries on
 });
 
 process.on('uncaughtException', (err) => {
@@ -36,14 +47,14 @@ process.on('uncaughtException', (err) => {
     errorName: err && err.name,
     errorMessage: err && err.message,
   });
-  logger.flush(SHUTDOWN_FLUSH_MS).finally(() => process.exit(1));
+  flushLogs().finally(() => process.exit(1));
 });
 
 // Docker stop / Ctrl+C: send the queued logs (at most 2 s), then exit.
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.once(signal, () => {
     logger.event('SERVER_STOP', `Received ${signal} - shutting down`, { signal });
-    logger.flush(SHUTDOWN_FLUSH_MS).finally(() => process.exit(0));
+    flushLogs().finally(() => process.exit(0));
   });
 }
 
@@ -92,5 +103,5 @@ connectDB()
   .then(startServer)
   .catch(() => {
     logger.error('Could not connect to the database - shutting down');
-    logger.flush(SHUTDOWN_FLUSH_MS).finally(() => process.exit(1));
+    flushLogs().finally(() => process.exit(1));
   });
