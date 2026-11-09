@@ -1,6 +1,7 @@
 # Screenshots
 
-The main README's **Screenshots** section shows these images. Use exactly
+The main README's section **15. Demonstration evidence** lists these
+images with a caption for each. They were taken for Part 2. Use exactly
 these file names. Never capture a real token, password, connection string
 or the `.env` file in a screenshot.
 
@@ -17,8 +18,10 @@ or the `.env` file in a screenshot.
 | `09-freelancer-income.png` | A freelancer's Income page: total earned, number of bookings and the per-booking table |
 | `10-admin-transactions.png` | The admin's All transactions table (reference, client, freelancer, amount, status, date) |
 | `11-newman-pass.png` | Terminal: `npx newman run postman/HustleHub_API.postman_collection.json --insecure` with the summary table showing 0 failures |
+| `11b-newman-rate-limits.png` | Terminal: the rate limit collection against the strict limits with 0 failures |
 | `12-vitest-pass.png` | Terminal: `npm run test:run` in `client/` showing all test files and tests passing |
 | `13-security-headers.png` | Response headers of an API or preview response (DevTools Network tab or `curl -k -I`): Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options, no X-Powered-By |
+| `13b-security-headers-continued.png` | The same headers scrolled further: X-Frame-Options and the rest of the Helmet headers |
 | `14-rate-limit-429.png` | A `429 Too Many Requests` response with the `Retry-After` header and the "Too many requests, please try again in N seconds." message (e.g. the 6th failed login) |
 
 `part1/` holds the Part 1 Postman screenshots, which the main README keeps as an appendix.
