@@ -81,6 +81,13 @@ services:
       CLIENT_ORIGIN: http://localhost:5173
       # One trusted proxy hop: nginx in the client container.
       TRUST_PROXY: "1"
+      # Logging: JSON lines by default. Cloud shipping (Axiom) only when
+      # both LOG_SHIPPING_* are set in .env; empty means off. Runtime
+      # environment only, never build args, so the token is never in an
+      # image layer.
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      LOG_SHIPPING_URL: ${LOG_SHIPPING_URL:-}
+      LOG_SHIPPING_TOKEN: ${LOG_SHIPPING_TOKEN:-}
     volumes:
       - certs:/app/certs:ro
     tmpfs:
