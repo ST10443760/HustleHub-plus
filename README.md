@@ -2412,6 +2412,28 @@ The two billing lock images are shown in
 
 [![Watch the Part 2 demo](https://img.youtube.com/vi/H5GcOdMPQNw/hqdefault.jpg)](https://youtu.be/H5GcOdMPQNw)
 
+## 16. What changed in Part 3
+
+| Change | Where it lives | Rubric row it serves |
+|---|---|---|
+| South African income tax estimate (SARS brackets, rebate, tax-free threshold, whole-cent maths, tax years in SA time) and `GET /api/income/tax-estimate` | `api/src/config/tax.js`, `api/src/utils/taxCalculator.js`, `taxYear.js`, `taxEstimate.js`, `api/src/controllers/incomeController.js`, `api/src/middleware/incomeValidators.js` | Tax estimation and income dashboard |
+| Income dashboard: summary cards, monthly SVG chart, tax-by-bracket table, assumptions and disclaimer | `client/src/pages/Income.jsx`, `client/src/components/MonthlyIncomeChart.jsx`, `TaxBreakdownTable.jsx` | Tax estimation and income dashboard |
+| Dockerfiles for the API, the client and the certificate step; Compose stack with a MongoDB replica set; a test-only override; container hardening; a smoke test | `api/Dockerfile`, `client/Dockerfile`, `client/nginx.conf`, `docker/`, `docker-compose.yml`, `docker-compose.test.yml` | Docker and Docker Compose |
+| `TRUST_PROXY` so per-IP rate limits work behind nginx; startup checks for required settings; a health check outside the rate limits | `api/src/config/proxy.js`, `api/src/config/env.js`, `api/src/app.js`, `api/scripts/healthcheck.js` | Docker and Docker Compose |
+| One shared source for the client's CSP and headers, plus `Permissions-Policy` and cross-origin isolation headers | `client/securityHeaders.js`, `client/scripts/nginx-security-headers.mjs`, `client/vite.config.js` | Security (headers); CI/CD (ZAP findings fixed) |
+| GitHub Actions pipeline: unit tests, Vitest, npm audit, gitleaks, hadolint, Compose config, actionlint, zizmor, the full stack with the smoke test and both Newman collections, Trivy, ZAP, static analysis, and one Pipeline OK gate; credentials generated per job | `.github/workflows/ci.yml`, `.github/scripts/`, `.zap/rules.tsv` | CI/CD pipeline |
+| Dependabot with a 7-day cooldown | `.github/dependabot.yml` | CI/CD pipeline; static analysis (a Semgrep finding) |
+| ESLint with eslint-plugin-security in both packages and Semgrep with 7 rule packs; 126 baseline findings fixed or justified, 0 left | `api/eslint.config.js`, `client/eslint.config.js`, `.semgrep/`, `docs/static-analysis/` | Static code analysis |
+| Fixes from static analysis: a fixed `Host` header in nginx, a ReDoS-safe price regex, prototype-safe lookups | `client/nginx.conf`, `api/src/middleware/gigValidators.js`, `client/src/utils/validation.js`, `api/src/utils/taxEstimate.js`, `client/src/utils/text.js` | Static code analysis |
+| Account lockout (5 failures in 15 minutes lock for 15 minutes, counted atomically, no enumeration) | `api/src/config/lockout.js`, `api/src/utils/lockout.js`, `api/src/utils/accountLockout.js` | Additional security features |
+| Change password and session revocation (token versions), "Sign out of all devices", the Account page; the 72-byte password limit; a `typeof` check on the login password | `api/src/controllers/authController.js`, `api/src/middleware/authMiddleware.js`, `api/src/utils/generateToken.js`, `client/src/pages/Account.jsx` | Additional security features |
+| Append-only admin audit log and the admin Audit log page | `api/src/models/AuditLog.js`, `api/src/utils/audit.js`, `api/src/controllers/adminController.js`, `client/src/pages/AdminAuditLog.jsx` | Additional security features |
+| Structured logging: event catalogue, request ids, access log, redaction, `LOG_FORMAT`, crash and shutdown handling | `api/src/utils/logger.js`, `logEvents.js`, `redact.js`, `requestContext.js`, `api/src/middleware/requestLogging.js`, `api/src/server.js` | Logging and monitoring |
+| Cloud logging to Axiom with batching, retries and a bounded queue; `npm run log:test`; `npm run start:test:strict`; Axiom queries and monitors | `api/src/utils/logShipper.js`, `api/scripts/sendTestLog.js`, `api/scripts/startTest.js`, `docs/logging-evidence/` | Logging and monitoring |
+| New tests: 191 api unit tests (from 0 in Part 2), 110 Vitest tests (from 67), 151 Newman requests (from 105) | `api/test/`, `client/src/**/*.test.*`, `api/postman/` | Testing across every row |
+| Final security review (threats, controls, evidence, residual risks) | [Section 9](#9-final-security-review) | Security review |
+| This README, rewritten to match the final system | `README.md`, `docs/*/README.md` | README update |
+
 ## 7. Troubleshooting
 
 The problems below all came up while building and testing this project.
