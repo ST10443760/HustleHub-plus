@@ -125,56 +125,82 @@ client only hides what a user can't use.
 | **Part 2: Secure Stack** | MongoDB with Mongoose; the React client; gig management with ownership checks; bookings with simulated payments and a transaction for every booking; income tracking; the admin area; rate limiting; an explicit Helmet CSP; CORS; NoSQL sanitising; the main and rate limit Newman collections and the first Vitest tests. |
 | **Part 3: DevSecOps, Monitoring and Finalisation** | The tax estimate and income dashboard; Dockerfiles and Docker Compose; the GitHub Actions pipeline; ESLint security rules and Semgrep with every finding fixed; account lockout, change password with session revocation and the admin audit log; structured logging shipped to Axiom; this final security review and README. See [What changed in Part 3](#16-what-changed-in-part-3). |
 
-## 4. Architecture
+## 2. Architecture
 
-The system follows a MERN architecture: a **React** frontend, an
-**Express/Node** backend and a **MongoDB** database (via Mongoose). Part 1
-kept users in memory; Part 2 replaces that with MongoDB, so accounts and all
-marketplace data now persist across server restarts.
+HustleHub+ is a MERN application: a **React** client, an **Express** API on
+Node 22 and **MongoDB** through Mongoose. It runs in two ways:
+
+- **Docker Compose** (the deployment shape): nginx serves the built
+  client and forwards `/api` to the API container over verified HTTPS.
+  MongoDB runs as a replica set in its own container.
+- **Local development with npm**: the Vite dev server forwards `/api` to
+  the API on `https://localhost:5000`, which uses MongoDB Atlas.
+
+Either way the API can ship its security logs to Axiom. The GitHub
+Actions pipeline builds and tests the same images.
 
 ```mermaid
 flowchart LR
     user(["Browser"])
+    dev(["Developer"])
 
-    subgraph client["React client - Vite, port 5173"]
-        ui["Pages and components<br/>React escapes all text<br/>strict CSP on the built app"]
-        apiClient["api/client.js<br/>relative /api URLs + Bearer token"]
-        proxy["Vite proxy<br/>dev and preview"]
+    subgraph compose["Docker Compose stack"]
+        client["client container<br/>nginx-unprivileged on 8080<br/>React build and security headers"]
+        api["api container<br/>Express on Node 22, HTTPS on 5000<br/>Helmet, CORS, rate limits,<br/>protect, RBAC, validators"]
+        mongo[("mongo container<br/>MongoDB 8, replica set rs0")]
+        certs["certs, one-shot<br/>self-signed certificate"]
     end
 
-    subgraph api["Express API - https://localhost:5000"]
-        direction TB
-        pipeline["1. request log<br/>2. Helmet headers + CSP<br/>3. CORS locked to CLIENT_ORIGIN<br/>4. general rate limit<br/>5. JSON body parser, 10kb<br/>6. NoSQL operator sanitiser"]
-        routes["Routers<br/>protect - requireRole - route rate limit<br/>validators - validateObjectId - requireOwnership"]
-        controllers["Controllers"]
-        models["Mongoose models<br/>User, Gig, Booking, Transaction"]
-        errors["Central error handler<br/>safe JSON errors only"]
-        pipeline --> routes --> controllers --> models
-        routes -. "4xx" .-> errors
-        controllers -. "errors" .-> errors
+    subgraph github["GitHub"]
+        repo["Repository, main branch"]
+        ci["GitHub Actions CI<br/>tests, scans, stack, ZAP"]
+        bot["Dependabot"]
     end
 
-    db[("MongoDB Atlas<br/>replica set, transactions")]
+    axiom[("Axiom<br/>dataset hustlehub-api")]
 
-    user --> ui --> apiClient --> proxy
-    proxy -- "HTTPS, self-signed cert" --> pipeline
-    models --> db
+    user -- "http://localhost:5173<br/>published as 5173" --> client
+    client -- "/api over HTTPS<br/>certificate verified" --> api
+    api -- "Mongoose" --> mongo
+    certs -. "certs volume, read-only" .-> client
+    certs -. "certs volume, read-only" .-> api
+    api -- "HTTPS, ingest-only token,<br/>batched JSON records" --> axiom
+    dev -- "git push" --> repo
+    bot -- "weekly update PRs" --> repo
+    repo -- "push, PR, manual run" --> ci
+    ci -- "builds, starts and tests<br/>the same images" --> compose
 ```
 
-Every request passes through the same middleware pipeline, in this order,
-before any route runs: a request log line, Helmet's security headers, CORS
-(locked to `CLIENT_ORIGIN`), the general rate limit, the JSON body parser
-(10kb limit) and the NoSQL operator sanitiser. Each router then adds its own
-checks - `protect` (JWT + user loaded from the database), `requireRole`,
-route-specific rate limits, validators, `validateObjectId` and
-`requireOwnership` - before the controller talks to MongoDB through Mongoose.
+**Local development:**
 
-> `docs/architecture-diagram.png` is the Part 1 diagram (API only). The
-> Mermaid diagrams in this README are the current ones.
+```mermaid
+flowchart LR
+    browser(["Browser"]) -- "http://localhost:5173" --> vite["Vite dev server<br/>proxy /api, secure: false<br/>(self-signed cert, dev only)"]
+    vite -- "HTTPS" --> api["Express API<br/>npm run dev, https://localhost:5000"]
+    api -- "TLS" --> atlas[("MongoDB Atlas<br/>replica set")]
+    api -. "optional, HTTPS" .-> axiom[("Axiom")]
+```
 
-Errors raised at any stage are caught by a single centralised error handler
-registered last in the middleware chain, so every error response is
-formatted consistently and never leaks internal details.
+### Request pipeline
+
+Every request passes through the same middleware, in this order
+(`api/src/app.js`):
+
+1. **Request id and access log**: a new `crypto.randomUUID()` id, returned
+   in `X-Request-Id`, and one access log line when the response is done.
+2. **Helmet**: security headers and the strict CSP.
+3. **CORS**: only `CLIENT_ORIGIN` is accepted.
+4. `GET /api/health` is answered here, before any rate limit.
+5. **General rate limit**: 100 requests per 15 minutes per IP.
+6. **Body parsers**, capped at 10kb.
+7. **NoSQL sanitiser**: removes keys starting with `$` or containing `.`.
+8. **Routers**, in this order on each route: `protect` (JWT plus the user
+   loaded from the database), `requireRole`, the route's own rate limit,
+   validators, `validateObjectId`, `requireOwnership`, then the controller
+   and the Mongoose models.
+9. **404 handler and the central error handler**, which formats every
+   error as `{ "success": false, "error": "..." }` and never leaks a stack
+   trace, file path or config value.
 
 ### Data model
 
@@ -188,6 +214,7 @@ erDiagram
     USER ||--o{ TRANSACTION : "pays (client)"
     USER ||--o{ TRANSACTION : "earns (freelancer)"
     GIG ||--o{ TRANSACTION : "is paid for in"
+    USER ||--o{ AUDITLOG : "acts in"
 
     USER {
         ObjectId _id PK
@@ -195,6 +222,9 @@ erDiagram
         string email UK "lowercase"
         string passwordHash "bcrypt, never selected by default"
         string role "client, freelancer or admin"
+        number tokenVersion "session revocation, hidden"
+        number failedLoginAttempts "lockout, hidden"
+        date lockUntil "lockout, hidden"
         date createdAt
         date updatedAt
     }
@@ -233,87 +263,80 @@ erDiagram
         date createdAt
         date updatedAt
     }
+    AUDITLOG {
+        ObjectId _id PK
+        ObjectId actorId FK
+        string actorRole
+        string action "fixed list"
+        string targetType "gig or user"
+        ObjectId targetId
+        string outcome
+        string ip
+        date createdAt "append-only"
+    }
 ```
 
-Every booking stores a snapshot of the gig's title and price, and has exactly
-one transaction (a unique index on `transaction.booking`). The owner and
-parties on every record come from the verified token and the database,
-never from the request.
+Every booking stores a snapshot of the gig's title and price and has
+exactly one transaction (a unique index on `transaction.booking`). The
+owner and the parties on every record come from the verified token and
+the database, never from the request. The user also has a
+`firstFailedLoginAt` and `lastFailedLoginAt` for the lockout; every hidden
+field is `select: false` and removed from every JSON response.
 
-## 5. Project Structure
+### Project structure
 
-```
-api/                           # Express backend
+```text
+api/                            Express backend (its own Dockerfile)
   src/
-    app.js                     # Express app, middleware pipeline, route mounting
-    server.js                  # entry point - starts the HTTPS server
-    routes/
-      authRoutes.js            # /api/auth/register, /login, /me
-      adminRoutes.js           # /api/admin/* (admin role only)
-      gigRoutes.js             # /api/gigs (browse, create, update, delete)
-      bookingRoutes.js         # /api/bookings (book a gig, my bookings, one booking)
-      transactionRoutes.js     # /api/transactions/mine
-      incomeRoutes.js          # /api/income (freelancer earnings)
-    controllers/
-      authController.js        # register/login business logic
-      adminController.js       # admin-only actions (users, all transactions)
-      gigController.js         # gig listing, search and owner-only changes
-      bookingController.js     # booking + transaction in one database transaction
-      transactionController.js # each user's own transactions
-      incomeController.js      # income aggregation over completed transactions
-    config/
-      db.js                    # MongoDB connection (Mongoose)
-      security.js              # Helmet/CSP options, CORS locked to CLIENT_ORIGIN
-      rateLimits.js            # rate limit numbers (strict defaults, no overrides in production)
-    models/
-      User.js                  # users (password hash never selected by default)
-      Gig.js                   # gig listings owned by a freelancer
-      Booking.js               # a client's booking of a gig
-      Transaction.js           # payment record created for every booking
-    middleware/
-      authMiddleware.js        # JWT verification ("protect") + role check ("requireRole")
-      ownership.js             # "requireOwnership" - users can only touch their own records
-      validateObjectId.js      # rejects malformed :id params with a 400
-      errorHandler.js          # centralised error handling
-      validators.js            # input validation rules (express-validator)
-      gigValidators.js         # gig body + list query rules, HTML escaping
-      bookingValidators.js     # booking body: gigId only
-      sanitize.js              # strips $ and . keys from body, query and params
-      rateLimiters.js          # login, register, booking and general limiters
-    utils/
-      logger.js                # shared logging utility
-      generateToken.js         # JWT signing helper
-      password.js              # bcryptjs hashing (shared salt rounds)
-      escapeRegex.js           # makes search text safe to use in a regex
-      money.js                 # rounds money to 2 decimals
-      gigRemoval.js            # shared delete-or-deactivate rule for gigs
-  scripts/
-    seedAdmin.js               # creates the admin account (npm run seed:admin)
-    cleanTestData.js           # removes test users and their data (npm run clean:test)
-    startTest.js               # starts the API with relaxed rate limits (npm run start:test)
-    generateCerts.js           # creates the local HTTPS certificate (npm run certs)
-  certs/                       # local self-signed SSL certificate (see api/certs/README.md)
-  postman/
-    HustleHub_API.postman_collection.json         # main API tests (Auth, RBAC, Gigs, Bookings, Income, Security)
-    HustleHub_RateLimits.postman_collection.json  # rate limit tests (strict server)
-client/                        # React frontend (Vite)
-  index.html                   # page shell and title
-  vite.config.js               # dev server + /api proxy to the HTTPS API
+    app.js                      middleware pipeline and route mounting
+    server.js                   starts HTTPS, cloud log shipping, crash and shutdown handlers
+    config/                     db, env checks, CORS and Helmet (security.js), rate limits,
+                                lockout policy, trust proxy, SARS tax tables (tax.js)
+    routes/                     auth, admin, gigs, bookings, transactions, income
+    controllers/                one per router
+    models/                     User, Gig, Booking, Transaction, AuditLog
+    middleware/                 protect and requireRole, requireOwnership, validators,
+                                validateObjectId, sanitiser, rate limiters, request id and
+                                access log, error handler
+    utils/                      logger, redaction, request context, event catalogue, log
+                                shipper, lockout, audit helper, token, password, money,
+                                tax calculator, tax year, tax estimate, regex escaping
+  test/                         21 unit test files (Node's built-in test runner)
+  scripts/                      certs, seed:admin, clean:test, start:test, log:test, healthcheck
+  postman/                      main and rate limit Postman collections
+  certs/                        local self-signed certificate (git-ignored) and its README
+client/                         React frontend (Vite, its own Dockerfile)
   src/
-    main.jsx                   # router, auth provider, global styles
-    App.jsx                    # routes, grouped by role
-    api/                       # fetch wrapper (client.js) and one file per resource
-    context/                   # AuthProvider, useAuth
-    components/                # layout/nav, ProtectedRoute, form field, gig card, booking panel
-    pages/                     # login, register, gigs, gig detail, my bookings, my transactions
-    utils/                     # formatting, entity decoding, validation, token storage, hooks
-    styles/                    # global.css (CSS variables, no UI library)
-    test/                      # Vitest setup and a render helper (tests sit next to the code: *.test.jsx)
-docs/
-  architecture-diagram.png     # Part 1 diagram (the Mermaid diagrams in this README are current)
-  screenshots/                 # Part 2 screenshots + README of what each shows; part1/ = Part 1 screenshots
-  test-evidence/               # saved Newman and Vitest output from real runs + README
+    api/                        fetch wrapper (client.js) and one file per resource
+    components/, pages/         UI, with tests next to the code (*.test.jsx)
+    context/, utils/, styles/   auth provider, helpers, global CSS
+    test/                       Vitest setup, render helper, security header test
+  securityHeaders.js            the client's CSP and headers, used by Vite and nginx
+  nginx.conf                    serves the build and proxies /api with TLS verification
+docker/                         certificate image and the smoke test
+docker-compose.yml              the stack; docker-compose.test.yml is a test-only override
+.github/                        workflow (ci.yml), Dependabot, CI helper scripts
+.semgrep/, .zap/                Semgrep runner and rule packs, ZAP rules
+docs/                           screenshots, test, pipeline, static analysis and logging evidence
 ```
+
+## 3. Tech stack
+
+Versions are the ones installed from the lock files.
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19.3, React Router 7.18, Vite 8.3. No UI or chart library: the income chart is hand-drawn SVG |
+| Backend | Node.js 22, Express 4.22, Mongoose 9.11 |
+| Database | MongoDB 8.0 (replica set) in Docker, or MongoDB Atlas for local development |
+| Authentication | bcryptjs 2.4 (password hashing), jsonwebtoken 9.0 (JWT) |
+| Security middleware | helmet 7.2, cors 2.8, express-rate-limit 8.7, express-validator 7.3, express-mongo-sanitize 2.2 |
+| Logging | Our own structured logger and shipper (Node's built-in `fetch` and `AsyncLocalStorage`, no logging library); Axiom as the cloud logging platform |
+| API tests | Node's built-in test runner (unit tests); Postman collections run with Newman 6 |
+| Frontend tests | Vitest 5, React Testing Library 16, jsdom |
+| Static analysis | ESLint 9 with eslint-plugin-security, eslint-plugin-react and eslint-plugin-react-hooks; Semgrep Community Edition 1.184 |
+| Containers | Docker and Docker Compose. Images: `node:22.23.4-alpine3.24`, `nginxinc/nginx-unprivileged:1.31.7-alpine3.24`, `alpine:3.24.4` (the Dockerfile base images are pinned by version and digest) and `mongo:8.0.34-noble` (pinned by version in Compose) |
+| CI/CD and scanning | GitHub Actions, Dependabot, gitleaks, hadolint, actionlint, zizmor, Trivy, OWASP ZAP |
 
 ## 6. How to Run
 
