@@ -5,123 +5,123 @@
 
  RUN  v5.0.3 C:/Users/LENOVO P14s/Downloads/hustlehub-backend-full/hustlehub-backend/HustleHub-plus/client
 
- ✓ src/components/ProtectedRoute.test.jsx > ProtectedRoute > sends a logged-out visitor to the login page 250ms
- ✓ src/components/ProtectedRoute.test.jsx > ProtectedRoute > shows "not allowed" to a logged-in user with the wrong role 1124ms
- ✓ src/components/ProtectedRoute.test.jsx > ProtectedRoute > shows the content to the right role 60ms
- ✓ src/components/ProtectedRoute.test.jsx > ProtectedRoute > waits while the session is being checked 68ms
- ✓ src/components/GigCard.test.jsx > GigCard > renders an escaped malicious title as text, with no img element 1315ms
- ✓ src/components/GigCard.test.jsx > GigCard > shows price, category, delivery time and the decoded freelancer name 125ms
- ✓ src/pages/AdminUsers.test.jsx > Admin users page > renders a row per user and never renders a password field 1400ms
- ✓ src/pages/AdminUsers.test.jsx > Admin users page > shows the error from the api 93ms
- ✓ src/pages/GigDetail.test.jsx > GigDetail > renders an escaped malicious title as plain text, with no img element 1344ms
- ✓ src/pages/Account.test.jsx > Account page - change password > uses the right autocomplete hints and password inputs 327ms
- ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > has an accessible summary on the SVG 1251ms
- ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > has a visually hidden table with every month 480ms
- ✓ src/pages/GigDetail.test.jsx > GigDetail > offers a client the Book button 200ms
- ✓ src/pages/GigDetail.test.jsx > GigDetail > shows the owner an Edit link and no Book button 206ms
- ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > draws a bar only for months with income 97ms
- ✓ src/pages/GigDetail.test.jsx > GigDetail > shows an admin "Delete as admin" but never Book or Edit 107ms
- ✓ src/pages/GigDetail.test.jsx > GigDetail > shows "not available" for a 404 91ms
- ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > shows the value of a month on hover 194ms
- ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > uses no inline styles, so the strict CSP is never an issue 80ms
- ✓ src/pages/Gigs.test.jsx > Gigs page > shows a loading state, then the list of gigs 1620ms
- ✓ src/pages/Gigs.test.jsx > Gigs page > shows an empty state when there are no gigs 236ms
- ✓ src/pages/MyGigs.test.jsx > My gigs > lists gigs with active and inactive badges 1621ms
- ✓ src/pages/GigEditor.test.jsx > GigEditor (edit mode) > pre-fills the form with decoded text 535ms
- ✓ src/pages/Income.test.jsx > Income dashboard > shows the summary cards, breakdown and assumptions from the API 1998ms
- ✓ src/pages/GigEditor.test.jsx > GigEditor (edit mode) > saves the raw typed text so the api escapes it exactly once (no &amp;amp;) 1156ms
- ✓ src/pages/GigEditor.test.jsx > GigEditor (edit mode) > refuses to show the form for someone else's gig 36ms
- ✓ src/components/BookingPanel.test.jsx > BookingPanel > shows a confirmation with the price and the simulated payment notice, and Cancel closes it 1465ms
- ✓ src/pages/Gigs.test.jsx > Gigs page > shows an error with a working retry button 400ms
- ✓ src/pages/Login.test.jsx > Login page > shows the generic error after a failed attempt 3242ms
- ✓ src/pages/Gigs.test.jsx > Gigs page > debounces the search: no request per keystroke, one after typing stops 350ms
- ✓ src/components/BookingPanel.test.jsx > BookingPanel > books only once on a double click, sending only the gig id 513ms
- ✓ src/pages/MyGigs.test.jsx > My gigs > asks for confirmation before deleting, and Cancel deletes nothing 848ms
- ✓ src/pages/Account.test.jsx > Account page - change password > shows inline errors and sends nothing when the form is invalid 3142ms
- ✓ src/pages/Income.test.jsx > Income dashboard > refetches when a different tax year is picked 772ms
- ✓ src/components/BookingPanel.test.jsx > BookingPanel > shows the transaction reference and a link to my bookings on success 323ms
- ✓ src/pages/Gigs.test.jsx > Gigs page > sends the chosen category with the next request 405ms
- ✓ src/pages/Income.test.jsx > Income dashboard > shows an empty state when there is no income in the tax year 472ms
- ✓ src/pages/Register.test.jsx > Register page > shows inline errors for bad input and does not submit 3194ms
- ✓ src/pages/Register.test.jsx > Register page > only offers the client and freelancer roles, never admin 302ms
- ✓ src/components/BookingPanel.test.jsx > BookingPanel > shows the retry message on a 429 and lets the user try again 407ms
- ✓ src/pages/MyGigs.test.jsx > My gigs > shows the server's message when the gig was deleted 833ms
- ✓ src/components/BookingPanel.test.jsx > BookingPanel > reports the gig as unavailable on a 404 198ms
- ✓ src/pages/Income.test.jsx > Income dashboard > shows the error and lets the user try again 406ms
- ✓ src/pages/Income.test.jsx > Income dashboard > shows a loading state first 25ms
- ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > shows each entry with a readable action, actor, target and details 1461ms
- ✓ src/pages/Login.test.jsx > Login page > shows the same generic error even if the server says something more specific 1468ms
- ✓ src/pages/Income.test.jsx > Income dashboard > still lists income per booking 361ms
- ✓ src/pages/Income.test.jsx > Income dashboard > does not link to a source that is not the SARS site 168ms
- ✓ src/pages/MyGigs.test.jsx > My gigs > shows the server's message when the gig was deactivated instead 646ms
- ✓ src/pages/Gigs.test.jsx > Gigs page > blocks an invalid price range before it reaches the api 1247ms
- ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > filters by action 361ms
- ✓ src/pages/MyGigs.test.jsx > My gigs > deactivates an active gig with { isActive: false } 330ms
- ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > ignores an unknown action in the URL 110ms
- ✓ src/components/GigForm.test.jsx > GigForm > blocks a bad price and bad delivery days without calling the api 4578ms
- ✓ src/pages/Account.test.jsx > Account page - change password > changes the password, shows success and clears the fields 1517ms
- ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > shows an empty state 135ms
- ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > shows the error from the API 77ms
- ✓ src/pages/Login.test.jsx > Login page > shows the retry message on a 429 838ms
- ✓ src/pages/Register.test.jsx > Register page > submits trimmed, valid data to register 1891ms
- ✓ src/pages/Account.test.jsx > Account page - change password > shows the API message for a wrong current password and does not log out 1135ms
- ✓ src/pages/Login.test.jsx > Login page > calls login with the trimmed email and goes to the gigs page 917ms
- ✓ src/components/GigForm.test.jsx > GigForm > sends price and delivery days as real numbers 1813ms
- ✓ src/components/GigForm.test.jsx > GigForm > shows a clear message when the api says the gig is not yours 107ms
- ✓ src/pages/Register.test.jsx > Register page > shows the server's message when it rejects the registration 1169ms
- ✓ src/pages/Account.test.jsx > Account page - change password > shows a generic message for a server error 1094ms
- ✓ src/pages/Account.test.jsx > Account page - sign out of all devices > asks for confirmation first, and cancel does nothing 211ms
- ✓ src/pages/Account.test.jsx > Account page - sign out of all devices > signs out everywhere after confirming 251ms
- ✓ src/pages/Account.test.jsx > Account page - sign out of all devices > shows an error if signing out fails 214ms
- ✓ src/api/client.test.js > apiRequest > attaches the Bearer header when a token is stored, and sends JSON 14ms
- ✓ src/api/client.test.js > apiRequest > sends no Authorization header without a token 2ms
- ✓ src/api/client.test.js > apiRequest > unwraps { success, data } 5ms
+ ✓ src/pages/Account.test.jsx > Account page - change password > uses the right autocomplete hints and password inputs 609ms
+ ✓ src/components/ProtectedRoute.test.jsx > ProtectedRoute > sends a logged-out visitor to the login page 426ms
+ ✓ src/components/Layout.test.jsx > Layout navigation > shows the Account page to a client 1578ms
+ ✓ src/components/ProtectedRoute.test.jsx > ProtectedRoute > shows "not allowed" to a logged-in user with the wrong role 977ms
+ ✓ src/components/ProtectedRoute.test.jsx > ProtectedRoute > shows the content to the right role 29ms
+ ✓ src/components/ProtectedRoute.test.jsx > ProtectedRoute > waits while the session is being checked 93ms
+ ✓ src/components/Layout.test.jsx > Layout navigation > shows the Account page to a freelancer 201ms
+ ✓ src/pages/AdminUsers.test.jsx > Admin users page > renders a row per user and never renders a password field 1548ms
+ ✓ src/pages/AdminUsers.test.jsx > Admin users page > shows the error from the api 193ms
+ ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > has an accessible summary on the SVG 1202ms
+ ✓ src/components/Layout.test.jsx > Layout navigation > shows the Account page to a admin 267ms
+ ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > has a visually hidden table with every month 675ms
+ ✓ src/components/Layout.test.jsx > Layout navigation > shows the Audit log only to admins 226ms
+ ✓ src/components/Layout.test.jsx > Layout navigation > does not show the Audit log to other roles 208ms
+ ✓ src/pages/GigDetail.test.jsx > GigDetail > renders an escaped malicious title as plain text, with no img element 1351ms
+ ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > draws a bar only for months with income 118ms
+ ✓ src/pages/GigDetail.test.jsx > GigDetail > offers a client the Book button 211ms
+ ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > shows the value of a month on hover 289ms
+ ✓ src/components/MonthlyIncomeChart.test.jsx > MonthlyIncomeChart > uses no inline styles, so the strict CSP is never an issue 133ms
+ ✓ src/pages/GigDetail.test.jsx > GigDetail > shows the owner an Edit link and no Book button 237ms
+ ✓ src/pages/GigDetail.test.jsx > GigDetail > shows an admin "Delete as admin" but never Book or Edit 137ms
+ ✓ src/pages/GigDetail.test.jsx > GigDetail > shows "not available" for a 404 83ms
+ ✓ src/components/BookingPanel.test.jsx > BookingPanel > shows a confirmation with the price and the simulated payment notice, and Cancel closes it 1939ms
+ ✓ src/pages/MyGigs.test.jsx > My gigs > lists gigs with active and inactive badges 2121ms
+ ✓ src/components/BookingPanel.test.jsx > BookingPanel > books only once on a double click, sending only the gig id 443ms
+ ✓ src/pages/GigEditor.test.jsx > GigEditor (edit mode) > pre-fills the form with decoded text 454ms
+ ✓ src/components/BookingPanel.test.jsx > BookingPanel > shows the transaction reference and a link to my bookings on success 347ms
+ ✓ src/pages/Register.test.jsx > Register page > shows inline errors for bad input and does not submit 3663ms
+ ✓ src/pages/Account.test.jsx > Account page - change password > shows inline errors and sends nothing when the form is invalid 3467ms
+ ✓ src/pages/Register.test.jsx > Register page > only offers the client and freelancer roles, never admin 272ms
+ ✓ src/pages/Gigs.test.jsx > Gigs page > shows a loading state, then the list of gigs 1558ms
+ ✓ src/pages/MyGigs.test.jsx > My gigs > asks for confirmation before deleting, and Cancel deletes nothing 885ms
+ ✓ src/components/BookingPanel.test.jsx > BookingPanel > shows the retry message on a 429 and lets the user try again 433ms
+ ✓ src/pages/Gigs.test.jsx > Gigs page > shows an empty state when there are no gigs 359ms
+ ✓ src/components/BookingPanel.test.jsx > BookingPanel > reports the gig as unavailable on a 404 318ms
+ ✓ src/pages/Income.test.jsx > Income dashboard > shows the summary cards, breakdown and assumptions from the API 1986ms
+ ✓ src/pages/Gigs.test.jsx > Gigs page > shows an error with a working retry button 473ms
+ ✓ src/pages/GigEditor.test.jsx > GigEditor (edit mode) > saves the raw typed text so the api escapes it exactly once (no &amp;amp;) 1187ms
+ ✓ src/pages/GigEditor.test.jsx > GigEditor (edit mode) > refuses to show the form for someone else's gig 63ms
+ ✓ src/pages/MyGigs.test.jsx > My gigs > shows the server's message when the gig was deleted 830ms
+ ✓ src/pages/Gigs.test.jsx > Gigs page > debounces the search: no request per keystroke, one after typing stops 328ms
+ ✓ src/pages/Income.test.jsx > Income dashboard > refetches when a different tax year is picked 823ms
+ ✓ src/pages/Gigs.test.jsx > Gigs page > sends the chosen category with the next request 302ms
+ ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > shows each entry with a readable action, actor, target and details 1311ms
+ ✓ src/pages/Income.test.jsx > Income dashboard > shows an empty state when there is no income in the tax year 314ms
+ ✓ src/pages/MyGigs.test.jsx > My gigs > shows the server's message when the gig was deactivated instead 645ms
+ ✓ src/pages/Account.test.jsx > Account page - change password > changes the password, shows success and clears the fields 1711ms
+ ✓ src/pages/MyGigs.test.jsx > My gigs > deactivates an active gig with { isActive: false } 411ms
+ ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > filters by action 465ms
+ ✓ src/pages/Income.test.jsx > Income dashboard > shows the error and lets the user try again 306ms
+ ✓ src/pages/Income.test.jsx > Income dashboard > shows a loading state first 31ms
+ ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > ignores an unknown action in the URL 139ms
+ ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > shows an empty state 159ms
+ ✓ src/pages/AdminAuditLog.test.jsx > Admin audit log page > shows the error from the API 73ms
+ ✓ src/pages/Income.test.jsx > Income dashboard > still lists income per booking 351ms
+ ✓ src/pages/Income.test.jsx > Income dashboard > does not link to a source that is not the SARS site 249ms
+ ✓ src/components/GigForm.test.jsx > GigForm > blocks a bad price and bad delivery days without calling the api 4894ms
+ ✓ src/pages/Login.test.jsx > Login page > shows the generic error after a failed attempt 2739ms
+ ✓ src/pages/Gigs.test.jsx > Gigs page > blocks an invalid price range before it reaches the api 1193ms
+ ✓ src/pages/Register.test.jsx > Register page > submits trimmed, valid data to register 2576ms
+ ✓ src/pages/Account.test.jsx > Account page - change password > shows the API message for a wrong current password and does not log out 1372ms
+ ✓ src/pages/Login.test.jsx > Login page > shows the same generic error even if the server says something more specific 865ms
+ ✓ src/pages/Register.test.jsx > Register page > shows the server's message when it rejects the registration 1129ms
+ ✓ src/pages/Account.test.jsx > Account page - change password > shows a generic message for a server error 1041ms
+ ✓ src/pages/Login.test.jsx > Login page > shows the retry message on a 429 897ms
+ ✓ src/pages/Account.test.jsx > Account page - sign out of all devices > asks for confirmation first, and cancel does nothing 204ms
+ ✓ src/components/GigForm.test.jsx > GigForm > sends price and delivery days as real numbers 1952ms
+ ✓ src/components/GigForm.test.jsx > GigForm > shows a clear message when the api says the gig is not yours 144ms
+ ✓ src/pages/Account.test.jsx > Account page - sign out of all devices > signs out everywhere after confirming 215ms
+ ✓ src/pages/Account.test.jsx > Account page - sign out of all devices > shows an error if signing out fails 248ms
+ ✓ src/pages/Login.test.jsx > Login page > calls login with the trimmed email and goes to the gigs page 710ms
+ ✓ src/api/client.test.js > apiRequest > attaches the Bearer header when a token is stored, and sends JSON 10ms
+ ✓ src/api/client.test.js > apiRequest > sends no Authorization header without a token 1ms
+ ✓ src/api/client.test.js > apiRequest > unwraps { success, data } 4ms
  ✓ src/api/client.test.js > apiRequest > throws an ApiError carrying the server's error message and status 3ms
- ✓ src/api/client.test.js > apiRequest > gives a generic message on a network failure 3ms
- ✓ src/api/client.test.js > apiRequest > gives a generic message for a non-JSON error response 5ms
- ✓ src/api/client.test.js > apiRequest > passes on the server's retry message for a 429 2ms
- ✓ src/api/client.test.js > apiRequest > on a 401 for a logged-in call, clears the session and calls the logout handler 6ms
- ✓ src/api/client.test.js > apiRequest > does not log out on a 401 from the login form 5ms
- ✓ src/api/client.test.js > apiRequest > refuses absolute URLs so no API host can be hard-coded 2ms
- ✓ src/utils/format.test.js > formatMoney > formats rand with two decimals 11ms
- ✓ src/utils/format.test.js > formatMoney > shows a dash for something that is not a number 1ms
- ✓ src/utils/format.test.js > formatDate > gives a readable date with the month name 1ms
- ✓ src/utils/format.test.js > formatDate > shows a dash for an invalid date 1ms
- ✓ src/utils/format.test.js > small formatters > capitalises categories and pluralises days 2ms
- ✓ src/utils/format.test.js > tax dashboard formatters > formats whole rand without cents 2ms
- ✓ src/utils/format.test.js > tax dashboard formatters > formats a percentage with two decimals 3ms
- ✓ src/utils/format.test.js > tax dashboard formatters > turns a YYYY-MM key into a short month name 2ms
- ✓ src/utils/validation.test.js > validateGig > converts price and delivery days to real numbers and trims text 12ms
- ✓ src/utils/validation.test.js > validateGig > rejects the same things the API rejects 4ms
- ✓ src/utils/validation.test.js > validateRegister > mirrors the API rules for name, email, password and role 3ms
+ ✓ src/api/client.test.js > apiRequest > gives a generic message on a network failure 2ms
+ ✓ src/api/client.test.js > apiRequest > gives a generic message for a non-JSON error response 3ms
+ ✓ src/api/client.test.js > apiRequest > passes on the server's retry message for a 429 1ms
+ ✓ src/api/client.test.js > apiRequest > on a 401 for a logged-in call, clears the session and calls the logout handler 3ms
+ ✓ src/api/client.test.js > apiRequest > does not log out on a 401 from the login form 2ms
+ ✓ src/api/client.test.js > apiRequest > refuses absolute URLs so no API host can be hard-coded 1ms
+ ✓ src/utils/validation.test.js > validateGig > converts price and delivery days to real numbers and trims text 7ms
+ ✓ src/utils/validation.test.js > validateGig > rejects the same things the API rejects 2ms
+ ✓ src/utils/validation.test.js > validateRegister > mirrors the API rules for name, email, password and role 1ms
  ✓ src/utils/validation.test.js > validateChangePassword > accepts a valid change 1ms
  ✓ src/utils/validation.test.js > validateChangePassword > needs every field 1ms
  ✓ src/utils/validation.test.js > validateChangePassword > uses the registration rules for the new password, including the 72 byte limit 1ms
- ✓ src/utils/validation.test.js > validateChangePassword > the new password must differ and be confirmed 1ms
- ✓ src/test/securityHeaders.test.js > client security headers > has a strict CSP with frame-ancestors in the header version 10ms
- ✓ src/test/securityHeaders.test.js > client security headers > includes the permissions and site isolation headers 3ms
- ✓ src/test/securityHeaders.test.js > client security headers > npm run preview sends exactly the shared headers 5ms
- ✓ src/test/securityHeaders.test.js > client security headers > generates one nginx add_header line per header, with the same values 11ms
- ✓ src/test/securityHeaders.test.js > client security headers > refuses to write a header value that would break the nginx config 7ms
- ✓ src/test/securityHeaders.test.js > client security headers > nginx includes the generated headers wherever it serves files 3ms
- ✓ src/test/securityHeaders.test.js > client security headers > nginx never defines a security header by hand 1ms
- ✓ src/test/securityHeaders.test.js > client security headers > nginx verifies the api certificate and passes the forwarding headers 3ms
- ✓ src/utils/text.test.js > decodeEntities > decodes every entity the API produces 9ms
+ ✓ src/utils/validation.test.js > validateChangePassword > the new password must differ and be confirmed 0ms
+ ✓ src/utils/format.test.js > formatMoney > formats rand with two decimals 7ms
+ ✓ src/utils/format.test.js > formatMoney > shows a dash for something that is not a number 1ms
+ ✓ src/utils/format.test.js > formatDate > gives a readable date with the month name 1ms
+ ✓ src/utils/format.test.js > formatDate > shows a dash for an invalid date 0ms
+ ✓ src/utils/format.test.js > small formatters > capitalises categories and pluralises days 1ms
+ ✓ src/utils/format.test.js > tax dashboard formatters > formats whole rand without cents 1ms
+ ✓ src/utils/format.test.js > tax dashboard formatters > formats a percentage with two decimals 1ms
+ ✓ src/utils/format.test.js > tax dashboard formatters > turns a YYYY-MM key into a short month name 1ms
+ ✓ src/components/GigCard.test.jsx > GigCard > renders an escaped malicious title as text, with no img element 336ms
+ ✓ src/components/GigCard.test.jsx > GigCard > shows price, category, delivery time and the decoded freelancer name 34ms
+ ✓ src/utils/text.test.js > decodeEntities > decodes every entity the API produces 4ms
  ✓ src/utils/text.test.js > decodeEntities > decodes in a single pass, so escaped entities stay as typed 1ms
- ✓ src/utils/text.test.js > decodeEntities > turns an escaped script-like title back into plain characters 1ms
+ ✓ src/utils/text.test.js > decodeEntities > turns an escaped script-like title back into plain characters 0ms
  ✓ src/utils/text.test.js > decodeEntities > leaves other entities alone and handles non-strings 1ms
- ✓ src/components/Layout.test.jsx > Layout navigation > shows the Account page to a client 562ms
- ✓ src/components/Layout.test.jsx > Layout navigation > shows the Account page to a freelancer 87ms
- ✓ src/components/Layout.test.jsx > Layout navigation > shows the Account page to a admin 40ms
- ✓ src/components/Layout.test.jsx > Layout navigation > shows the Audit log only to admins 28ms
- ✓ src/components/Layout.test.jsx > Layout navigation > does not show the Audit log to other roles 31ms
+ ✓ src/test/securityHeaders.test.js > client security headers > has a strict CSP with frame-ancestors in the header version 5ms
+ ✓ src/test/securityHeaders.test.js > client security headers > includes the permissions and site isolation headers 1ms
+ ✓ src/test/securityHeaders.test.js > client security headers > npm run preview sends exactly the shared headers 2ms
+ ✓ src/test/securityHeaders.test.js > client security headers > generates one nginx add_header line per header, with the same values 3ms
+ ✓ src/test/securityHeaders.test.js > client security headers > refuses to write a header value that would break the nginx config 2ms
+ ✓ src/test/securityHeaders.test.js > client security headers > nginx includes the generated headers wherever it serves files 2ms
+ ✓ src/test/securityHeaders.test.js > client security headers > nginx never defines a security header by hand 1ms
+ ✓ src/test/securityHeaders.test.js > client security headers > nginx verifies the api certificate and passes the forwarding headers 1ms
 
  Test Files  21 passed (21)
       Tests  110 passed (110)
-   Start at  12:56:53
-   Duration  32.32s (environment 64%, tests 15%, setup 13%, import 5%, transform 2%)
+   Start at  20:42:48
+   Duration  33.55s (environment 62%, tests 15%, setup 14%, import 7%, transform 2%)
 
-Environment  jsdom was created 21 times · 247.30s total, 64% of tracked time
+Environment  jsdom was created 21 times · 256.40s total, 62% of tracked time
              create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
              learn more: https://vitest.dev/guide/improving-performance#test-environments
 
