@@ -17,7 +17,6 @@ locked for a billing issue, so every job was run locally on 9 November
 | [`trivy-results.txt`](trivy-results.txt) | Trivy on the api, client and certs images (0 fixable HIGH or CRITICAL vulnerabilities) and on the three Dockerfiles (0 misconfigurations) |
 | [`zap-baseline.txt`](zap-baseline.txt) | The OWASP ZAP baseline scan of the running stack: 0 FAIL, 3 WARN (informational), 65 PASS |
 | [`remote-run-status.md`](remote-run-status.md) | What GitHub reports for the remote runs: no job started, because of the billing lock |
-| `billing-lock-actions-run.png`, `billing-lock-account.png` | Screenshots of an Actions run with GitHub's billing lock message and of the billing notice (added by the team) |
 
 The test jobs' outputs are in [`../test-evidence/`](../test-evidence/README.md):
 
