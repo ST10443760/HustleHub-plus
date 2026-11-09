@@ -13,6 +13,7 @@
     "certs": "node scripts/generateCerts.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "clean:test": "node scripts/cleanTestData.js",
+    "log:test": "node scripts/sendTestLog.js",
     "test": "node --test \"test/**/*.test.js\"",
     "lint": "eslint . --max-warnings 0"
   },
