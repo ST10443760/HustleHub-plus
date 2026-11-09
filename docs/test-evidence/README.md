@@ -15,10 +15,9 @@ host, Newman 6.2.3, Vitest 5.0.3). Every run passed with 0 failures.
 
 **Docker runs**, against the Compose stack and its own MongoDB replica set
 (started with the `LOG_SHIPPING_*` values blanked, so nothing went to
-Axiom), all from the final pass on 9 November 2026. The smoke test ran on
-a freshly restarted API, because the rate limit collection uses up the
-per-IP login limit (the pipeline runs the smoke test first for the same
-reason):
+Axiom), all from the final pass on 9 November 2026. On the fresh strict stack
+the smoke test ran first and the rate limit collection second, like the
+pipeline, because that collection uses up the per-IP login limit:
 
 | File | What it is | Command (repo root) | Result |
 |---|---|---|---|
