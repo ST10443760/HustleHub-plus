@@ -1630,8 +1630,9 @@ npm run start:test          # terminal 1 (refuses to run in production)
 npx newman run postman/HustleHub_API.postman_collection.json --insecure     # terminal 2
 
 # 2. Rate limit collection, against the strict defaults
-#    stop start:test, then start the API normally so the strict limits apply
-npm run dev                 # terminal 1
+#    stop start:test, then start it with the strict limits (test runs never
+#    ship logs to the cloud, so the Axiom dataset gets no test data)
+npm run start:test:strict   # terminal 1
 npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure    # terminal 2
 ```
 
@@ -1665,7 +1666,7 @@ screenshots of the same runs:
 | Suite | How to run it | Result | Evidence |
 |---|---|---|---|
 | Main Postman collection (Newman) | API on `npm run start:test`, then `npx newman run postman/HustleHub_API.postman_collection.json --insecure` with the admin credentials | **85 requests, 145 assertions, 0 failed** (80 / 134 without admin credentials, when the 5 admin requests are skipped) | [`newman-main-results.txt`](docs/test-evidence/newman-main-results.txt), [screenshot 11](docs/screenshots/11-newman-pass.png) |
-| Rate limit collection (Newman) | API freshly started with `npm run dev` (strict limits), then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure` | **20 requests, 26 assertions, 0 failed** | [`newman-rate-limits-results.txt`](docs/test-evidence/newman-rate-limits-results.txt), [screenshot 11b](docs/screenshots/11b-newman-rate-limits.png), [screenshot 14](docs/screenshots/14-rate-limit-429.png) |
+| Rate limit collection (Newman) | API freshly started with `npm run start:test:strict` (strict limits), then `npx newman run postman/HustleHub_RateLimits.postman_collection.json --insecure` | **20 requests, 26 assertions, 0 failed** | [`newman-rate-limits-results.txt`](docs/test-evidence/newman-rate-limits-results.txt), [screenshot 11b](docs/screenshots/11b-newman-rate-limits.png), [screenshot 14](docs/screenshots/14-rate-limit-429.png) |
 | Frontend (Vitest + React Testing Library) | `npm run test:run` in `client/` | **16 files, 67 tests passed** | [`vitest-results.txt`](docs/test-evidence/vitest-results.txt), [screenshot 12](docs/screenshots/12-vitest-pass.png) |
 
 ### Frontend tests
