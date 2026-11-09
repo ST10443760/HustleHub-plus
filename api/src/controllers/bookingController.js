@@ -58,8 +58,7 @@ async function createBooking(req, res, next) {
       );
     });
   } catch (err) {
-    logger.event('BOOKING', 'Booking failed - nothing was saved', {
-      clientId,
+    logger.event('BOOKING_FAILED', 'Booking failed - nothing was saved', {
       gigId,
       reason: err instanceof AppError ? err.message : err.name,
     });
@@ -68,18 +67,20 @@ async function createBooking(req, res, next) {
     await session.endSession();
   }
 
-  logger.event('BOOKING', 'Booking created', {
+  logger.event('BOOKING_CREATED', 'Booking created', {
     bookingId: booking.id,
     gigId,
     clientId,
     freelancerId: booking.freelancer.toString(),
     price: booking.price,
   });
-  logger.event('TRANSACTION', 'Transaction created', {
+  logger.event('TRANSACTION_CREATED', 'Transaction created', {
     transactionId: transaction.id,
     bookingId: booking.id,
     reference: transaction.reference,
     amount: transaction.amount,
+    clientId,
+    freelancerId: transaction.freelancer.toString(),
   });
 
   res.status(201).json({
